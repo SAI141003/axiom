@@ -1,0 +1,43 @@
+# ── Secrets — NEVER commit ────────────────────────────────────────────────────
+.env
+.env.*
+*.pem
+*.key
+# ...but the template MUST ship: it is the setup instructions. Re-include it.
+!.env.example
+
+# ── Python ────────────────────────────────────────────────────────────────────
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# ── Node / Next.js ────────────────────────────────────────────────────────────
+frontend/node_modules/
+frontend/.next/
+frontend/tsconfig.tsbuildinfo
+frontend/.data/
+
+# ── Runtime data / logs ───────────────────────────────────────────────────────
+.data/
+logs/
+*.log
+*.jsonl
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+
+# ── Vendored third-party clones (study references, not our code) ──────────────
+# Each is a full upstream repo cloned locally for reference. They keep their own
+# licenses and git history, so they are credited in the README instead of vendored.
+vibe_trading_repo/
+kronos_repo/
+rdagent_repo/
+brody_repo/
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+graft/
+
+# ── Agent scratch ─────────────────────────────────────────────────────────────
+.agents/

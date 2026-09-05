@@ -1,0 +1,77 @@
+# Core async + HTTP
+asyncio-mqtt>=0.16.2
+aiohttp>=3.9.0
+httpx>=0.27.0
+websockets>=12.0
+
+# Polymarket
+py-clob-client-v2>=2.0.0
+py-clob-client>=0.18.0
+
+# AI / LLM
+anthropic>=0.40.0
+openai>=1.50.0
+
+# Data + matching
+sentence-transformers>=3.0.0
+rank-bm25>=0.2.2
+numpy>=1.26.0
+pandas>=2.2.0
+
+# Research worker — inspired by LLMQuant/quant-mind (NeurIPS 2025)
+# Uses same fetch/parse layer as quant-mind but with our Claude API, not OpenAI.
+arxiv>=2.1.0            # arXiv search + metadata
+pymupdf>=1.23.0         # PDF → plain text (same lib quant-mind uses in preprocess/)
+
+# Prediction (Kronos + TimesFM)
+torch>=2.2.0
+transformers>=4.40.0
+huggingface-hub>=0.22.0
+# TimesFM 2.5 — requires Python 3.10-3.12: pip install timesfm[torch]
+# timesfm[torch]>=2.5.0
+peft>=0.10.0  # LoRA fine-tuning for TimesFM
+
+# Quant calibration libraries (Phases 3-7, QuantCalibrationWorker)
+cvxpy>=1.9.1           # Phase 3: constrained Kelly portfolio optimization (LP/SOCP)
+jax[cpu]>=0.4.30       # Phase 4+5: JIT-compiled Heston CF + NumPyro JAX backend
+diffrax>=0.6.0         # Phase 4: differentiable SDE solver (Heston path simulation)
+optax>=0.2.0           # Phase 4: JAX Adam optimizer for Heston gradient calibration
+numpyro>=0.14.0        # Phase 5: SVI Bayesian vol posterior (200 steps ≈ 8s, bg only)
+financepy>=0.310       # Phase 6: SABR model + FinancePy pricing (0.004ms eval)
+py-pde>=0.30.0         # Phase 7: Fokker-Planck PDE pricer (research benchmark only)
+
+# Sports signal (PATH E)
+scipy>=1.13.0          # Dixon-Coles Poisson model
+scikit-learn>=1.4.0    # Random Forest (ML ensemble component)
+xgboost>=2.0.0         # XGBoost (ML ensemble component)
+lightgbm>=4.3.0        # LightGBM (ML ensemble component)
+
+# Persistence
+asyncpg>=0.29.0
+redis[hiredis]>=5.0.0
+SQLAlchemy[asyncio]>=2.0.0
+alembic>=1.13.0
+
+# Config + validation
+pydantic>=2.6.0
+pydantic-settings>=2.2.0
+python-dotenv>=1.0.0
+
+# News ingestion
+feedparser>=6.0.0
+tweepy>=4.14.0
+python-telegram-bot>=21.0.0
+
+# Observability
+prometheus-client>=0.20.0
+rich>=13.0.0
+structlog>=24.1.0
+
+# Testing
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+pytest-mock>=3.12.0
+
+# Utilities
+python-dateutil>=2.9.0
+tenacity>=8.2.0

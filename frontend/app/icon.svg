@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="AXIOM">
+  <defs>
+    <linearGradient id="ax" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#a8b9ff"/>
+      <stop offset="45%" stop-color="#7c9aff"/>
+      <stop offset="100%" stop-color="#5568e6"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="62" height="62" rx="15" fill="#0a0c11" stroke="#232936" stroke-width="2"/>
+  <!-- The A: two legs meeting at an apex. -->
+  <path d="M14 49 L32 15 L50 49" fill="none" stroke="url(#ax)" stroke-width="6"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Crossbar drawn as a price level: it overshoots the legs like a support line. -->
+  <path d="M18 39 H46" stroke="url(#ax)" stroke-width="4" stroke-linecap="round" opacity="0.95"/>
+  <circle cx="32" cy="15" r="3.2" fill="#a8b9ff"/>
+</svg>

@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AXIOM — Technical Stack Dossier</title>
+<style>
+  :root {
+    --paper: #f6f8fa; --ink: #141922; --muted: #5a6472; --faint: #8a95a4;
+    --line: #dde3ea; --card: #ffffff; --card2: #f0f3f7;
+    --accent: #0b8fa6; --accent-soft: #e2f4f6;
+    --good: #1f9d63; --good-soft: #e4f4ec;
+    --warn: #b7791f; --warn-soft: #f7efdd;
+    --shadow: 0 1px 2px rgba(20,25,34,.04), 0 8px 24px rgba(20,25,34,.05);
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", monospace;
+    --sans: ui-sans-serif, -apple-system, "Segoe UI", "Inter", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0b0e13; --ink: #dfe5ee; --muted: #97a2b2; --faint: #6b7686;
+      --line: #1e242e; --card: #11151c; --card2: #151b23;
+      --accent: #35d0c4; --accent-soft: #10312f;
+      --good: #46c98a; --good-soft: #0f2a1e;
+      --warn: #e0a94b; --warn-soft: #2c2413;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"] {
+    --paper: #f6f8fa; --ink: #141922; --muted: #5a6472; --faint: #8a95a4;
+    --line: #dde3ea; --card: #ffffff; --card2: #f0f3f7;
+    --accent: #0b8fa6; --accent-soft: #e2f4f6;
+    --good: #1f9d63; --good-soft: #e4f4ec; --warn: #b7791f; --warn-soft: #f7efdd;
+    --shadow: 0 1px 2px rgba(20,25,34,.04), 0 8px 24px rgba(20,25,34,.05);
+  }
+  :root[data-theme="dark"] {
+    --paper: #0b0e13; --ink: #dfe5ee; --muted: #97a2b2; --faint: #6b7686;
+    --line: #1e242e; --card: #11151c; --card2: #151b23;
+    --accent: #35d0c4; --accent-soft: #10312f;
+    --good: #46c98a; --good-soft: #0f2a1e; --warn: #e0a94b; --warn-soft: #2c2413;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: var(--sans); line-height: 1.6; -webkit-font-smoothing: antialiased;
+    font-size: 16px;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 0 24px; }
+  .mono { font-family: var(--mono); }
+  .eyebrow {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .18em;
+    text-transform: uppercase; color: var(--accent); font-weight: 600;
+  }
+  h1, h2, h3 { text-wrap: balance; letter-spacing: -.02em; line-height: 1.15; }
+  a { color: var(--accent); }
+
+  /* ── Masthead ── */
+  header.top {
+    border-bottom: 1px solid var(--line);
+    background:
+      radial-gradient(120% 140% at 88% -20%, var(--accent-soft) 0%, transparent 55%);
+  }
+  .top-inner { padding: 46px 0 38px; }
+  .kicker { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .tag {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .06em;
+    padding: 3px 9px; border-radius: 5px; border: 1px solid var(--line);
+    color: var(--muted); background: var(--card);
+  }
+  .tag.live { color: var(--good); border-color: color-mix(in srgb, var(--good) 40%, var(--line)); background: var(--good-soft); }
+  h1.title { font-size: clamp(34px, 6vw, 56px); font-weight: 800; margin: 0 0 10px; }
+  h1.title .fade { color: var(--faint); font-weight: 300; }
+  .lede { font-size: clamp(16px, 2.1vw, 19px); color: var(--muted); max-width: 62ch; margin: 0; }
+
+  .statbar {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 1px; background: var(--line); border: 1px solid var(--line);
+    border-radius: 12px; overflow: hidden; margin-top: 34px;
+  }
+  .stat { background: var(--card); padding: 16px 18px; }
+  .stat b { font-family: var(--mono); font-size: 26px; font-weight: 700; display: block; letter-spacing: -.03em; }
+  .stat span { font-size: 12px; color: var(--muted); }
+
+  /* ── Sections ── */
+  section { padding: 52px 0; border-bottom: 1px solid var(--line); }
+  .sec-head { margin-bottom: 30px; }
+  .sec-head h2 { font-size: clamp(23px, 3.4vw, 30px); font-weight: 750; margin: 8px 0 8px; }
+  .sec-head p { color: var(--muted); margin: 0; max-width: 68ch; }
+
+  /* spec rows */
+  .spec { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .row { display: grid; grid-template-columns: 190px 1fr; gap: 20px; background: var(--card); padding: 15px 20px; align-items: baseline; }
+  .row .k { font-family: var(--mono); font-size: 12px; letter-spacing: .04em; color: var(--accent); text-transform: uppercase; padding-top: 2px; }
+  .row .v { font-size: 15px; }
+  .row .v .sub { color: var(--muted); font-size: 13.5px; }
+  @media (max-width: 620px) { .row { grid-template-columns: 1fr; gap: 5px; } }
+
+  /* chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  .chip {
+    font-family: var(--mono); font-size: 12px; padding: 4px 10px; border-radius: 6px;
+    background: var(--card2); border: 1px solid var(--line); color: var(--ink);
+  }
+  .chip.v { color: var(--accent); }
+
+  /* architecture stack */
+  .stack { display: flex; flex-direction: column; gap: 10px; }
+  .layer {
+    display: grid; grid-template-columns: 46px 1fr; gap: 16px; align-items: center;
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 18px; box-shadow: var(--shadow); position: relative;
+  }
+  .layer .num { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--accent);
+    width: 46px; height: 46px; display: grid; place-items: center; border-radius: 9px;
+    background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); }
+  .layer h4 { margin: 0 0 3px; font-size: 15.5px; font-weight: 700; }
+  .layer p { margin: 0; font-size: 13.5px; color: var(--muted); }
+  .flowdot { text-align: center; color: var(--faint); font-family: var(--mono); font-size: 12px; margin: -4px 0; }
+
+  /* engine cards */
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+  .ecard { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; box-shadow: var(--shadow); }
+  .ecard .ehead { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+  .ecard h4 { margin: 0; font-size: 16px; font-weight: 730; }
+  .ecard .desc { font-size: 14px; color: var(--ink); margin: 0 0 12px; }
+  .ecard .cite { font-family: var(--mono); font-size: 11.5px; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 9px; line-height: 1.5; }
+  .badge { font-family: var(--mono); font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; padding: 3px 8px; border-radius: 5px; white-space: nowrap; }
+  .badge.live { color: var(--good); background: var(--good-soft); border: 1px solid color-mix(in srgb, var(--good) 35%, transparent); }
+  .badge.ret { color: var(--warn); background: var(--warn-soft); border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent); }
+
+  /* council viz */
+  .council { display: grid; grid-template-columns: 1fr; gap: 24px; align-items: center; }
+  @media (min-width: 720px) { .council { grid-template-columns: 300px 1fr; } }
+  .swarm { display: grid; grid-template-columns: repeat(12, 1fr); gap: 5px; padding: 18px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+  .agent { aspect-ratio: 1; border-radius: 50%; background: color-mix(in srgb, var(--accent) 26%, transparent); }
+  .agent.hi { background: var(--accent); }
+
+  .pipe { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; }
+  .pstage { font-family: var(--mono); font-size: 12.5px; padding: 6px 11px; border-radius: 7px; background: var(--card2); border: 1px solid var(--line); }
+  .parrow { color: var(--faint); font-family: var(--mono); }
+
+  .note { display: flex; gap: 12px; background: var(--card2); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 8px; padding: 14px 16px; font-size: 14px; color: var(--muted); }
+  .note b { color: var(--ink); font-weight: 650; }
+
+  table.metrics { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table.metrics th, table.metrics td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  table.metrics th { font-family: var(--mono); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  table.metrics td.num { font-family: var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+  .win { color: var(--good); font-weight: 600; }
+
+  footer { padding: 40px 0 60px; color: var(--faint); font-size: 13px; }
+  footer .mono { color: var(--muted); }
+  ::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+</style>
+
+<header class="top">
+  <div class="wrap top-inner">
+    <div class="kicker">
+      <span class="eyebrow">Technical Stack Dossier</span>
+      <span class="tag live">● Paper / DRY_RUN</span>
+      <span class="tag">Python 3.14 · Next.js 14</span>
+    </div>
+    <h1 class="title">AXIOM <span class="fade">/ prediction-market research platform</span></h1>
+    <p class="lede">A self-hosted, always-on quant stack that forecasts prediction markets, equities and options — grounded in cited research, run entirely on paper, and judged by its own tracked calibration rather than its claims.</p>
+
+    <div class="statbar">
+      <div class="stat"><b>17</b><span>launchd services</span></div>
+      <div class="stat"><b>8</b><span>strategy engines</span></div>
+      <div class="stat"><b>72</b><span>council micro-agents</span></div>
+      <div class="stat"><b>30+</b><span>API routes · 20 pages</span></div>
+      <div class="stat"><b>4</b><span>LLM providers (fallback)</span></div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ARCHITECTURE -->
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">01 — Architecture</span>
+      <h2>A single pipeline, six layers</h2>
+      <p>Every stage has one input type and one output type. Signals are proposed, judged by a deliberating agent council, gated through risk, and only ever recorded as paper fills — never sent to a live venue.</p>
+    </div>
+    <div class="stack">
+      <div class="layer"><div class="num">01</div><div><h4>Ingest &amp; market data</h4><p>Async WebSocket + REST from Polymarket CLOB / Gamma, Deribit, Yahoo, Chainlink, three CEX order books, NWS weather. Snapshot-before-delta reconnect.</p></div></div>
+      <div class="flowdot">↓</div>
+      <div class="layer"><div class="num">02</div><div><h4>Signal engines</h4><p>8 strategy daemons + a quant/ML model library (Heston, SABR, Bayesian vol, Markov, foundation models) each emit an edge + calibrated probability.</p></div></div>
+      <div class="flowdot">↓</div>
+      <div class="layer"><div class="num">03</div><div><h4>AI council &amp; meta-labeling</h4><p>A 72-agent LLM swarm deliberates; a López-de-Prado meta-label classifier gates each signal on fee-aware break-even probability.</p></div></div>
+      <div class="flowdot">↓</div>
+      <div class="layer"><div class="num">04</div><div><h4>Risk engine</h4><p>Seven independent checks (edge, net daily-loss, drawdown, concentration, concurrency, staleness, CVaR tail-risk) — no order passes without all of them.</p></div></div>
+      <div class="flowdot">↓</div>
+      <div class="layer"><div class="num">05</div><div><h4>Paper execution &amp; ledger</h4><p>Kelly-scaled sizing, fee-true P&amp;L, positions marked to the bid, survivorship-safe resolution. Bankroll persisted in PostgreSQL.</p></div></div>
+      <div class="flowdot">↓</div>
+      <div class="layer"><div class="num">06</div><div><h4>Brain, journal &amp; frontend</h4><p>A nightly reflection loop scores every engine, writes lessons, and surfaces live records on a Next.js dashboard. Nothing on screen is stale.</p></div></div>
+    </div>
+  </section>
+
+  <!-- LANGUAGES & FRAMEWORKS -->
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">02 — Languages &amp; frameworks</span>
+      <h2>What it's built with</h2>
+    </div>
+    <div class="spec">
+      <div class="row"><div class="k">Backend</div><div class="v">Python 3.14 · fully async (<span class="mono">asyncio, aiohttp, httpx, websockets</span>). <span class="sub">Pydantic v2 settings, structlog, tenacity retries.</span></div></div>
+      <div class="row"><div class="k">Frontend</div><div class="v">Next.js 14.2 · React 18 · TypeScript 5.5 <div class="chips" style="margin-top:8px"><span class="chip">Tailwind 3.4</span><span class="chip">Zustand</span><span class="chip">Recharts</span><span class="chip">Framer Motion</span><span class="chip">Canvas / WebGL HUD</span></div></div></div>
+      <div class="row"><div class="k">Persistence</div><div class="v">PostgreSQL <span class="sub">(asyncpg, SQLAlchemy 2 async, Alembic migrations)</span> — durable bankroll &amp; fills · Redis <span class="sub">(hiredis)</span> — volatile risk state.</div></div>
+      <div class="row"><div class="k">Orchestration</div><div class="v">17 macOS <span class="mono">launchd</span> services (KeepAlive daemons + scheduled jobs) · Prometheus metrics.</div></div>
+      <div class="row"><div class="k">Market client</div><div class="v"><span class="mono">py-clob-client</span> (Polymarket CLOB) as a credentials-once singleton.</div></div>
+      <div class="row"><div class="k">Numerics</div><div class="v"><span class="mono">NumPy · pandas · SciPy · JAX[cpu] · PyTorch</span> · scikit-learn / XGBoost / LightGBM · cvxpy · NumPyro · diffrax · FinancePy.</div></div>
+    </div>
+  </section>
+
+  <!-- DATA SOURCES -->
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">03 — Data sources</span>
+      <h2>Where the numbers come from</h2>
+      <p>All free or public endpoints, authenticated where required (Yahoo crumb, Deribit, Kalshi). No paid market-data vendor.</p>
+    </div>
+    <div class="chips">
+      <span class="chip v">Polymarket CLOB</span><span class="chip v">Polymarket Gamma API</span>
+      <span class="chip">Deribit (options IV)</span><span class="chip">Yahoo Finance</span>
+      <span class="chip">Chainlink (BTC oracle)</span><span class="chip">Coinbase · Kraken · OKX</span>
+      <span class="chip">CoinDesk RSS</span><span class="chip">NWS / weather.gov</span>
+      <span class="chip">Open-Meteo</span><span class="chip">Kalshi</span>
+      <span class="chip">Financial Modeling Prep</span><span class="chip">arXiv (research advisor)</span>
+      <span class="chip">NVIDIA NIM (LLM)</span>
+    </div>
+  </section>
+
+  <!-- STRATEGY ENGINES -->
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">04 — Strategy engines</span>
+      <h2>Eight forecasting logics, each with a paper behind it</h2>
+      <p>Every engine is forward-tested on paper and kept only if its current-config record beats fees. Engines with no measurable edge are retired on purpose — the honest result, not hidden.</p>
+    </div>
+    <div class="grid2">
+
+      <div class="ecard">
+        <div class="ehead"><h4>Oracle-lag (BTC)</h4><span class="badge live">Live · gated</span></div>
+        <p class="desc">Exploits the reprice lag between the Chainlink BTC oracle and the Polymarket CLOB on 5-min windows. Meta-label + fee-aware gate; ~62–66% at executable prices.</p>
+        <p class="cite">Latency-not-prediction thesis; López de Prado meta-labeling (2018). Cross-checked vs Coinbase/Kraken/OKX consensus.</p>
+      </div>
+
+      <div class="ecard">
+        <div class="ehead"><h4>Weather (late-day)</h4><span class="badge live">Live</span></div>
+        <p class="desc">Trades wide-spread niche NWS temperature-bucket markets late in the session, as an observer of favorites rather than a forecaster. ~76–81%.</p>
+        <p class="cite">Brier-calibrated; edge-cap fix (big model-vs-market gaps are anti-predictive). Informed-specialist niche-market literature.</p>
+      </div>
+
+      <div class="ecard">
+        <div class="ehead"><h4>Options desk</h4><span class="badge live">Live · main legs</span></div>
+        <p class="desc">Directional single-leg options on real chains with Kelly sizing, a 10% bankroll cap, −55% stop / +80% target, and expiry settlement.</p>
+        <p class="cite">Penny (deep-OTM) legs retired: 12% win-rate lottery tickets, negative-EV by construction.</p>
+      </div>
+
+      <div class="ecard">
+        <div class="ehead"><h4>VWAP trend</h4><span class="badge live">Live</span></div>
+        <p class="desc">Session-VWAP trend/flip on QQQ/TQQQ with anti-churn confirmation and end-of-day flat; a chop-guard after 4 flips.</p>
+        <p class="cite">Faithful replication of Zarattini &amp; Aziz, SSRN 4631351.</p>
+      </div>
+
+      <div class="ecard">
+        <div class="ehead"><h4>News-lag</h4><span class="badge live">Live</span></div>
+        <p class="desc">Acts inside the documented 30–90s window between a headline and market repricing; LLM-classified event type/direction/magnitude.</p>
+        <p class="cite">Semantic match-score gate; skips near-resolved markets and held slugs.</p>
+      </div>
+
+      <div class="ecard">
+        <div class="ehead"><h4>Pre-market</h4><span class="badge live">Live</span></div>
+        <p class="desc">Forward-tests a gap / liquidity-sweep equity strategy with an enforced 2R asymmetry (1.6× target / 0.8× stop) and prior-day H/L reclaim feature.</p>
+        <p class="cite">Stop / target / time-exit resolution; break-even record.</p>
+      </div>
+
+      <div class="ecard">
+        <div class="ehead"><h4>Kronos × 1-hour</h4><span class="badge live">Horizon-matched</span></div>
+        <p class="desc">Pairs the Kronos price foundation model to 1-hour markets; armed only when a 3-run ensemble fully agrees (honest confidence).</p>
+        <p class="cite">Foundation-model output treated as a feature, never a standalone signal.</p>
+      </div>
+
+      <div class="ecard">
+        <div class="ehead"><h4>Crypto 5-min momentum</h4><span class="badge ret">Retired</span></div>
+        <p class="desc">Momentum/persistence bot on 5-minute BTC/alt windows. Halted after proving no edge: 49% coin-flip, armed subset worse.</p>
+        <p class="cite">Efficient-market null: every price bucket won exactly its price. Permutation p≈1.0. No slice to gate.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- QUANT / ML MODELS -->
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">05 — Quant &amp; ML model library</span>
+      <h2>The math the engines draw on</h2>
+    </div>
+    <div class="spec">
+      <div class="row"><div class="k">Vol surface</div><div class="v"><b>Heston</b> stochastic-vol pricer (differentiable, JAX/diffrax gradient calibration) · <b>SABR</b> smile (L-BFGS-B, FinancePy) · <b>Fokker-Planck</b> PDE pricer as research benchmark.</div></div>
+      <div class="row"><div class="k">Bayesian vol</div><div class="v"><b>NumPyro SVI</b> — stochastic variational inference posterior over volatility (≈200 steps, background only).</div></div>
+      <div class="row"><div class="k">Time-series FMs</div><div class="v"><b>TimesFM 2.5</b> (Google Research) · <b>Kronos</b> price foundation model — both used as features, never standalone.</div></div>
+      <div class="row"><div class="k">Sequence models</div><div class="v"><b>Markov</b> state-transition signal (BTC) · mean-reversion, order-flow, microstructure &amp; velocity factors.</div></div>
+      <div class="row"><div class="k">ML ensemble</div><div class="v">scikit-learn <b>bagged logistic</b> meta-label (purged walk-forward CV + MDA importance) · Random Forest / XGBoost / LightGBM components.</div></div>
+      <div class="row"><div class="k">Simulation</div><div class="v"><b>Monte Carlo</b> — 10,000 realized-vol price paths (Box-Muller, drift-0 martingale) → P(close up).</div></div>
+      <div class="row"><div class="k">Sports</div><div class="v"><b>Dixon-Coles</b> bivariate-Poisson goal model (SciPy).</div></div>
+      <div class="row"><div class="k">Sizing</div><div class="v">Constrained <b>Kelly</b> portfolio optimization via cvxpy (LP/SOCP).</div></div>
+      <div class="row"><div class="k">Memory</div><div class="v"><b>sentence-transformers</b> semantic recall + <b>BM25</b> lexical — an Obsidian-style local vector brain over lessons &amp; research.</div></div>
+    </div>
+  </section>
+
+  <!-- AI COUNCIL -->
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">06 — The AI council &amp; agents</span>
+      <h2>MiroFish: a deliberating swarm, not a single prompt</h2>
+      <p>The differentiator from “ask an LLM”: a population of diverse persona-agents argues each question in two rounds, and the aggregate is influence-weighted — then the council’s own rulings are Brier-scored against reality.</p>
+    </div>
+    <div class="council">
+      <div class="swarm" aria-hidden="true"></div>
+      <div>
+        <div class="spec">
+          <div class="row"><div class="k">Population</div><div class="v"><b>24 persona archetypes × 3 replicas = 72 micro-agents</b><div class="sub">Domain Expert, Quant PM, Contrarian, Base-Rate Statistician, Market Microstructure… each with a role, prior bias and influence weight.</div></div></div>
+          <div class="row"><div class="k">Micro-agent LLM</div><div class="v"><span class="mono">meta/llama-3.1-8b-instruct</span> via NVIDIA NIM <span class="sub">(temperature-varied replicas for genuine spread)</span></div></div>
+          <div class="row"><div class="k">Deliberation</div><div class="v">Round 1 independent → agents see the crowd consensus &amp; disagreement → Round 2 revise. Aggregate is influence-weighted, dispersion reported.</div></div>
+          <div class="row"><div class="k">Accountability</div><div class="v"><span class="mono">council_resolver.py</span> logs every ruling and scores directional calls on a rolling <b>Brier</b> — calibrated, not asserted.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note" style="margin-top:22px">
+      <div>🛰️ <b>LLM provider chain (fallback, fastest first).</b> The app-facing reasoning layer tries, in order:
+        <span class="mono">Groq — Llama 3.3 70B</span> → <span class="mono">Cerebras — Llama 3.3 70B</span> → <span class="mono">Anthropic claude-haiku-4-5</span> → <span class="mono">NVIDIA NIM (Gemma)</span>. First provider with a key wins; failures fall through automatically.</div>
+    </div>
+  </section>
+
+  <!-- ORACLE + EARNINGS -->
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">07 — The Oracle &amp; earnings engine</span>
+      <h2>A superforecaster you can audit</h2>
+      <p>Ask anything — a stock direction, a business idea, an earnings print — and get a decomposed, cited, logged-and-scored answer built on the forecasting-science literature.</p>
+    </div>
+
+    <p style="font-family:var(--mono);font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:0 0 4px">Oracle pipeline</p>
+    <div class="pipe">
+      <span class="pstage">Outside-view base rate</span><span class="parrow">→</span>
+      <span class="pstage">Fermi decomposition</span><span class="parrow">→</span>
+      <span class="pstage">10k Monte Carlo</span><span class="parrow">→</span>
+      <span class="pstage">72-agent swarm</span><span class="parrow">→</span>
+      <span class="pstage">Behavior / momentum</span><span class="parrow">→</span>
+      <span class="pstage">Extremized fusion</span>
+    </div>
+    <p class="cite" style="font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:12px;border:0">Tetlock superforecasting · Satopää extremizing · Halawi et al. 2024 (LLM forecasting) · every prediction logged to <span class="mono">oracle_predictions.jsonl</span> and Brier-scored nightly.</p>
+
+    <div style="margin-top:28px" class="grid2">
+      <div class="ecard">
+        <div class="ehead"><h4>Earnings engine — signals</h4><span class="badge live">Cited</span></div>
+        <p class="desc">Each factor is a documented effect, not a vibe:</p>
+        <p class="cite">
+          • <b>P(beat)</b> — Beta-Binomial shrink of beat-streak + revision momentum <span style="color:var(--faint)">(Chan-Jegadeesh-Lakonishok)</span><br>
+          • <b>Expected surprise</b> — PEAD persistence <span style="color:var(--faint)">(Bernard &amp; Thomas 1989/90)</span><br>
+          • <b>Dispersion</b> — high disagreement ⇒ bearish <span style="color:var(--faint)">(Diether-Malloy-Scherbina 2002)</span><br>
+          • <b>Implied move</b> — ATM straddle / spot · <b>Priced-in penalty</b>
+        </p>
+      </div>
+      <div class="ecard">
+        <div class="ehead"><h4>Historical benchmark</h4><span class="badge live">Out-of-sample</span></div>
+        <p class="desc">Walk-forward over 76 real quarters × 38 tickers, no lookahead, vs baselines:</p>
+        <table class="metrics">
+          <tr><th>Task</th><th style="text-align:right">Brier</th><th style="text-align:right">vs</th></tr>
+          <tr><td>Model — beat</td><td class="num win">0.170</td><td class="num">coin 0.25</td></tr>
+          <tr><td>Calibration (ECE)</td><td class="num win">0.073</td><td class="num">—</td></tr>
+          <tr><td>Direction (hard)</td><td class="num">0.260</td><td class="num">≈ coin</td></tr>
+        </table>
+      </div>
+    </div>
+    <div class="note" style="margin-top:18px">
+      <div><b>The honest thesis.</b> The model ties the base rate on beats and sits at coin-flip on post-earnings direction — exactly what the Efficient Market Hypothesis predicts. Its value is <b>audited calibration</b> (ECE 0.073), not a suspicious “95% accurate” claim.</div>
+    </div>
+  </section>
+
+  <!-- RIGOR -->
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">08 — Calibration, risk &amp; honesty</span>
+      <h2>The discipline that holds it together</h2>
+    </div>
+    <div class="spec">
+      <div class="row"><div class="k">Self-scoring</div><div class="v">Oracle, council and earnings each resolve their own past forecasts and publish a rolling <b>Brier / accuracy / ECE</b> scorecard. A forecaster you can’t audit is treated as a vibe.</div></div>
+      <div class="row"><div class="k">Reflection loop</div><div class="v"><span class="mono">brain.py</span> — per-segment win-rate z-scores vs fee break-even, stable-both-halves gate, bounded self-actions (e.g. disarming a biased model), long-term principle consolidation.</div></div>
+      <div class="row"><div class="k">Risk checks</div><div class="v" style="padding-top:2px"><div class="chips"><span class="chip">1 · Edge threshold</span><span class="chip">2 · Net daily-loss</span><span class="chip">3 · Max drawdown</span><span class="chip">4 · Concentration</span><span class="chip">5 · Concurrency</span><span class="chip">6 · Staleness</span><span class="chip">7 · CVaR tail-risk</span></div></div></div>
+      <div class="row"><div class="k">Testing</div><div class="v">pytest suite (risk / signal / executor) · production type-checked build · every strategy forward-tested on paper before it counts.</div></div>
+      <div class="row"><div class="k">Safety posture</div><div class="v"><b>DRY_RUN throughout</b> — no live orders. Fee-true P&amp;L, no fabricated or deleted losing data, secrets in a gitignored <span class="mono">.env</span>.</div></div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="mono">AXIOM — internal technical dossier · paper-trading research system</div>
+    <div>Prepared as a stack reference. All performance figures are fee-true paper records at current configuration; retired engines are shown deliberately as part of the scientific record.</div>
+  </footer>
+</main>
+
+<script>
+  // build the 72-agent swarm grid (24 archetypes × 3 replicas), a few highlighted
+  var s = document.querySelector('.swarm');
+  if (s) {
+    for (var i = 0; i < 72; i++) {
+      var d = document.createElement('div');
+      d.className = 'agent' + (i % 8 === 0 ? ' hi' : '');
+      s.appendChild(d);
+    }
+  }
+</script>
+
+</html>
