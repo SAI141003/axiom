@@ -283,7 +283,9 @@ permission**.
 
 ## License
 
-[MIT](LICENSE) — with an explicit **not financial advice** notice. Research and paper trading
-only; live trading is disabled by default. Trading carries risk of total loss.
+[MIT](LICENSE). Research and paper trading only; live trading is disabled by default.
+
+**This is not financial advice** and trading carries risk of total loss — please read the
+[DISCLAIMER](DISCLAIMER.md) before using this with real funds.
 
 <div align="center"><sub><b>AXIOM</b> — an idea does not ship unless it survives data it has never seen.</sub></div>
