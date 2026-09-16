@@ -3,7 +3,7 @@
 <img src="docs/logo.svg" alt="AXIOM" width="420">
 
 **A proof gated quantitative trading desk.**
-Backtester · safety proving ground · 20+ paper-trading bots · live market data — in one dashboard.
+Backtester · safety proving ground · 20+ paper-trading bots · live market data in one dashboard.
 
 <sub>
 Python 3.14 · Next.js 15 · CCXT 4.5 · OpenBB · MIT licensed
