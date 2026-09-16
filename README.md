@@ -2,7 +2,7 @@
 
 <img src="docs/logo.svg" alt="AXIOM" width="420">
 
-**A proof-gated quantitative trading desk.**
+**A proof gated quantitative trading desk.**
 Backtester · safety proving ground · 20+ paper-trading bots · live market data — in one dashboard.
 
 <sub>
