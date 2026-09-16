@@ -421,6 +421,23 @@ def engines_status() -> dict:
         return days.get(today, {"trades": 0, "wins": 0, "pnl": 0.0}), \
                [{"day": d, **v} for d, v in sorted(days.items())[-7:]]
 
+    def walk_account(trades_l, start=100.0):
+        """Walk trades chronologically against a finite bankroll.
+
+        A real account stops trading when it runs out of money, so trades after
+        ruin never happen and must not be scored. Summing every pnl instead let
+        a $100 account report a negative balance -- the same loss-floor rule the
+        execution adapters enforce (invariant I10), missing from the paper books.
+        Returns (final_account, trades_actually_taken).
+        """
+        acct, taken = start, []
+        for t in sorted(trades_l, key=lambda x: x.get("ts", 0)):
+            if acct <= 0:
+                break
+            acct = max(0.0, acct + t["pnl"])
+            taken.append(t)
+        return acct, taken
+
     if g:
         w = sum(1 for t in g if t["won"])
         today, daily = day_split(g)
@@ -489,12 +506,9 @@ def engines_status() -> dict:
         ret = c["realized"] / p["cost"]                 # return on premium paid
         ol.append({"won": c["realized"] > 0, "pnl": round(10 * ret, 2),  # flat $10 bet
                    "ts": c.get("ts", 0)})
-    ol.sort(key=lambda t: t["ts"])
+    acct, ol = walk_account(ol)
     if ol:
         w = sum(1 for t in ol if t["won"])
-        acct = 100.0                                    # start a $100 account
-        for t in ol:
-            acct += t["pnl"]
         today_o, daily_o = day_split(ol)
         out["options ($100 acct)"] = {
             "trades": len(ol), "wins": w, "win_rate": round(w / len(ol), 3),
@@ -506,9 +520,8 @@ def engines_status() -> dict:
     gres = [r for r in rows if r["type"] == "gresolve"]
     if gres:
         gl = [{"won": r["won"], "pnl": r["pnl"], "ts": r.get("ts", 0)} for r in gres]
-        gl.sort(key=lambda t: t["ts"])
+        acct, gl = walk_account(gl)
         w = sum(1 for t in gl if t["won"])
-        acct = 100.0 + sum(t["pnl"] for t in gl)
         today_g, daily_g = day_split(gl)
         out["gamma-pulse ($100 acct)"] = {
             "trades": len(gl), "wins": w, "win_rate": round(w / len(gl), 3),
@@ -520,9 +533,8 @@ def engines_status() -> dict:
     scl = [r for r in rows if r["type"] == "sclose"]
     if scl:
         sl = [{"won": r["won"], "pnl": r["pnl"], "ts": r.get("ts", 0)} for r in scl]
-        sl.sort(key=lambda t: t["ts"])
+        acct, sl = walk_account(sl)
         w = sum(1 for t in sl if t["won"])
-        acct = 100.0 + sum(t["pnl"] for t in sl)
         today_s, daily_s = day_split(sl)
         out["stocks-bot ($100 acct)"] = {
             "trades": len(sl), "wins": w, "win_rate": round(w / len(sl), 3),
@@ -534,8 +546,8 @@ def engines_status() -> dict:
     mcl = [r for r in rows if r["type"] == "mclose"]
     if mcl:
         ml = [{"won": r["won"], "pnl": r["pnl"], "ts": r.get("ts", 0)} for r in mcl]
-        ml.sort(key=lambda t: t["ts"])
-        w = sum(1 for t in ml if t["won"]); acct = 100.0 + sum(t["pnl"] for t in ml)
+        acct, ml = walk_account(ml)
+        w = sum(1 for t in ml if t["won"])
         today_m, daily_m = day_split(ml)
         out["meme-coin ($100 acct)"] = {
             "trades": len(ml), "wins": w, "win_rate": round(w / len(ml), 3),
@@ -547,8 +559,8 @@ def engines_status() -> dict:
     scl = [r for r in rows if r["type"] == "sclose"]
     if scl:
         sl = [{"won": r["won"], "pnl": r["pnl"], "ts": r.get("ts", 0)} for r in scl]
-        sl.sort(key=lambda t: t["ts"])
-        w = sum(1 for t in sl if t["won"]); acct = 100.0 + sum(t["pnl"] for t in sl)
+        acct, sl = walk_account(sl)
+        w = sum(1 for t in sl if t["won"])
         today_c, daily_c = day_split(sl)
         out["ccxt-strategy ($100 acct)"] = {
             "trades": len(sl), "wins": w, "win_rate": round(w / len(sl), 3),
@@ -560,8 +572,8 @@ def engines_status() -> dict:
     fcl = [r for r in rows if r["type"] == "fclose"]
     if fcl:
         fl = [{"won": r["won"], "pnl": r["pnl"], "ts": r.get("ts", 0)} for r in fcl]
-        fl.sort(key=lambda t: t["ts"])
-        w = sum(1 for t in fl if t["won"]); acct = 100.0 + sum(t["pnl"] for t in fl)
+        acct, fl = walk_account(fl)
+        w = sum(1 for t in fl if t["won"])
         today_f, daily_f = day_split(fl)
         out["flow-bot ($100 acct)"] = {
             "trades": len(fl), "wins": w, "win_rate": round(w / len(fl), 3),

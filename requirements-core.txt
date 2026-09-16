@@ -1,0 +1,44 @@
+# ── AXIOM core ────────────────────────────────────────────────────────────────
+# Everything the documented quick start needs: the test suite, the safety
+# proving ground, and the backtest engine. Installs in well under a minute.
+#
+#   python3 -m venv .venv && ./.venv/bin/pip install -r requirements-core.txt
+#
+# requirements.txt is the FULL stack (torch, jax, transformers, xgboost …) and
+# is only needed for the ML bots — Kronos forecasting, the Heston/SABR
+# calibration workers, and the sports models. Start here.
+
+# Exchange + market data
+ccxt>=4.5.0
+aiohttp>=3.9.0
+httpx>=0.27.0
+websockets>=12.0
+
+# Math
+numpy>=1.26.0
+scipy>=1.13.0
+
+# Config + validation
+pydantic>=2.6.0
+pydantic-settings>=2.2.0
+python-dotenv>=1.0.0
+
+# Persistence clients (imported at module load; no running server required
+# for the tests, the scenario sim, or the backtest)
+asyncpg>=0.29.0
+redis[hiredis]>=5.0.0
+
+# News ingestion (imported on the executor path)
+feedparser>=6.0.0
+
+# Observability + utilities
+structlog>=24.1.0
+prometheus-client>=0.20.0
+rich>=13.0.0
+python-dateutil>=2.9.0
+tenacity>=8.2.0
+
+# Testing
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+pytest-mock>=3.12.0
