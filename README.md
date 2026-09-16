@@ -50,19 +50,26 @@ No API keys required — the core runs entirely on keyless public data.
 ```bash
 git clone https://github.com/SAI141003/axiom.git && cd axiom
 
-python3 -m venv .venv && ./.venv/bin/pip install -r requirements.txt   # backend
-cd frontend && npm install && npm run dev                              # dashboard
+python3 -m venv .venv && ./.venv/bin/pip install -r requirements-core.txt
+cd frontend && npm install && npm run dev
 ```
 
 Open **http://localhost:3000**.
 
-### Verify it yourself (offline, no keys, ~20s)
+`requirements-core.txt` is the lightweight set — exchange data, math, config and
+tests. It is verified to run the whole quick start from a clean clone.
+`requirements.txt` is the full stack (torch, jax, transformers, xgboost) and is only
+needed for the ML bots; you do not need it to evaluate the system.
+
+### Verify it yourself (no keys, ~20s)
 
 ```bash
-./.venv/bin/python -m pytest tests/ -q          # 26 tests
-./.venv/bin/python execution/scenario_sim.py 5  # 10,500 safety assertions
-./.venv/bin/python -m backtest.octobot_engine   # walk-forward backtest
+./.venv/bin/python -m pytest tests/ -q          # 26 tests  (offline)
+./.venv/bin/python execution/scenario_sim.py 5  # 10,500 safety assertions (offline)
+./.venv/bin/python -m backtest.octobot_engine   # walk-forward backtest (fetches live OHLCV)
 ```
+
+All three are verified to pass from a clean clone with only `requirements-core.txt`.
 
 ---
 
@@ -107,6 +114,12 @@ Run across all three adapters (Hyperliquid, Solana/Jupiter, CCXT), enforcing 11 
 ## Results
 
 All figures are written to `.data/*.json` by the commands below and reproduced verbatim.
+
+> **Read the dates.** The safety proof is deterministic and offline — it reproduces exactly,
+> always. The backtest is not: it fetches **live** OHLCV from Kraken, so re-running it today
+> scores a different 720-candle window than the run recorded here and the numbers will drift.
+> Backtest figures below are **as of 2026-08-14**; the safety proof is **as of 2026-09-04**.
+> Treat the backtest as a dated measurement, not a constant.
 
 ### Safety proving ground
 

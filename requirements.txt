@@ -12,6 +12,9 @@ py-clob-client>=0.18.0
 anthropic>=0.40.0
 openai>=1.50.0
 
+# Exchange connectivity (100+ venues) — also required by the backtest engine
+ccxt>=4.5.0
+
 # Data + matching
 sentence-transformers>=3.0.0
 rank-bm25>=0.2.2
