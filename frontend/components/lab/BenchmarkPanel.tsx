@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import TopNav from "@/components/TopNav";
 
 /**
  * MODEL BENCHMARK — every engine vs. the right baseline + published research.
  * Honest by design: shows where we beat, tie, or sit below the baseline.
  */
-export default function BenchmarkPage() {
+export default function BenchmarkPanel() {
   const [d, setD] = useState<any>(null);
   const [mkt, setMkt] = useState<any>(null);
   const [vol, setVol] = useState<any>(null);
@@ -27,8 +26,7 @@ export default function BenchmarkPage() {
       : v === "pending" ? "var(--hud-muted)" : "var(--hud-amber)";
 
   return (
-    <div className="hud-bg min-h-screen">
-      <TopNav />
+    <div className="">
       <main className="max-w-5xl mx-auto p-6 font-mono">
         <h1 className="text-xl font-bold tracking-[0.25em] glow-cyan text-center">▤ MODEL BENCHMARK</h1>
         <p className="text-[11px] mt-1 mb-2 text-center" style={{ color: "var(--hud-muted)" }}>

@@ -55,6 +55,10 @@ const HEADS = [
     lens: "market efficiency — is there a real free edge here, or is it already priced?" },
   { id: "sky", name: "Sky", role: "Prediction-Market Analyst", influence: 0.9,
     lens: "prediction-market pricing, where informed specialists set the line" },
+  // TradingAgents (Xiao et al. 2024) puts a risk manager between the trader and
+  // the book. Vault is that seat: it argues the downside, never the upside.
+  { id: "vault", name: "Vault", role: "Risk Manager", influence: 1.2,
+    lens: "position sizing, drawdown and ruin — what happens if this is wrong; if the downside is unbounded the answer is no" },
 ];
 
 // role → human name (matches the workforce council roster) so the graph can

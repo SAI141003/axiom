@@ -359,3 +359,13 @@ h1.glow-cyan, h1.glow-violet {
 h1.glow-green { color: var(--hud-green); }
 h1.glow-amber { color: var(--hud-amber); }
 h1.glow-red   { color: var(--hud-red); }
+
+/* ── Overflow discipline ─────────────────────────────────────────────────────
+   Long tickers, config strings, URLs and model output must never push a panel
+   wider than its column or bleed under a neighbour. Panels are minimum-width
+   zero inside grids, long tokens wrap, tables and code scroll in place. */
+.hud-panel, .hud-panel-static { min-width: 0; overflow-wrap: anywhere; }
+.hud-panel pre, .hud-panel-static pre { overflow-x: auto; max-width: 100%; }
+main { overflow-x: clip; }
+h1 { overflow-wrap: anywhere; }
+.recharts-wrapper { max-width: 100%; }

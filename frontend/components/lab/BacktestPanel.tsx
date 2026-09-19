@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import TopNav from "@/components/TopNav";
 
 function Curve({ strat, bench }: { strat: number[]; bench: number[] }) {
   if (!strat?.length) return null;
@@ -19,7 +18,7 @@ function Curve({ strat, bench }: { strat: number[]; bench: number[] }) {
   );
 }
 
-export default function BacktestLabPage() {
+export default function BacktestPanel() {
   const [d, setD] = useState<any>(null);
   useEffect(() => {
     const load = () => fetch("/api/backtest-lab").then((r) => r.json()).then(setD).catch(() => {});
@@ -37,8 +36,7 @@ export default function BacktestLabPage() {
   const beat = m && m.total_return > m.buyhold_return;
 
   return (
-    <div className="hud-bg min-h-screen">
-      <TopNav />
+    <div className="">
       <main className="max-w-4xl mx-auto p-6 font-mono">
         <h1 className="text-xl font-bold tracking-[0.25em] glow-cyan text-center">🧪 BACKTEST LAB</h1>
         <p className="text-[11px] mt-1 mb-4 text-center" style={{ color: "var(--hud-muted)" }}>

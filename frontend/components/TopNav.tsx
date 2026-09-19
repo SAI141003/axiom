@@ -4,38 +4,41 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
 
-const LINKS = [
-  { href: "/",          label: "Home" },
-  { href: "/brain",     label: "Brain" },
-  { href: "/workforce", label: "Workforce" },
-  { href: "/council",   label: "Council" },
-  { href: "/live-account", label: "Account" },
-  { href: "/intel",     label: "Intel" },
-  { href: "/journal",   label: "Journal" },
-  { href: "/news",      label: "News" },
-  { href: "/crypto",    label: "Auto-Bot" },
-  { href: "/weather",   label: "Weather" },
-  { href: "/weather-bot", label: "Bot 2" },
-  { href: "/premarket", label: "Pre-Market" },
-  { href: "/options",   label: "Options" },
-  { href: "/live",      label: "Markets" },
-  { href: "/arbitrage", label: "Arb" },
-  { href: "/ai",        label: "AI Desk" },
-  { href: "/scenario",  label: "Scenario" },
-  { href: "/benchmark", label: "Benchmark" },
-  { href: "/venues",    label: "Venues" },
-  { href: "/proving-ground", label: "Proving Ground" },
-  { href: "/backtest-lab", label: "Backtest Lab" },
-  { href: "/data-desk", label: "Data Desk" },
-  { href: "/ccxt-bot",  label: "Strategy Bot" },
-  { href: "/flow-bot",  label: "Flow Bot" },
-  { href: "/gamma-pulse", label: "Gamma" },
-  { href: "/stocks-bot", label: "Stocks Bot" },
-  { href: "/meme-bot",  label: "Meme Bot" },
-  { href: "/stocks",    label: "Stocks" },
-  { href: "/mirofish",  label: "MiroFish" },
-  { href: "/terminal",  label: "Terminal" },
-  { href: "/settings",  label: "Keys" },
+// Grouped: the desk reads left-to-right from "what is running" to "where it is
+// tested" to "what it can reach". Each group is a thin divider in the bar.
+const GROUPS: { label: string; links: { href: string; label: string }[] }[] = [
+  { label: "DESK", links: [
+    { href: "/",             label: "Home" },
+    { href: "/jarvis",       label: "Jarvis" },
+    { href: "/terminal",     label: "Terminal" },
+    { href: "/brain",        label: "Brain" },
+    { href: "/council",      label: "Council" },
+    { href: "/workforce",    label: "Workforce" },
+  ]},
+  { label: "TRADE", links: [
+    { href: "/bots",         label: "Bots" },
+    { href: "/crypto",       label: "Auto-Bot" },
+    { href: "/weather",      label: "Weather" },
+    { href: "/premarket",    label: "Pre-Market" },
+    { href: "/options",      label: "Options" },
+    { href: "/stocks",       label: "Stocks" },
+    { href: "/arbitrage",    label: "Arb" },
+    { href: "/live",         label: "Markets" },
+    { href: "/tape",         label: "Tape" },
+  ]},
+  { label: "RESEARCH", links: [
+    { href: "/lab",          label: "Lab" },
+    { href: "/ai",           label: "AI Desk" },
+    { href: "/oracle",       label: "Oracle" },
+    { href: "/intel",        label: "Intel" },
+    { href: "/news",         label: "News" },
+    { href: "/journal",      label: "Journal" },
+  ]},
+  { label: "ACCOUNT", links: [
+    { href: "/live-account", label: "Account" },
+    { href: "/venues",       label: "Venues" },
+    { href: "/settings",     label: "Keys" },
+  ]},
 ];
 
 export default function TopNav() {
@@ -70,31 +73,37 @@ export default function TopNav() {
       {/* Nav */}
       <div className="flex items-center gap-0.5 overflow-x-auto flex-1 min-w-0"
            style={{ scrollbarWidth: "none" }}>
-        {LINKS.map((l) => {
-          const active = pathname === l.href || (l.href === "/ai" && pathname.startsWith("/ai"));
-          return (
-            <Link
-              key={l.href}
-              href={l.href}
-              aria-current={active ? "page" : undefined}
-              className={clsx(
-                "relative px-3 py-1.5 rounded-md text-[11px] font-medium tracking-wide whitespace-nowrap flex-shrink-0",
-                "transition-all duration-200 hover:text-[color:var(--hud-text)]",
-              )}
-              style={{
-                color: active ? "var(--hud-accent)" : "var(--hud-muted)",
-                background: active ? "var(--hud-accent-soft)" : "transparent",
-                boxShadow: active ? "inset 0 0 0 1px rgba(124,154,255,0.28)" : "none",
-              }}
-            >
-              {l.label}
-              {active && (
-                <span className="absolute left-1/2 -translate-x-1/2 -bottom-[7px] h-[2px] w-5 rounded-full"
-                      style={{ background: "var(--hud-accent)", boxShadow: "0 0 8px var(--hud-glow)" }} />
-              )}
-            </Link>
-          );
-        })}
+        {GROUPS.map((g, gi) => (
+          <div key={g.label} className="flex items-center gap-0.5 flex-shrink-0">
+            {gi > 0 && <span aria-hidden className="mx-1.5 h-4 w-px" style={{ background: "var(--hud-border-2)" }} />}
+            <span className="hidden xl:inline text-[8px] tracking-[0.2em] mr-1 select-none" style={{ color: "var(--hud-border-2)" }}>{g.label}</span>
+            {g.links.map((l) => {
+              const active = pathname === l.href || (l.href !== "/" && pathname.startsWith(l.href + "/")) || (l.href === "/ai" && pathname.startsWith("/ai"));
+              return (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  aria-current={active ? "page" : undefined}
+                  className={clsx(
+                    "relative px-2.5 py-1.5 rounded-md text-[11px] font-medium tracking-wide whitespace-nowrap flex-shrink-0",
+                    "transition-all duration-200 hover:text-[color:var(--hud-text)]",
+                  )}
+                  style={{
+                    color: active ? "var(--hud-accent)" : "var(--hud-muted)",
+                    background: active ? "var(--hud-accent-soft)" : "transparent",
+                    boxShadow: active ? "inset 0 0 0 1px rgba(124,154,255,0.28)" : "none",
+                  }}
+                >
+                  {l.label}
+                  {active && (
+                    <span className="absolute left-1/2 -translate-x-1/2 -bottom-[7px] h-[2px] w-5 rounded-full"
+                          style={{ background: "var(--hud-accent)", boxShadow: "0 0 8px var(--hud-glow)" }} />
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </div>
 
       {/* Status */}

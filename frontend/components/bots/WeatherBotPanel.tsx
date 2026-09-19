@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from "recharts";
-import TopNav from "@/components/TopNav";
 import EngineBanner from "@/components/EngineBanner";
 import { useToggle } from "@/lib/toggles";
 
@@ -14,7 +13,7 @@ interface WTrade {
 }
 interface Stats { placed: number; open: number; resolved: number; wins: number; winRate: number; totalPnl: number }
 
-export default function WeatherBotPage() {
+export default function WeatherBotPanel() {
   const [trades, setTrades] = useState<WTrade[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [curve, setCurve] = useState<{ ts: number; pnl: number }[]>([]);
@@ -40,7 +39,6 @@ export default function WeatherBotPage() {
 
   return (
     <div className="hud-bg">
-      <TopNav />
       <main className="max-w-6xl mx-auto p-6 font-mono">
         <EngineBanner engine="weather (late-day)" />
         <WeatherPicks />

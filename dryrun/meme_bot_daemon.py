@@ -50,35 +50,89 @@ def _write(rec):
         f.write(json.dumps(rec) + "\n")
 
 
-def market():
-    """Live meme-coin snapshot: {id: {sym, price, m1h, m24h, vol}}."""
+# pump.fun — Solana's meme launchpad, read through DexScreener's free API (no key).
+# Bonding-curve pairs carry dexId "pumpfun"; graduated ones "pumpswap". These are
+# fresh tokens, so a liquidity floor is the rug guard: below it a "momentum"
+# candle is one whale, and the exit fill would not exist.
+PUMP_MIN_LIQ_USD = 25_000
+PUMP_MIN_VOL24_USD = 250_000
+DEX = "https://api.dexscreener.com"
+
+
+def _get(url):
+    return json.load(urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=15))
+
+
+def pump_market(extra_addrs=()):
+    """pump.fun snapshot keyed "pump:<mint>" in the same shape as market()."""
+    try:
+        boosted = _get(f"{DEX}/token-boosts/top/v1")
+        addrs = [x["tokenAddress"] for x in boosted if x.get("chainId") == "solana"][:30]
+    except Exception:
+        addrs = []
+    addrs = list(dict.fromkeys([*addrs, *extra_addrs]))
+    out = {}
+    for i in range(0, len(addrs), 30):
+        try:
+            pairs = _get(f"{DEX}/tokens/v1/solana/{','.join(addrs[i:i + 30])}")
+        except Exception:
+            continue
+        for pr in pairs:
+            if not str(pr.get("dexId", "")).startswith("pump"):
+                continue
+            mint = pr["baseToken"]["address"]
+            liq = (pr.get("liquidity") or {}).get("usd") or 0
+            px = pr.get("priceUsd")
+            key = f"pump:{mint}"
+            if px is None or key in out:
+                continue
+            ch = pr.get("priceChange") or {}
+            out[key] = {"sym": pr["baseToken"]["symbol"].upper(), "price": float(px),
+                        "m1h": ch.get("h1") or 0.0, "m24h": ch.get("h24") or 0.0,
+                        "vol": (pr.get("volume") or {}).get("h24") or 0, "liq": liq,
+                        "source": "pump.fun", "url": pr.get("url")}
+    return out
+
+
+def market(extra_pump_addrs=()):
+    """Live meme-coin snapshot: {id: {sym, price, m1h, m24h, vol}} — CoinGecko majors + pump.fun."""
+    out = pump_market(extra_pump_addrs)
     ids = ",".join(COINS)
     url = (f"https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids={ids}"
            f"&price_change_percentage=1h,24h")
     try:
-        d = json.load(urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=15))
+        d = _get(url)
     except Exception:
-        return {}
-    out = {}
+        return out
     for c in d:
         out[c["id"]] = {
             "sym": c["symbol"].upper(), "price": c["current_price"],
             "m1h": c.get("price_change_percentage_1h_in_currency") or 0.0,
             "m24h": c.get("price_change_percentage_24h") or 0.0,
-            "vol": c.get("total_volume") or 0,
+            "vol": c.get("total_volume") or 0, "source": "coingecko",
         }
     return out
 
 
+def _tradeable(cid, m):
+    """Entry filter. Majors need real volume; pump.fun tokens also need a liquidity floor."""
+    if not (m["m1h"] > 1.0 and m["m24h"] > 0):
+        return False
+    if cid.startswith("pump:"):
+        return m["vol"] >= PUMP_MIN_VOL24_USD and m.get("liq", 0) >= PUMP_MIN_LIQ_USD
+    return m["vol"] > 3e6
+
+
 def cycle():
-    mkt = market()
-    if not mkt:
-        return
     rows = _rows()
-    now = time.time()
     closed = {r["id"] for r in rows if r["type"] == "mclose"}
     open_pos = [r for r in rows if r["type"] == "mentry" and r["id"] not in closed]
     held = {p["coin"] for p in open_pos}
+    # held pump.fun mints must be repriced even after they drop off the trending list
+    mkt = market(extra_pump_addrs=[c.split(":", 1)[1] for c in held if c.startswith("pump:")])
+    if not mkt:
+        return
+    now = time.time()
 
     # 1) exit: reversal (1h down) or max hold
     for p in open_pos:
@@ -100,14 +154,15 @@ def cycle():
     if slots <= 0:
         return
     cands = [(m["m1h"] + 0.4 * m["m24h"], cid, m) for cid, m in mkt.items()
-             if cid not in held and m["m1h"] > 1.0 and m["m24h"] > 0 and m["vol"] > 3e6]
+             if cid not in held and _tradeable(cid, m)]
     cands.sort(reverse=True)
     today = datetime.now(ET).strftime("%Y-%m-%d")
     for score, cid, m in cands[:slots]:
         _write({"type": "mentry", "id": f"{int(now)}-{cid}", "date": today, "coin": cid,
                 "sym": m["sym"], "entry": m["price"], "m1h": round(m["m1h"], 2),
-                "m24h": round(m["m24h"], 2), "score": round(score, 2), "ts": int(now)})
-        print(f"[meme-bot] BUY {m['sym']} @ {m['price']} (1h {m['m1h']:+.1f}% 24h {m['m24h']:+.1f}%)", flush=True)
+                "m24h": round(m["m24h"], 2), "score": round(score, 2), "ts": int(now),
+                "source": m.get("source", "coingecko"), "liq": m.get("liq"), "url": m.get("url")})
+        print(f"[meme-bot] BUY {m['sym']} @ {m['price']} via {m.get('source')} (1h {m['m1h']:+.1f}% 24h {m['m24h']:+.1f}%)", flush=True)
 
 
 def main():

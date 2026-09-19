@@ -6,7 +6,7 @@
 Prediction markets · crypto · equities · options in one dashboard, one safety model.
 
 <sub>
-Python 3.14 · Next.js 15 · CCXT 4.5 · OpenBB · 33 pages · 29 bots · MIT
+Python 3.14 · Next.js 14 · CCXT 4.5 · OpenBB · 23 pages · 29 bots · JARVIS · MIT
 </sub>
 
 </div>
@@ -16,8 +16,9 @@ Python 3.14 · Next.js 15 · CCXT 4.5 · OpenBB · 33 pages · 29 bots · MIT
 ## What AXIOM is
 
 AXIOM started as a Polymarket high-frequency bot and grew into a full research desk:
-a backtest engine, a fault-injection proving ground, 29 paper-trading daemons, and
-a 33-page dashboard over live market data.
+a backtest engine, a fault-injection proving ground, 29 paper-trading daemons, a
+23-page dashboard over live market data — and **JARVIS**, a voice that answers for all
+of it from the data, running on your Claude Code login.
 
 It is built around one rule: **an idea does not ship unless it survives data it has
 never seen.** Every strategy runs through a train/holdout split and walk-forward folds.
@@ -36,7 +37,7 @@ failures** — rejected orders, timeouts, partial fills, slippage blowouts, dupl
 
 ## Contents
 
-[Quick start](#quick-start) · [What it has been through](#what-it-has-been-through) ·
+[Quick start](#quick-start) · [JARVIS](#jarvis) · [What it has been through](#what-it-has-been-through) ·
 [Results](#results) · [Polymarket](#polymarket-the-origin) · [Commands](#command-reference) ·
 [Agents & skills](#agents--skills) · [Going live](#going-live) · [Safety](#safety-model) ·
 [Credits](#tools--repos-combined) · [Security](#security)
@@ -71,6 +72,51 @@ needed for the ML bots; you do not need it to evaluate the system.
 
 All three are verified to pass from a clean clone with only `requirements-core.txt`.
 
+### Optional: wake JARVIS
+
+```bash
+cd jarvis && npm install && npm start      # ws://127.0.0.1:8788 — uses your Claude Code login
+```
+
+Open **/jarvis**, tap the reactor, and ask. Without the bridge the page still answers the
+common questions from the desk's data files.
+
+---
+
+## JARVIS
+
+The desk has a voice. **/jarvis** is an arc-reactor HUD with browser-native speech in and
+out (no key), a wake word (*"hey Jarvis"*), and a streaming transcript. Its brain is the
+[Claude Agent SDK](https://docs.claude.com/en/docs/claude-code) — Claude Code run as a
+library on your existing login, the pattern from
+[adewaskar/jarvis](https://github.com/adewaskar/jarvis) — with the desk exposed as tools:
+
+| Tool | Answers |
+|---|---|
+| `fleet_status` | every paper account, P&L, win rate, today |
+| `backtest_results` | the grid, the anti-overfit search, the variant bake-off and their verdicts |
+| `safety_proof` | 10,500 assertions, 35 scenarios, per-scenario pass rate |
+| `venues` | where a bot can trade from here, custody, KYC |
+| `scenario_forecast` | 20,000-path Monte-Carlo verdict on a ticker |
+| `propose_strategy` | **invent a blend; the engine judges it on holdout** and says if it is overfit |
+| `run_backtest` | refresh the walk-forward backtest on live candles |
+| `desk_api` | open positions, recent closes, journal, council rulings |
+
+It is instructed to answer only from tools, to speak in short plain prose, and to be
+honest about losses. A sample turn, verbatim:
+
+> *"Try a strategy that is pure momentum plus RSI, weights 1.2 and 0.9, and tell me
+> honestly whether it beats what we ship out of sample."*
+>
+> **JARVIS:** No, it does not beat the default out of sample. Your momentum plus RSI blend
+> returned negative fourteen point five percent on holdout versus the shipped strategy's
+> negative fifteen point five percent — slightly better in absolute terms but with a worse
+> Sharpe at negative zero point eight two. The engine's verdict is overfit and rejected
+> because it won on the training fold but lost on holdout.
+
+If the bridge is not running, **/api/jarvis** answers the common questions with no model
+at all, straight from `.data/`. The page works either way.
+
 ---
 
 ## What it has been through
@@ -87,7 +133,7 @@ paper-trading system, and the following is what it has actually been subjected t
 | **Backtest grid** | 9 symbol × timeframe cells, 720 candles each, walk-forward validated |
 | **Strategy variants tested** | 5 (4 rejected out-of-sample, 1 shipped) |
 | **Bots written** | 29 paper daemons, run as supervised `launchd` services |
-| **Dashboard** | 33 pages, production build green |
+| **Dashboard** | 23 pages, production build green |
 
 Every one of those numbers is regenerable from the commands in this README.
 
@@ -183,6 +229,21 @@ and the research is ongoing. Treat AXIOM as a research platform, not a money pri
 the live path exists and is documented below, but the project's own data does not yet
 justify deploying capital. See [DISCLAIMER.md](DISCLAIMER.md).
 
+### The dashboard
+
+23 pages, grouped **Desk · Trade · Research · Account**. The ones that matter most:
+
+| Page | What it is |
+|---|---|
+| **/jarvis** | the voice — see [JARVIS](#jarvis) |
+| **/bots** | the whole fleet on one screen: capital donut, P&L and win-rate comparison bars, every account's equity curve, then each bot's open book as a tab |
+| **/lab** | research on one desk: edge donut, strategy-variant comparison, grid vs buy-and-hold, the anti-overfit chart, the equity curve, all 35 fault scenarios — then Backtest, Proving Ground, Scenario, Benchmarks and Data Desk as tabs |
+| **/tape** | the flow bot replayed frame by frame — bias, CVD, block trades, book imbalance next to the decision it made, after [hftengine](https://github.com/mirkovicdev/HFTENGINE) |
+| **/terminal** | the Bloomberg-style desk: order book, signal feed, kill switch |
+| **/council** | eight role agents debate a thesis and rule; every ruling Brier-scored |
+
+Eleven former pages became tabs of `/bots` and `/lab`; their old URLs redirect.
+
 ---
 
 ## Polymarket — the origin
@@ -235,6 +296,7 @@ Everything is a plain Python module. No hidden daemons, no magic.
 ./.venv/bin/python -m backtest.experiments        # strategy variant bake-off
 ./.venv/bin/python -m backtest.per_symbol         # per-symbol routing test
 ./.venv/bin/python -m backtest.validate_5m_live   # 5m live-data validation
+./.venv/bin/python backtest/propose.py '{"weights":{"momentum":1,"rsi":0.8}}'  # judge a blend on holdout
 ```
 
 ### Signals & data
@@ -268,7 +330,8 @@ Everything is a plain Python module. No hidden daemons, no magic.
 ```bash
 ./.venv/bin/python dryrun/flow_bot_daemon.py       # order-flow bot (10-min cadence)
 ./.venv/bin/python dryrun/ccxt_strategy_daemon.py  # daily BTC/ETH/SOL blend
-./.venv/bin/python dryrun/meme_bot_daemon.py       # meme-coin momentum (CoinGecko)
+./.venv/bin/python dryrun/meme_bot_daemon.py       # meme momentum — CoinGecko majors + pump.fun launches
+./.venv/bin/python dryrun/flow_bot_daemon.py       # also writes logs/flow_tape.jsonl for /tape
 ./.venv/bin/python dryrun/options_daemon.py        # options scanner
 ./.venv/bin/python dryrun/forward_snapshot.py      # daily scoreboard across all accounts
 ```
@@ -389,10 +452,12 @@ AXIOM stands on a lot of other people's work. Full credit:
 |---|---|---|
 | [**CCXT**](https://github.com/ccxt/ccxt) | MIT | One gated door to 100+ exchanges; all OHLCV/ticker data |
 | [**OpenBB**](https://github.com/OpenBB-finance/OpenBB) | AGPL-3.0 | Open data platform — macro, equities, rates, CPI, news |
-| [**Next.js**](https://github.com/vercel/next.js) | MIT | The 33-page dashboard |
+| [**Next.js**](https://github.com/vercel/next.js) | MIT | The 23-page dashboard |
 | [**pandas**](https://github.com/pandas-dev/pandas) · [**NumPy**](https://github.com/numpy/numpy) | BSD-3 | Every backtest computation |
 | [**Hyperliquid SDK**](https://github.com/hyperliquid-dex/hyperliquid-python-sdk) | MIT | Perps adapter |
 | [**Jupiter**](https://station.jup.ag/) | — | Solana spot routing |
+| [**DexScreener API**](https://docs.dexscreener.com/) | — | Keyless [pump.fun](https://pump.fun) pair data (price, 1h/24h, volume, liquidity) for the meme bot, with a liquidity floor as the rug guard |
+| [**Claude Agent SDK**](https://docs.claude.com/en/docs/claude-code) | — | JARVIS's brain, on your Claude Code login |
 
 ### Architectural influences
 
@@ -403,6 +468,11 @@ AXIOM stands on a lot of other people's work. Full credit:
 | [**Kronos**](https://github.com/shiyu-coder/Kronos) (MIT) | Pretrained K-line foundation model behind the 1h forecast bot |
 | [**HKUDS Vibe-Trading**](https://github.com/HKUDS/Vibe-Trading) | LLM-agent trading research patterns |
 | [**brodyautomates/polymarket-pipeline**](https://github.com/brodyautomates/polymarket-pipeline) | Prediction-market ingestion patterns |
+| [**mirkovicdev/hftengine**](https://github.com/mirkovicdev/HFTENGINE) | The replay-console idea — show what the engine *saw* next to what it *did*, frame by frame, and say plainly what is modelled. Became `/tape` and the flow bot's frame log |
+| [**adewaskar/jarvis**](https://github.com/adewaskar/jarvis) | The bridge architecture: Claude Code as a library over a local WebSocket, in-process MCP tools, the browser as face and voice. Became `jarvis/bridge.mjs` and `/jarvis` |
+| [**TradingAgents**](https://github.com/TauricResearch/TradingAgents) ([Xiao et al. 2024](https://arxiv.org/abs/2412.20138)) | A desk of role agents that debate before a call, with a risk manager between trader and book. The Council already worked this way; the paper's missing seat, **Vault — Risk Manager**, was added |
+| [**Automate Strategy Finding with LLM**](https://github.com/kouzhizhuo/Automate-Strategy-Finding-with-LLM-in-Quant-investment) ([Kou et al., EMNLP 2025](https://arxiv.org/abs/2409.06289)) | A model proposes factors, a backtester filters them. Became `backtest/propose.py` and JARVIS's `propose_strategy` — the honest version, where nothing ships unless it wins on holdout |
+| [**HARLF**](https://github.com/franjgs/llm-rl-finance-trader) ([arXiv 2507.18560](https://arxiv.org/abs/2507.18560)) · [**FinBERT**](https://github.com/ProsusAI/finBERT) | Sentiment as a portfolio input. AXIOM's news classifier already produces direction and materiality; coupling that to allocation is **not shipped** — it would need to win out-of-sample first, like everything else here |
 
 > These are studied as references and cloned locally. They are **gitignored**, keep their
 > own licenses and history, and are **not redistributed** here.

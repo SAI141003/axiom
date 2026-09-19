@@ -41,3 +41,9 @@ graft/
 
 # ── Agent scratch ─────────────────────────────────────────────────────────────
 .agents/
+
+# ── Reference clones studied for this build (hftengine, jarvis) ──────────────
+.study/
+
+# ── JARVIS bridge ─────────────────────────────────────────────────────────────
+jarvis/node_modules/
