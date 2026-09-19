@@ -46,6 +46,14 @@ def _rows() -> list[dict]:
     return [json.loads(l) for l in LOG.open() if l.strip()] if LOG.exists() else []
 
 
+TAPE = LOG.parent / "flow_tape.jsonl"
+
+
+def _write_tape(rec: dict) -> None:
+    with TAPE.open("a") as fh:
+        fh.write(json.dumps(rec) + "\n")
+
+
 def _write(rec: dict) -> None:
     LOG.parent.mkdir(exist_ok=True)
     with LOG.open("a") as f:
@@ -59,10 +67,15 @@ def cycle() -> None:
     now = time.time()
     today = datetime.now(ET).strftime("%Y-%m-%d")
     acted = False
+    # One read of the tape per symbol per cycle. Every read is kept as a frame
+    # (logs/flow_tape.jsonl) so the /tape page can replay what the bot saw next
+    # to what it did -- the hftbacktest replay-console idea, applied here.
+    flows = {sym: order_flow(sym) for sym in set(UNIVERSE) | set(open_pos)}
+    decisions: dict[str, str] = {}
 
     # 1) manage exits — flow flip or max hold
     for sym, p in list(open_pos.items()):
-        f = order_flow(sym)
+        f = flows.get(sym)
         px = ccxt_adapter.ticker(sym)
         if px is None:
             continue
@@ -74,7 +87,7 @@ def cycle() -> None:
             _write({"type": "fclose", "id": p["id"], "sym": sym, "exit": px, "pnl": pnl,
                     "won": pnl > 0, "bias": round(bias, 3),
                     "reason": "flow-flip" if (f and bias < EXIT_BIAS) else "max-hold", "ts": int(now)})
-            del open_pos[sym]; acted = True
+            del open_pos[sym]; acted = True; decisions[sym] = "exit"
             print(f"[flow-bot] EXIT {sym} @ {px} → {pnl:+.2f} (bias {bias:+.2f})", flush=True)
 
     # 2) entries — strongest buy-flow symbols not held
@@ -84,7 +97,7 @@ def cycle() -> None:
         for sym in UNIVERSE:
             if sym in open_pos:
                 continue
-            f = order_flow(sym)
+            f = flows.get(sym)
             if f and f["bias"] > ENTER_BIAS:
                 cands.append((f["bias"], sym, f))
         cands.sort(reverse=True)
@@ -95,8 +108,17 @@ def cycle() -> None:
             _write({"type": "fentry", "id": f"{int(now)}-{sym.replace('/', '')}", "date": today,
                     "sym": sym, "entry": px, "stake": STAKE, "bias": round(bias, 3),
                     "cvd_ratio": f["cvd_ratio"], "big_trades": f["big_trades"], "ts": int(now)})
-            acted = True
+            acted = True; decisions[sym] = "enter"
             print(f"[flow-bot] BUY {sym} @ {px} (bias {bias:+.2f}, CVD {f['cvd_ratio']*100:+.0f}%, {f['big_trades']} big)", flush=True)
+
+    for sym, f in flows.items():
+        if not f:
+            continue
+        _write_tape({"type": "frame", "ts": int(now), "sym": sym, "bias": f["bias"], "cvd_ratio": f["cvd_ratio"],
+                     "big_trades": f["big_trades"], "big_buy": f["big_buy"], "big_sell": f["big_sell"],
+                     "obi": f["obi"], "intensity": f["intensity_per_s"], "trades": f["trades"],
+                     "held": sym in open_pos or decisions.get(sym) == "exit",
+                     "decision": decisions.get(sym, "hold")})
 
     if not acted:
         print("[flow-bot] no flow strong enough — holding", flush=True)

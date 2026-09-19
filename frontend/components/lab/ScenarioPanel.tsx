@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import TopNav from "@/components/TopNav";
 
 /**
  * COMPANY SCENARIO — quantum-inspired forecasting on REAL market data.
@@ -14,7 +13,7 @@ import TopNav from "@/components/TopNav";
 const EXAMPLES = ["NVDA", "TSLA", "AAPL", "AMD", "MSFT", "GOOGL"];
 function pct(v: number) { return `${(v * 100).toFixed(0)}%`; }
 
-export default function ScenarioPage() {
+export default function ScenarioPanel() {
   const [sym, setSym] = useState("");
   const [hz, setHz] = useState(21);
   const [busy, setBusy] = useState(false);
@@ -59,8 +58,7 @@ export default function ScenarioPage() {
   const vColor = r ? (up ? "var(--hud-green)" : "#f87171") : "";
 
   return (
-    <div className="hud-bg min-h-screen">
-      <TopNav />
+    <div className="">
       <main className="max-w-4xl mx-auto p-6 font-mono">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
           <h1 className="text-xl font-bold tracking-[0.25em] glow-cyan text-center">◇ COMPANY SCENARIO</h1>

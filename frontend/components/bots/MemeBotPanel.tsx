@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import TopNav from "@/components/TopNav";
 
-export default function MemeBotPage() {
+export default function MemeBotPanel() {
   const [d, setD] = useState<any>(null);
   useEffect(() => {
     const load = () => fetch("/api/meme-bot").then((r) => r.json()).then(setD).catch(() => {});
@@ -14,8 +13,7 @@ export default function MemeBotPage() {
   const recent: any[] = a?.recent ?? [];
 
   return (
-    <div className="hud-bg min-h-screen">
-      <TopNav />
+    <div className="">
       <main className="max-w-4xl mx-auto p-6 font-mono">
         <h1 className="text-xl font-bold tracking-[0.25em] glow-cyan text-center">🐕 MEME BOT</h1>
         <p className="text-[11px] mt-1 mb-4 text-center" style={{ color: "var(--hud-muted)" }}>

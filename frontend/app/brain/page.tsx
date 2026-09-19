@@ -256,7 +256,7 @@ export default function BrainPage() {
             {actions.length ? actions.map((a, i) => (
               <div key={i} className="text-[10px] truncate" style={{ color: "var(--hud-amber)" }}>⚙ {a}</div>
             )) : <div className="text-[10px]" style={{ color: "var(--hud-muted)" }}>segments stable — no action needed</div>}
-            <Link href="/mirofish" className="block mt-1 text-[9px] font-bold tracking-widest hover:opacity-80"
+            <Link href="/terminal" className="block mt-1 text-[9px] font-bold tracking-widest hover:opacity-80"
                   style={{ color: "var(--hud-cyan)" }}>
               ⬡ OPEN MIROFISH CANVAS →
             </Link>

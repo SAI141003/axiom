@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import TopNav from "@/components/TopNav";
 
 function CurveChart({ curve }: { curve: { tenor: string; rate: number }[] }) {
   if (!curve?.length) return null;
@@ -25,7 +24,7 @@ function CurveChart({ curve }: { curve: { tenor: string; rate: number }[] }) {
   );
 }
 
-export default function DataDeskPage() {
+export default function DataDeskPanel() {
   const [d, setD] = useState<any>(null);
   useEffect(() => {
     const load = () => fetch("/api/data-desk").then((r) => r.json()).then(setD).catch(() => {});
@@ -51,8 +50,7 @@ export default function DataDeskPage() {
   );
 
   return (
-    <div className="hud-bg min-h-screen">
-      <TopNav />
+    <div className="">
       <main className="max-w-5xl mx-auto p-6 font-mono">
         <h1 className="text-xl font-bold tracking-[0.25em] glow-cyan text-center">🛰 DATA DESK</h1>
         <p className="text-[11px] mt-1 mb-1 text-center" style={{ color: "var(--hud-muted)" }}>
