@@ -24,7 +24,7 @@ export function Transcript({ msgs, state, suggestions, onPick, className = "" }:
             {m.role === "you" ? "YOU" : "JARVIS"}{m.brain === "local" ? " · LOCAL" : ""}{m.tools?.length ? ` · ${m.tools.join(" → ")}` : ""}
           </div>
           <div className="prose-sans text-[13px] leading-relaxed break-words whitespace-pre-wrap rounded-xl px-3.5 py-2.5"
-               style={{ background: m.role === "you" ? "var(--hud-accent-soft)" : "rgba(255,255,255,0.035)", color: "var(--hud-text)", border: "1px solid " + (m.role === "you" ? "rgba(124,154,255,0.22)" : "var(--hud-border)") }}>
+               style={{ background: m.role === "you" ? "var(--hud-accent-soft)" : "rgba(255,255,255,0.035)", color: "var(--hud-text)", border: "1px solid " + (m.role === "you" ? "rgba(56,189,248,0.22)" : "var(--hud-border)") }}>
             {m.text || (state === "thinking" ? <span className="inline-flex gap-1" aria-label="thinking"><Dot /><Dot d={0.15} /><Dot d={0.3} /></span> : "")}
           </div>
         </motion.div>

@@ -86,7 +86,7 @@ function Row({ icon: Icon, label, value, tone }: { icon: any; label: string; val
 function Toggle({ icon: Icon, label, on, onChange }: { icon: any; label: string; on: boolean; onChange: (v: boolean) => void }) {
   return (
     <button onClick={() => onChange(!on)} role="switch" aria-checked={on} className="flex items-center gap-2 px-3 min-h-[44px] rounded-lg prose-sans text-[12px] text-left cursor-pointer transition-colors"
-            style={{ background: on ? "var(--hud-accent-soft)" : "rgba(255,255,255,0.03)", border: `1px solid ${on ? "rgba(124,154,255,0.35)" : "var(--hud-border)"}` }}>
+            style={{ background: on ? "var(--hud-accent-soft)" : "rgba(255,255,255,0.03)", border: `1px solid ${on ? "rgba(56,189,248,0.35)" : "var(--hud-border)"}` }}>
       <Icon size={14} aria-hidden style={{ color: on ? "var(--hud-accent)" : "var(--hud-muted)" }} /><span style={{ color: "var(--hud-text)" }}>{label}</span><span className="flex-1" />
       <span className="relative inline-block w-9 h-5 rounded-full transition-colors" style={{ background: on ? "var(--hud-accent)" : "var(--hud-border-2)" }} aria-hidden>
         <span className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform" style={{ transform: on ? "translateX(18px)" : "translateX(2px)" }} />

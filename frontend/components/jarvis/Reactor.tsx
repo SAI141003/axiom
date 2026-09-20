@@ -15,8 +15,8 @@ export function Reactor({ state, size = 260, onClick, label = "talk to JARVIS" }
   const spin = reduced ? 0 : state === "thinking" ? 2.2 : state === "speaking" ? 6 : 16;
   const core = size * 0.3;
   return (
-    <button onClick={onClick} aria-label={label} className="relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0c11] cursor-pointer"
-            style={{ width: size, height: size, background: "radial-gradient(circle, rgba(124,154,255,0.12) 0%, rgba(10,12,17,0) 68%)", ["--tw-ring-color" as any]: color }}>
+    <button onClick={onClick} aria-label={label} className="relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#070a12] cursor-pointer"
+            style={{ width: size, height: size, background: "radial-gradient(circle, rgba(56,189,248,0.12) 0%, rgba(10,12,17,0) 68%)", ["--tw-ring-color" as any]: color }}>
       <motion.svg viewBox="0 0 200 200" className="absolute inset-0 w-full h-full" animate={spin ? { rotate: 360 } : {}} transition={{ repeat: Infinity, ease: "linear", duration: spin || 1 }}>
         <circle cx="100" cy="100" r="93" fill="none" stroke={color} strokeWidth="0.8" strokeDasharray="3 9" opacity="0.45" />
         <circle cx="100" cy="100" r="80" fill="none" stroke={color} strokeWidth="2.2" strokeDasharray="46 22" opacity="0.85" strokeLinecap="round" />
@@ -34,8 +34,8 @@ export function Reactor({ state, size = 260, onClick, label = "talk to JARVIS" }
                   animate={reduced ? {} : { scale: state === "listening" ? [1, 1.16, 1] : state === "speaking" ? [1, 1.08, 0.96, 1] : [1, 1.035, 1] }}
                   transition={{ repeat: Infinity, duration: state === "speaking" ? 0.5 : state === "listening" ? 1.1 : 2.4, ease: "easeInOut" }} />
       <svg viewBox="0 0 64 64" className="absolute inset-0 m-auto" style={{ width: core * 0.5, height: core * 0.5 }} aria-hidden="true">
-        <path d="M14 49 L32 15 L50 49" fill="none" stroke="#0a0c11" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M18 39 H46" stroke="#0a0c11" strokeWidth="5" strokeLinecap="round" />
+        <path d="M14 49 L32 15 L50 49" fill="none" stroke="#070a12" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M18 39 H46" stroke="#070a12" strokeWidth="5" strokeLinecap="round" />
       </svg>
     </button>
   );

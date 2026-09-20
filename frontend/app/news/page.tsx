@@ -6,6 +6,7 @@ import Link from "next/link";
 import TopNav from "@/components/TopNav";
 import EngineBanner from "@/components/EngineBanner";
 import LiveTV from "@/components/news/LiveTV";
+import WorldWire from "@/components/news/WorldWire";
 import { Newspaper } from "lucide-react";
 
 interface Affected { sym: string; relation: string; direction: string; price: number; chgPct: number }
@@ -60,6 +61,7 @@ export default function NewsDeskPage() {
           <EngineBanner engine="news-lag (niche)" />
         </motion.div>
         <LiveTV />
+        <WorldWire />
 
         <form className="flex gap-2 mb-5" onSubmit={(e) => { e.preventDefault(); load(q || undefined); }}>
           <input value={q} onChange={(e) => setQ(e.target.value)}

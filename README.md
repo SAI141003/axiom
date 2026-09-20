@@ -264,7 +264,7 @@ justify deploying capital. See [DISCLAIMER.md](DISCLAIMER.md).
 | **/terminal** | the Bloomberg-style desk: order book, signal feed, kill switch |
 | **/council** | eight role agents debate a thesis and rule; every ruling Brier-scored |
 | **/bots → + Create a bot** | the Bot OS: describe a bot in words (JARVIS writes the spec) or set the dials; it trades on paper from $100 and shows its own book |
-| **/news** | live television from ten channels (free YouTube streams) above every classified headline |
+| **/news** | live television from ten channels (free YouTube streams), then the **World Wire** — 76 feeds from World Monitor's open catalog across markets, crypto, energy, crisis and geopolitics — above every classified headline |
 | **/about** | every source this desk is built from — 104 entries: 25 repositories, 34 papers and models, 21 data feeds, 6 venue citations, 18 libraries — each with where it is used and what came of it, every path verified |
 
 Eleven former pages became tabs of `/bots` and `/lab`; their old URLs redirect.
@@ -496,6 +496,7 @@ AXIOM stands on a lot of other people's work. Full credit:
 | [**Kronos**](https://github.com/shiyu-coder/Kronos) (MIT) | Pretrained K-line foundation model behind the 1h forecast bot |
 | [**HKUDS Vibe-Trading**](https://github.com/HKUDS/Vibe-Trading) | LLM-agent trading research patterns |
 | [**brodyautomates/polymarket-pipeline**](https://github.com/brodyautomates/polymarket-pipeline) | Prediction-market ingestion patterns |
+| [**koala73/worldmonitor**](https://github.com/koala73/worldmonitor) (AGPL-3.0) | The open feed catalog behind the World Wire, and the ops-room signal palette |
 | [**mirkovicdev/hftengine**](https://github.com/mirkovicdev/HFTENGINE) | The replay-console idea — show what the engine *saw* next to what it *did*, frame by frame, and say plainly what is modelled. Became `/tape` and the flow bot's frame log |
 | [**adewaskar/jarvis**](https://github.com/adewaskar/jarvis) | The bridge architecture: Claude Code as a library over a local WebSocket, in-process MCP tools, the browser as face and voice. Became `jarvis/bridge.mjs` and `/jarvis` |
 | [**TradingAgents**](https://github.com/TauricResearch/TradingAgents) ([Xiao et al. 2024](https://arxiv.org/abs/2412.20138)) | A desk of role agents that debate before a call, with a risk manager between trader and book. The Council already worked this way; the paper's missing seat, **Vault — Risk Manager**, was added |
