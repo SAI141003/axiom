@@ -47,3 +47,7 @@ graft/
 
 # ── JARVIS bridge ─────────────────────────────────────────────────────────────
 jarvis/node_modules/
+jarvis/state.json
+jarvis/journal.jsonl
+jarvis/memory.md
+jarvis/proposals/

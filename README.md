@@ -99,11 +99,18 @@ library on your existing login, the pattern from
 | `venues` | where a bot can trade from here, custody, KYC |
 | `scenario_forecast` | 20,000-path Monte-Carlo verdict on a ticker |
 | `propose_strategy` | **invent a blend; the engine judges it on holdout** and says if it is overfit |
-| `run_backtest` | refresh the walk-forward backtest on live candles |
-| `desk_api` | open positions, recent closes, journal, council rulings |
+| `run_backtest` · `run_tests` | refresh the backtest; run the suite and a safety round |
+| `desk_api` | **every page's data** — 49 read-only endpoints: positions, journal, council, options, weather picks, markets, quotes |
+| `news` | **every outlet the desk reads** — Reuters, BBC, NYT, CoinDesk, Cointelegraph, TechCrunch, Ars Technica, Google News topics — plus a live search |
+| `morning_brief` | say *"hey Jarvis"* and nothing else: fleet P&L today and overall, who traded, anything broken, disk, the headlines that matter |
+| `fleet_control` | start, stop, restart or read the log of any **paper** bot — never the dashboard or the live executor |
+| `read_code` · `search_code` · `propose_fix` | read the source, diagnose, and write an exact before/after proposal to `jarvis/proposals/` for a human to apply |
+| `remember` · `recall` | a memory: `memory.md` holds standing notes; the conversation itself resumes across restarts |
 
 It is instructed to answer only from tools, to speak in short plain prose, and to be
-honest about losses. A sample turn, verbatim:
+honest about losses. It **does not edit code** — when asked for a fix it reads the source
+and writes a precise proposal for a human to apply; keys, `.env`, live switches and git are
+out of its reach by construction. A sample turn, verbatim:
 
 > *"Try a strategy that is pure momentum plus RSI, weights 1.2 and 0.9, and tell me
 > honestly whether it beats what we ship out of sample."*

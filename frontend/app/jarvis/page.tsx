@@ -9,8 +9,10 @@ type State = "idle" | "listening" | "thinking" | "speaking";
 const BRIDGE = "ws://127.0.0.1:8788";
 const WAKE = /\b(hey|ok|okay)\s+jarvis\b/i;
 
+const BRIEF = "Good morning, Jarvis. Give me the status briefing.";
 const SUGGESTIONS = [
   "How is the fleet doing?",
+  "What's in the news that matters to our positions?",
   "Which bot is winning?",
   "Is the desk safe?",
   "What did the backtest say?",
@@ -101,7 +103,7 @@ export default function JarvisPage() {
     r.onresult = (e: any) => {
       const t = Array.from(e.results).slice(e.resultIndex).map((x: any) => x[0].transcript).join(" ").trim();
       if (!t) return;
-      if (continuous) { if (WAKE.test(t)) { const q = t.replace(WAKE, "").trim(); if (q) ask(q); } }
+      if (continuous) { if (WAKE.test(t)) { const q = t.replace(WAKE, "").replace(/^[,.\s]+/, "").trim(); ask(q.length > 2 ? q : BRIEF); } }
       else ask(t);
     };
     try { r.start(); rec.current = r; } catch { setState("idle"); }
@@ -141,7 +143,7 @@ export default function JarvisPage() {
           <div className="min-w-0">
             <h1 className="text-xl font-bold tracking-[0.25em] glow-cyan">J.A.R.V.I.S.</h1>
             <p className="text-[11px] mt-1 mb-4 break-words" style={{ color: "var(--hud-muted)" }}>
-              the desk&apos;s voice — every account, backtest, scenario and venue, answered from the data, spoken aloud
+              every page, every news outlet, the fleet&apos;s controls, the code to read — answered from the data, spoken aloud, remembered
             </p>
             <div className="hud-panel hud-panel-static p-4 min-h-[380px] max-h-[56vh] overflow-y-auto flex flex-col gap-3">
               {msgs.length === 0 && (
@@ -167,7 +169,14 @@ export default function JarvisPage() {
               ))}
               <div ref={bottom} />
             </div>
-            <form onSubmit={(e) => { e.preventDefault(); ask(input); }} className="flex gap-2 mt-3">
+            <div className="flex gap-2 mt-3 flex-wrap">
+              <button onClick={() => ask(BRIEF)} disabled={state === "thinking"} className="text-[10px] tracking-widest font-bold px-3 py-1.5 rounded border"
+                      style={{ borderColor: "var(--hud-accent)", color: "var(--hud-accent)" }}>◉ BRIEF ME</button>
+              <button onClick={() => { ws.current?.send(JSON.stringify({ type: "forget" })); setMsgs([]); }} className="text-[10px] tracking-widest px-3 py-1.5 rounded border"
+                      style={{ borderColor: "var(--hud-border)", color: "var(--hud-muted)" }} title="start a fresh conversation; memory notes are kept">NEW THREAD</button>
+              <span className="text-[9px] self-center" style={{ color: "var(--hud-muted)" }}>say “hey Jarvis” alone for the briefing · conversation resumes across restarts</span>
+            </div>
+            <form onSubmit={(e) => { e.preventDefault(); ask(input); }} className="flex gap-2 mt-2">
               <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="ask the desk anything…"
                      className="flex-1 min-w-0 px-4 py-3 text-sm rounded border bg-transparent"
                      style={{ borderColor: "var(--hud-border)", color: "var(--hud-text)" }} />
