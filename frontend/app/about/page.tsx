@@ -31,6 +31,7 @@ const RESULTS = [
   { k: "Upgrades rejected", v: "4 of 5", sub: "tuning, regime, volume profile, per-symbol routing — all overfit" },
   { k: "Order flow", v: "shipped", sub: "the one upgrade that survived holdout" },
   { k: "Options v1", v: "retired at $0", sub: "score<0.5 legs 16% win; puts 0/28 — v2 gates from 2026-09-20" },
+  { k: "Meme v1", v: "retired at −$77", sub: "pump.fun graduation flag 0/4, −$87 in a day; v2 gates block 9 of those 20 trades (−$84 avoided, in-sample)" },
 ];
 
 export default function AboutPage() {

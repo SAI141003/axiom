@@ -552,17 +552,25 @@ def engines_status() -> dict:
             "config": "multi-factor (12m trend + 5d reversal + Faber + low-vol), long/short, 3-day hold — forward-testing"}
     # meme-coin bot: $100 paper, momentum (buy the pump) — high-risk casino test
     rows = load("meme_bot.jsonl")
-    mcl = [r for r in rows if r["type"] == "mclose"]
-    if mcl:
-        ml = [{"won": r["won"], "pnl": r["pnl"], "ts": r.get("ts", 0)} for r in mcl]
-        acct, ml = walk_account(ml)
+    ment = {r["id"]: r for r in rows if r["type"] == "mentry"}
+    books = {1: [], 2: []}
+    for r in rows:
+        if r["type"] == "mclose":
+            books[2 if ment.get(r["id"], {}).get("v") == 2 else 1].append({"won": r["won"], "pnl": r["pnl"], "ts": r.get("ts", 0)})
+    # v1 bought graduation spikes on pump.fun and gave back a month of gains in a
+    # day; it stays on the board as history. v2 is the gated book, fresh from $100.
+    for ver, label, cfg in ((1, "meme v1 (retired)", "majors + pump.fun launches, $20/bet — RETIRED 2026-09-20: graduation flag 0/4, -$87 in a day"),
+                            (2, "meme-coin ($100 acct)", "v2: majors $20, pump.fun $5 max 1, no pairs <6h, no 1h>+40%, graduation = cooldown — forward test from 2026-09-20")):
+        acct, ml = walk_account(books[ver])
+        if not ml and ver == 2:
+            out[label] = {"trades": 0, "wins": 0, "win_rate": None, "pnl": 0.0, "account": 100.0, "today": {"trades": 0, "wins": 0, "pnl": 0.0}, "daily": [], "config": cfg}
+            continue
+        if not ml:
+            continue
         w = sum(1 for t in ml if t["won"])
         today_m, daily_m = day_split(ml)
-        out["meme-coin ($100 acct)"] = {
-            "trades": len(ml), "wins": w, "win_rate": round(w / len(ml), 3),
-            "pnl": round(acct - 100, 2), "account": round(acct, 2),
-            "today": today_m, "daily": daily_m,
-            "config": "meme momentum (buy pump, exit reversal), $20/bet — HIGH-RISK casino test, paper only"}
+        out[label] = {"trades": len(ml), "wins": w, "win_rate": round(w / len(ml), 3), "pnl": round(acct - 100, 2), "account": round(acct, 2),
+                      "today": today_m, "daily": daily_m, "config": cfg}
     # ccxt-strategy bot: $100 paper, OctoBot-style evaluator blend on daily BTC/ETH/SOL
     rows = load("ccxt_bot.jsonl")
     scl = [r for r in rows if r["type"] == "sclose"]

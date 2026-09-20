@@ -364,7 +364,7 @@ Everything is a plain Python module. No hidden daemons, no magic.
 ```bash
 ./.venv/bin/python dryrun/flow_bot_daemon.py       # order-flow bot (10-min cadence)
 ./.venv/bin/python dryrun/ccxt_strategy_daemon.py  # daily BTC/ETH/SOL blend
-./.venv/bin/python dryrun/meme_bot_daemon.py       # meme momentum — CoinGecko majors + pump.fun, smart-money flagged
+./.venv/bin/python dryrun/meme_bot_daemon.py       # meme v2: majors $20; pump.fun $5, max 1, no pairs <6h, no 1h>+40%, graduation = cooldown
 ./.venv/bin/python signals/pump_smart_money.py     # pump.fun creator/graduation tracker (buyer-level with a funded key)
 ./.venv/bin/python dryrun/botos.py once            # run every user-made bot one cycle
 ./.venv/bin/python dryrun/options_daemon.py        # options v2: score>=0.5, calls only (v1 retired at $0)
