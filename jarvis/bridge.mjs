@@ -236,12 +236,14 @@ const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
   tool("second_opinion", "Ask the optional second brain (GPT-6 Astra via the OpenAI API, if OPENAI_API_KEY is set in .env) one self-contained question and get its answer verbatim. Use for a cross-check on a hard judgement, never as a source of desk numbers — those come from the desk's own tools. Says so if not configured.",
     { question: z.string().min(5).max(6000) }, async ({ question }) => {
       const env = await dotenv();
-      const useOpenAI = !!env.OPENAI_API_KEY;
-      const key = useOpenAI ? env.OPENAI_API_KEY : (env.NVIDIA_API_KEY_JARVIS || env.NVIDIA_API_KEY);
-      const model = useOpenAI ? (env.OPENAI_MODEL || "gpt-6-astra") : (env.NVIDIA_MODEL_JARVIS_DEEP || "nvidia/nemotron-3-ultra-550b-a55b");
-      if (!key) return text("second brain not configured: add OPENAI_API_KEY or an NVIDIA key to .env", true);
+      // Deep bench, in order of preference: Meta Muse Spark, GPT-6 Astra, Nemotron 550B.
+      const deep = env.META_API_KEY ? { base: env.META_API_BASE || "https://api.meta.com/v1", key: env.META_API_KEY, model: env.META_MODEL || "muse-spark-1.1" }
+        : env.OPENAI_API_KEY ? { base: "https://api.openai.com/v1", key: env.OPENAI_API_KEY, model: env.OPENAI_MODEL || "gpt-6-astra" }
+        : { base: "https://integrate.api.nvidia.com/v1", key: env.NVIDIA_API_KEY_JARVIS || env.NVIDIA_API_KEY, model: env.NVIDIA_MODEL_JARVIS_DEEP || "nvidia/nemotron-3-ultra-550b-a55b" };
+      const { key, model } = deep;
+      if (!key) return text("second brain not configured: add META_API_KEY, OPENAI_API_KEY or an NVIDIA key to .env", true);
       try {
-        const r = await fetch(`${useOpenAI ? "https://api.openai.com/v1" : "https://integrate.api.nvidia.com/v1"}/chat/completions`, { method: "POST", signal: AbortSignal.timeout(180_000),
+        const r = await fetch(`${deep.base}/chat/completions`, { method: "POST", signal: AbortSignal.timeout(180_000),
           headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
           body: JSON.stringify({ model, messages: [{ role: "system", content: "You are a careful quantitative-finance reviewer. Be concrete and brief. Do not invent numbers." }, { role: "user", content: question }] }) });
         const j = await r.json();
@@ -386,6 +388,8 @@ async function providers() {
     // Cerebras: 2,600 tok/s and a 60k tokens/min budget -- the fast lane.
     env.CEREBRAS_API_KEY && { name: "cerebras", base: "https://api.cerebras.ai/v1", key: env.CEREBRAS_API_KEY, models: [env.CEREBRAS_MODEL_JARVIS || "gpt-oss-120b", "qwen-3.8-27b"] },
     env.GROQ_API_KEY && { name: "groq", base: "https://api.groq.com/openai/v1", key: env.GROQ_API_KEY, models: [env.GROQ_MODEL_JARVIS || "qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b"] },
+    // Meta Muse Spark (Meta Model API, public preview, paid after $20 credit): agentic, 1M context -- a deep lane, not the fast one.
+    env.META_API_KEY && { name: "meta", base: env.META_API_BASE || "https://api.meta.com/v1", key: env.META_API_KEY, models: [env.META_MODEL || "muse-spark-1.1"] },
     env.MISTRAL_API_KEY && { name: "mistral", base: "https://api.mistral.ai/v1", key: env.MISTRAL_API_KEY, models: [env.MISTRAL_MODEL || "mistral-medium-latest", "mistral-small-latest", "mistral-large-latest"] },
     env.GEMINI_API_KEY && /^AIza/.test(env.GEMINI_API_KEY) && { name: "gemini", base: "https://generativelanguage.googleapis.com/v1beta/openai", key: env.GEMINI_API_KEY, models: [env.GEMINI_MODEL || "gemini-2.5-flash", "gemini-2.5-flash-lite"] },
     env.SILICONFLOW_API_KEY && { name: "siliconflow", base: "https://api.siliconflow.com/v1", key: env.SILICONFLOW_API_KEY, models: [env.SILICONFLOW_MODEL || "Qwen/Qwen3-8B"] },
