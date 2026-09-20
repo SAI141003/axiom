@@ -168,7 +168,8 @@ const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
   tool("news", "Headlines from every outlet the desk reads (Reuters, BBC, NYT, CoinDesk, Cointelegraph, TechCrunch, Ars Technica, Google News topics) via the news desk, plus the intel classifier's direction/materiality calls. Optional query does a live Google News search.",
     { query: z.string().max(80).optional() }, async ({ query: q }) => {
       const out = {};
-      try { out.newsdesk = JSON.parse(await deskGet("/api/newsdesk")); } catch { out.newsdesk = "unavailable"; }
+      for (const c of ["crypto", "markets"]) { try { const w = JSON.parse(await deskGet(`/api/world?cat=${c}`)); out[`wire_${c}`] = (w.items ?? []).slice(0, 10).map((x) => `${x.title} — ${x.source}`); } catch {} }
+      try { const nd = JSON.parse(await deskGet("/api/newsdesk")); out.newsdesk_cards = (nd.cards ?? []).slice(0, 8).map((c) => ({ sym: c.sym, title: c.title, direction: c.direction, magnitude: c.magnitude, publisher: c.publisher })); } catch { out.newsdesk_cards = "unavailable"; }
       try { out.intel = JSON.parse(await deskGet("/api/intel")); } catch {}
       if (q) {
         try {
@@ -254,7 +255,7 @@ const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
       ["Kraken OHLCV (CCXT)", "https://api.kraken.com/0/public/OHLC?pair=XBTUSD&interval=1440", (t) => t.includes('"error":[]')],
       ["Polymarket Gamma", "https://gamma-api.polymarket.com/events?limit=1&active=true", (t) => t.startsWith("[")],
       ["Polymarket CLOB", "https://clob.polymarket.com/time", (t) => /^\d+/.test(t)],
-      ["Kalshi", "https://api.elections.kalshi.com/trade-api/v2/markets?limit=1", (t) => t.includes(markets)],
+      ["Kalshi", "https://api.elections.kalshi.com/trade-api/v2/markets?limit=1", (t) => t.includes("markets")],
       ["Binance", "https://api.binance.com/api/v3/ping", (t) => t.trim() === "{}"],
       ["Open-Meteo ensemble", "https://ensemble-api.open-meteo.com/v1/ensemble?latitude=52.3&longitude=4.8&daily=temperature_2m_max&models=icon_seamless&forecast_days=1", (t) => t.includes("temperature_2m_max")],
       ["aviationweather METAR", "https://aviationweather.gov/api/data/metar?ids=EHAM&format=json", (t) => t.includes("EHAM")],
@@ -337,7 +338,7 @@ async function systemPrompt() {
   return `${persona}
 
 DESK STATE (your compact working model — trust it, verify with tools when it matters, and keep it current with update_desk_state)
-${state.slice(0, 6000)}
+${state.slice(0, 2400)}
 
 You speak for the desk's own data and act only on the user's instruction.
 
@@ -379,48 +380,115 @@ async function providers() {
   // rate limits), then Groq for speed, then the shared NIM key, then OpenAI.
   const nvKey = env.NVIDIA_API_KEY_JARVIS || env.NVIDIA_API_KEY;
   const nvModels = [env.NVIDIA_MODEL_JARVIS || env.NVIDIA_MODEL_TOOLS || "nvidia/nemotron-3-super-120b-a12b", "moonshotai/kimi-k3", "nvidia/nemotron-3-ultra-550b-a55b", "mistralai/mistral-large-2-instruct"];
+  // Speed first: Groq answers in 0.2-0.5s but allows 8k tokens/min on the free
+  // tier, so every turn is kept small (see platformTurn). NIM is the deep bench.
   return [
+    env.GROQ_API_KEY && { name: "groq", base: "https://api.groq.com/openai/v1", key: env.GROQ_API_KEY, models: [env.GROQ_MODEL_JARVIS || "qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b"] },
     nvKey && { name: "nvidia", base: env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1", key: nvKey, models: nvModels },
-    env.GROQ_API_KEY && { name: "groq", base: "https://api.groq.com/openai/v1", key: env.GROQ_API_KEY, models: [env.GROQ_MODEL || "openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b"] },
     env.OPENAI_API_KEY && { name: "openai", base: "https://api.openai.com/v1", key: env.OPENAI_API_KEY, models: [env.OPENAI_MODEL || "gpt-6-astra", "gpt-5"] },
   ].filter(Boolean);
 }
 const picked = new Map();
-async function chat(messages, tools) {
+let groqTurn = 0;   // Groq's free tier meters tokens per minute PER MODEL; rotating across three models triples the budget
+// Enums are hidden from the model to keep turns small; snap a near-miss to the
+// closest allowed value (e.g. "/bots page" -> "/bots", "fleet" -> "/api/fleet").
+function nearest(t, args) {
+  const shape = t.schema.shape ?? {};
+  for (const [k, v] of Object.entries(args)) {
+    const def = shape[k]?._def; const vals = def?.values ?? def?.innerType?._def?.values;
+    if (vals && typeof v === "string" && !vals.includes(v)) {
+      const s = v.toLowerCase().replace(/^\/?api\//, "").replace(/[^a-z0-9]/g, "");
+      const best = [...vals].sort((a, b) => score(b, s) - score(a, s))[0];
+      if (best && score(best, s) > 0) args[k] = best;
+    }
+  }
+  return args;
+}
+const score = (cand, s) => { const c = cand.toLowerCase().replace(/^\/?api\//, "").replace(/[^a-z0-9]/g, ""); if (!c || !s) return 0; if (c === s) return 100; if (c.includes(s) || s.includes(c)) return 50 + Math.min(c.length, s.length); let k = 0; for (const ch of new Set(s)) if (c.includes(ch)) k++; return k; };
+
+async function chat(messages, tools, send) {
   const errs = [];
   for (const p of await providers()) {
-    for (const model of [picked.get(p.name), ...p.models].filter((v, i, a) => v && a.indexOf(v) === i)) {
+    const order = p.name === "groq" ? [...p.models.slice(groqTurn++ % p.models.length), ...p.models.slice(0, groqTurn % p.models.length)] : [picked.get(p.name), ...p.models];
+    for (const model of order.filter((v, i, a) => v && a.indexOf(v) === i)) {
       try {
         const r = await fetch(`${p.base}/chat/completions`, { method: "POST", signal: AbortSignal.timeout(p.name === "nvidia" ? 120_000 : 60_000),
           headers: { "content-type": "application/json", authorization: `Bearer ${p.key}` },
-          body: JSON.stringify({ model, messages, tools, tool_choice: "auto", max_tokens: 1400, temperature: 0.3 }) });
-        const j = await r.json();
-        if (r.ok && j.choices?.[0]?.message) { picked.set(p.name, model); return { msg: j.choices[0].message, brain: `${p.name}/${model}` }; }
-        errs.push(`${p.name}/${model} ${r.status} ${JSON.stringify(j.error ?? "").slice(0, 80)}`);
-        if (![400, 404, 410, 429, 503].includes(r.status)) break;   // rate limits and retired models are per model: try the next
+          body: JSON.stringify({ model, messages, tools, tool_choice: "auto", max_tokens: 900, temperature: 0.3, stream: true }) });
+        if (!r.ok) { let j = {}; try { j = await r.json(); } catch {} const e = `${p.name}/${model} ${r.status} ${JSON.stringify(j.error ?? "").slice(0, 160)}`; errs.push(e); console.error("[brain] fallback:", e); if (![400, 404, 410, 429, 503].includes(r.status)) break; continue; }
+        // stream: text deltas go to the browser as they arrive; tool calls are assembled
+        const msg = { role: "assistant", content: "", tool_calls: [] }; const calls = new Map(); let buf = "";
+        const reader = r.body.getReader(); const dec = new TextDecoder();
+        while (true) { const { value, done } = await reader.read(); if (done) break; buf += dec.decode(value, { stream: true });
+          let i; while ((i = buf.indexOf("\n")) >= 0) { const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1); if (!line.startsWith("data:")) continue; const data = line.slice(5).trim(); if (data === "[DONE]") continue;
+            let ev; try { ev = JSON.parse(data); } catch { continue; } const d = ev.choices?.[0]?.delta; if (!d) continue;
+            if (d.content) { msg.content += d.content; send?.({ type: "delta", text: d.content }); }
+            for (const tc of d.tool_calls ?? []) { const c = calls.get(tc.index) ?? { id: tc.id, type: "function", function: { name: "", arguments: "" } }; if (tc.id) c.id = tc.id; if (tc.function?.name) c.function.name += tc.function.name; if (tc.function?.arguments) c.function.arguments += tc.function.arguments; calls.set(tc.index, c); } } }
+        for (const line of buf.split("\n")) { const l = line.trim(); if (!l.startsWith("data:") || l.slice(5).trim() === "[DONE]") continue; try { const d = JSON.parse(l.slice(5)).choices?.[0]?.delta; if (d?.content) { msg.content += d.content; send?.({ type: "delta", text: d.content }); } } catch {} }
+        msg.tool_calls = [...calls.values()]; if (!msg.tool_calls.length) delete msg.tool_calls;
+        picked.set(p.name, model); return { msg, brain: `${p.name}/${model}` };
       } catch (e) { errs.push(`${p.name}/${model} ${String(e.message).slice(0, 60)}`); break; }
     }
   }
   throw new Error("no platform brain answered: " + errs.join(" | "));
 }
+// Only the tools a question can plausibly need travel with it. The four core
+// tools always go; the rest are picked by topic. Keeps a turn near 3k tokens.
+const CORE_TOOLS = ["navigate", "fleet_status", "desk_api", "recall"];
+const TOPICS = [
+  [/news|headline|world|happening|market.?s?\b|wire|crypto|geopolit|oil|war/i, ["news"]],
+  [/research|paper|arxiv|scholar|study|read\b|literature|search the web|look up|google/i, ["arxiv_search", "scholar_search", "web_search", "read_url", "write_note"]],
+  [/create|new bot|make a bot|build a bot|my bots|spec bot|pause|resume|retire/i, ["create_bot", "list_bots", "set_bot"]],
+  [/fix|change|bug|code|why does|why is .* (losing|broken)|source|function|file/i, ["read_code", "search_code", "propose_fix"]],
+  [/health|running|down|degraded|working|broken|status|everything ok/i, ["health_check"]],
+  [/brief|morning|status|summary|what happened|since yesterday|overnight/i, ["morning_brief"]],
+  [/backtest|strategy|sharpe|edge|blend|weights|overfit|holdout|momentum|rsi/i, ["backtest_results", "propose_strategy", "run_backtest"]],
+  [/forecast|predict|scenario|will .* go up|monte/i, ["scenario_forecast"]],
+  [/safe|safety|assert|invariant|cap|proving/i, ["safety_proof"]],
+  [/venue|exchange|where can|trade from|canada|kraken|hyperliquid|polymarket|kalshi/i, ["venues"]],
+  [/start|stop|restart|kick|log of|logs?\b|service/i, ["fleet_control"]],
+  [/remember|note this|keep in mind|memory|desk state|forget/i, ["remember", "update_desk_state"]],
+  [/second opinion|cross.?check|ask astra|ask the 550|deep think/i, ["second_opinion"]],
+  [/test|pytest/i, ["run_tests"]],
+];
+function pickTools(q) {
+  const want = new Set(CORE_TOOLS);
+  for (const [re, names] of TOPICS) if (re.test(q)) names.forEach((x) => want.add(x));
+  if (want.size <= CORE_TOOLS.length) ["morning_brief", "news", "health_check"].forEach((x) => want.add(x));
+  return REGISTRY.filter((t) => want.has(t.name));
+}
+
+// Something on screen within a few milliseconds, whichever brain ends up
+// answering. Replaced by the real answer when it lands.
+const ACK = { navigate: "Opening it.", morning_brief: "Pulling the briefing.", health_check: "Checking every feed.", news: "Reading the wire.", backtest_results: "Checking the backtests.",
+  scenario_forecast: "Running the scenarios — about ten seconds.", propose_strategy: "Judging it on holdout — about twenty seconds.", create_bot: "Building it.", read_code: "Reading the code.", arxiv_search: "Searching the literature." };
+function ack(q, picked) { const hit = picked.find((t) => ACK[t.name] && t.name !== "navigate" && t.name !== "desk_api" && t.name !== "fleet_status" && t.name !== "recall"); if (/open|show|go to|take me/i.test(q)) return ACK.navigate; return hit ? ACK[hit.name] : "On it."; }
+
 async function platformTurn(q, send) {
-  const tools = REGISTRY.map((t) => ({ type: "function", function: { name: t.name, description: t.description.slice(0, 420), parameters: zodToJsonSchema(t.schema, { target: "openApi3" }) } }));
-  const history = await loadThread();
-  const messages = [{ role: "system", content: await systemPrompt() }, ...history, { role: "user", content: q }];
+  const chosen = pickTools(q);
+  send({ type: "delta", text: ack(q, chosen) + " " });
+  const tools = chosen.map((t) => { const p = zodToJsonSchema(t.schema, { target: "openApi3" }); delete p.$schema;
+    for (const v of Object.values(p.properties ?? {})) { if (v.enum && v.enum.length > 12) { v.description = `one of ${v.enum.length} known values; the tool corrects near-misses`; delete v.enum; } }
+    return { type: "function", function: { name: t.name, description: t.description.split(/(?<=[.!?])\s/)[0].slice(0, 160), parameters: p } }; });
+  let history = (await loadThread()).slice(-8).map((m) => (m.role === "tool" ? { ...m, content: String(m.content).slice(0, 500) } : m));
+  const firstUser = history.findIndex((m) => m.role === "user"); history = firstUser >= 0 ? history.slice(firstUser) : [];   // never start on an orphaned tool result
+  const messages = [{ role: "system", content: (await systemPrompt()).slice(0, 5200) }, ...history, { role: "user", content: q }];
   let answer = "", brain = "";
   for (let step = 0; step < 24; step++) {
-    const { msg, brain: b } = await chat(messages, tools); brain = b;
+    const { msg, brain: b } = await chat(messages, tools, send); brain = b;
     messages.push({ role: "assistant", content: msg.content ?? "", ...(msg.tool_calls ? { tool_calls: msg.tool_calls } : {}) });
-    if (!msg.tool_calls?.length) { answer = msg.content ?? ""; if (answer) send({ type: "delta", text: answer }); break; }
-    for (const call of msg.tool_calls) {
+    if (!msg.tool_calls?.length) { answer = msg.content ?? ""; break; }
+    const results = await Promise.all(msg.tool_calls.map(async (call) => {
       const t = REGISTRY.find((x) => x.name === call.function.name);
       let args = {}; try { args = JSON.parse(call.function.arguments || "{}"); } catch {}
       send({ type: "tool", name: call.function.name });
-      let out;
-      if (!t) out = "unknown tool";
-      else { const parsed = t.schema.safeParse(args); if (!parsed.success) out = `bad arguments: ${parsed.error.issues.map((i) => i.path.join(".") + " " + i.message).join("; ")}`; else { try { const r = await t.handler(parsed.data); out = (r.content ?? []).map((c) => c.text ?? "").join("\n"); if (r.isError) out = "ERROR: " + out; } catch (e) { out = "tool failed: " + String(e.message).slice(0, 200); } } }
-      messages.push({ role: "tool", tool_call_id: call.id, content: String(out).slice(0, 24_000) });
-    }
+      if (!t) return { id: call.id, out: "unknown tool" };
+      const parsed = t.schema.safeParse(nearest(t, args));
+      if (!parsed.success) return { id: call.id, out: `bad arguments: ${parsed.error.issues.map((i) => i.path.join(".") + " " + i.message).join("; ")}` };
+      try { const r = await t.handler(parsed.data); let out = (r.content ?? []).map((c) => c.text ?? "").join("\n"); if (r.isError) out = "ERROR: " + out; return { id: call.id, out }; }
+      catch (e) { return { id: call.id, out: "tool failed: " + String(e.message).slice(0, 200) }; }
+    }));
+    for (const r of results) messages.push({ role: "tool", tool_call_id: r.id, content: String(r.out).slice(0, 12_000) });
   }
   await saveThread(messages.slice(1));   // everything but the system prompt
   return { answer: answer || "I could not complete that.", brain };

@@ -178,6 +178,48 @@ async def ensemble_member_maxes(s: aiohttp.ClientSession, lat: float, lon: float
     return maxes
 
 
+_MULTI_CACHE: dict = {}
+MULTI_TTL_S = 3 * 3600
+MULTI_MODELS = "ecmwf_ifs025,gfs_seamless,icon_seamless,gem_seamless,meteofrance_seamless,ukmo_seamless,jma_seamless,bom_access_global"
+
+
+async def multimodel_member_maxes(s: aiohttp.ClientSession, lat: float, lon: float,
+                                  event_date: str, now_key: str, is_f: bool):
+    """
+    The middle tier when the ensemble API is rate-limited: eight independent
+    global models from the (separately limited) forecast API, each one a
+    member. Eight is thin next to eighty, but it is a real spread from real
+    models -- far better than a Gaussian guess. Cached three hours per city.
+    """
+    ck = (round(lat, 2), round(lon, 2), is_f)
+    hit = _MULTI_CACHE.get(ck)
+    if hit and time.time() - hit[0] < MULTI_TTL_S:
+        d = hit[1]
+    else:
+        params = {"latitude": lat, "longitude": lon, "hourly": "temperature_2m", "models": MULTI_MODELS,
+                  "forecast_days": 2, "timezone": "auto"}
+        if is_f:
+            params["temperature_unit"] = "fahrenheit"
+        d = await jget(s, "https://api.open-meteo.com/v1/forecast", params=params)
+        if d and d.get("hourly"):
+            _MULTI_CACHE[ck] = (time.time(), d)
+        elif hit:
+            d = hit[1]
+    h = (d or {}).get("hourly") or {}
+    times = h.get("time") or []
+    idx = [i for i, t in enumerate(times) if t.startswith(event_date) and t[:13] > now_key]
+    if not idx:
+        return []
+    maxes = []
+    for key, vals in h.items():
+        if not key.startswith("temperature_2m_") or not isinstance(vals, list):
+            continue
+        member = [vals[i] for i in idx if i < len(vals) and vals[i] is not None]
+        if member:
+            maxes.append(max(member))
+    return maxes
+
+
 def log_write(rec: dict) -> None:
     with LOG.open("a") as f:
         f.write(json.dumps(rec) + "\n")
@@ -305,10 +347,18 @@ async def scan_once(s: aiohttp.ClientSession) -> int:
 
         # ── ENSEMBLE bucket probabilities (ECMWF+GFS members) ────────────────
         member_maxes: list[float] = []
+        prob_source = "gaussian"
         if not day_complete:
             member_maxes = await ensemble_member_maxes(
                 s, geo["lat"], geo["lon"], event_date, now_key, is_f)
-        prob_source = "ensemble" if len(member_maxes) >= 15 else "gaussian"
+            if len(member_maxes) >= 15:
+                prob_source = "ensemble"
+            else:
+                # ensemble API limited or down: eight global models beat a Gaussian
+                member_maxes = await multimodel_member_maxes(
+                    s, geo["lat"], geo["lon"], event_date, now_key, is_f)
+                if len(member_maxes) >= 5:
+                    prob_source = "multimodel"
 
         # Gaussian fallback parameters (also used for center/sigma reporting)
         if day_complete:
@@ -321,7 +371,7 @@ async def scan_once(s: aiohttp.ClientSession) -> int:
             sigma = math.sqrt(station_noise ** 2 + (forecast_noise * rem) ** 2)
 
         def bucket_prob(lo: float, hi: float) -> float:
-            if prob_source == "ensemble":
+            if prob_source in ("ensemble", "multimodel"):
                 # mixture over member day-maxes. CRITICAL: a member only counts
                 # as pushing the max HIGHER if its remaining-hours peak exceeds
                 # the observed station max by ≥1 whole degree — Wunderground
