@@ -20,6 +20,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from "recharts";
 import TopNav from "@/components/TopNav";
+import { Zap } from "lucide-react";
 import EngineBanner from "@/components/EngineBanner";
 import { getToggle } from "@/lib/toggles";
 
@@ -261,7 +262,7 @@ export default function CryptoAutoTrader() {
         <EngineBanner engine="oracle-lag (gated)" />
         <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
           <div>
-            <h1 className="text-xl font-bold tracking-[0.2em] glow-cyan">◎ CRYPTO 5-MIN AUTO-TRADER</h1>
+            <h1 className="inline-flex items-center gap-2 text-xl font-bold tracking-[0.2em] glow-cyan"><Zap size={20} aria-hidden /> CRYPTO 5-MIN AUTO-TRADER</h1>
             <p className="text-xs mt-1" style={{ color: "var(--hud-muted)" }}>
               Live Binance spot + live Polymarket Up/Down markets · paper-trades ${STAKE_USD}/window automatically
               · window closes in <span className="glow-amber">{Math.floor(secsLeft / 60)}:{String(secsLeft % 60).padStart(2, "0")}</span>

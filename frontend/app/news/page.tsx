@@ -5,6 +5,8 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import TopNav from "@/components/TopNav";
 import EngineBanner from "@/components/EngineBanner";
+import LiveTV from "@/components/news/LiveTV";
+import { Newspaper } from "lucide-react";
 
 interface Affected { sym: string; relation: string; direction: string; price: number; chgPct: number }
 interface Card {
@@ -50,13 +52,14 @@ export default function NewsDeskPage() {
       <TopNav />
       <main className="max-w-6xl mx-auto p-6 font-mono">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-          <h1 className="text-xl font-bold tracking-[0.2em] glow-cyan">◈ QUANT NEWS DESK</h1>
+          <h1 className="text-xl font-bold tracking-[0.2em] glow-cyan inline-flex items-center gap-2"><Newspaper size={20} aria-hidden /> WORLD NEWS DESK</h1>
           <p className="text-xs mt-1 mb-4" style={{ color: "var(--hud-muted)" }}>
-            Live headlines → event type → affected chain → expected move &amp; vol → the play.
+            Live television from the major channels, then every headline the desk reads → event type → affected chain → expected move &amp; vol → the play.
             Every ticker below is validated against a live quote. Refreshes every 5 min.
           </p>
           <EngineBanner engine="news-lag (niche)" />
         </motion.div>
+        <LiveTV />
 
         <form className="flex gap-2 mb-5" onSubmit={(e) => { e.preventDefault(); load(q || undefined); }}>
           <input value={q} onChange={(e) => setQ(e.target.value)}

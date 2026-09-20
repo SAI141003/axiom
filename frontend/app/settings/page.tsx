@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import TopNav from "@/components/TopNav";
+import { KeyRound } from "lucide-react";
 import { TOGGLES, getToggle, setToggle } from "@/lib/toggles";
 
 interface KeyRow {
@@ -87,7 +88,7 @@ export default function SettingsPage() {
     <div className="hud-bg">
       <TopNav />
       <main className="max-w-3xl mx-auto p-6 font-mono">
-        <h1 className="text-xl font-bold tracking-[0.2em] glow-cyan">⚙ SETTINGS — API KEYS</h1>
+        <h1 className="inline-flex items-center gap-2 text-xl font-bold tracking-[0.2em] glow-cyan"><KeyRound size={20} aria-hidden /> SETTINGS — API KEYS</h1>
         <p className="text-xs mt-1 mb-6" style={{ color: "var(--hud-muted)" }}>
           Paste keys here instead of chat — they go straight to the local env files
           (gitignored, never leave this machine). Values are never displayed back, only last 4 chars.

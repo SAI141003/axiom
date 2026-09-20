@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import TopNav from "@/components/TopNav";
+import { Eye } from "lucide-react";
 
 /**
  * THE ORACLE — ask anything, get an exact verdict + probability + why.
@@ -67,7 +68,7 @@ export default function OraclePage() {
       <TopNav />
       <main className="max-w-4xl mx-auto p-6 font-mono">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-xl font-bold tracking-[0.25em] glow-cyan text-center">◈ THE ORACLE</h1>
+          <h1 className="inline-flex items-center gap-2 text-xl font-bold tracking-[0.25em] glow-cyan text-center"><Eye size={20} aria-hidden /> THE ORACLE</h1>
           <p className="text-[11px] mt-1 mb-4 text-center" style={{ color: "var(--hud-muted)" }}>
             outside-view base rate → simulation → 72-agent swarm → extremized verdict · every call Brier-scored
           </p>

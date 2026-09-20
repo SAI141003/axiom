@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import TopNav from "@/components/TopNav";
+import { TrendingUp, Search } from "lucide-react";
 import { getToggle } from "@/lib/toggles";
 
 interface Quote {
@@ -162,7 +163,7 @@ function DeepChain() {
   return (
     <div className="mb-10">
       <h2 className="text-sm font-bold tracking-widest mb-1" style={{ color: "var(--hud-accent)" }}>
-        🔎 SEARCH ANY STOCK — DEEP RESEARCH
+        <Search size={14} aria-hidden /> SEARCH ANY STOCK — DEEP RESEARCH
       </h2>
       <p className="text-[10px] mb-3" style={{ color: "var(--hud-muted)" }}>
         Type any symbol — even a penny stock. AI maps its parts → named manufacturers (incl. small caps),
@@ -407,7 +408,7 @@ export default function StocksPage() {
     <div className="hud-bg">
       <TopNav />
       <main className="max-w-6xl mx-auto p-6 font-mono">
-        <h1 className="text-xl font-bold tracking-[0.2em] glow-amber">▲ AI STOCK PLAYBOOK</h1>
+        <h1 className="inline-flex items-center gap-2 text-xl font-bold tracking-[0.2em] glow-amber"><TrendingUp size={20} aria-hidden /> AI STOCK PLAYBOOK</h1>
         <p className="text-xs mt-1 mb-6" style={{ color: "var(--hud-muted)" }}>
           July 2026 · 5 catalyst trades (2-4 mo) + 5 long-term compounders · live quotes via Yahoo Finance
           · educational only, not financial advice

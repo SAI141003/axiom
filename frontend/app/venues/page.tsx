@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import TopNav from "@/components/TopNav";
+import { ShieldCheck } from "lucide-react";
 
 type Venue = {
   name: string; cat: string; tier: number; canada: string; custody: string;
@@ -30,7 +31,7 @@ export default function VenuesPage() {
     <div className="hud-bg min-h-screen">
       <TopNav />
       <main className="max-w-5xl mx-auto p-6 font-mono">
-        <h1 className="text-xl font-bold tracking-[0.25em] glow-cyan text-center">⚡ TRADING VENUES</h1>
+        <h1 className="inline-flex items-center gap-2 text-xl font-bold tracking-[0.25em] glow-cyan text-center"><ShieldCheck size={20} aria-hidden /> TRADING VENUES</h1>
         <p className="text-[11px] mt-1 mb-4 text-center" style={{ color: "var(--hud-muted)" }}>
           every platform a bot can trade on · can we reach it from Vancouver (BC)? · is the custody model safe for automation? · researched {d?.as_of ?? ""}, cited
         </p>

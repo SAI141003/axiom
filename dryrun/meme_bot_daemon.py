@@ -94,6 +94,27 @@ def pump_market(extra_addrs=()):
     return out
 
 
+SMART = ROOT / ".data" / "pump_smart_money.json"
+
+
+def smart_money():
+    """Mints the pump.fun tracker flags right now, with why. Empty if it is not running."""
+    try:
+        d = json.loads(SMART.read_text())
+    except Exception:
+        return {}
+    if time.time() - d.get("ts", 0) > 900:        # stale tracker = no opinion
+        return {}
+    out = {}
+    for s in d.get("signals", []):                  # buyer-level (needs key): strongest
+        out[s["mint"]] = f"smart-money x{s['smart_buyers']}"
+    for m in d.get("migrations_1h", []):            # graduated in the last hour: real liquidity event
+        out.setdefault(m["mint"], "graduated")
+    for l in d.get("smart_creator_launches_1h", []):
+        out.setdefault(l["mint"], "smart-creator launch")
+    return out
+
+
 def market(extra_pump_addrs=()):
     """Live meme-coin snapshot: {id: {sym, price, m1h, m24h, vol}} — CoinGecko majors + pump.fun."""
     out = pump_market(extra_pump_addrs)
@@ -129,7 +150,12 @@ def cycle():
     open_pos = [r for r in rows if r["type"] == "mentry" and r["id"] not in closed]
     held = {p["coin"] for p in open_pos}
     # held pump.fun mints must be repriced even after they drop off the trending list
-    mkt = market(extra_pump_addrs=[c.split(":", 1)[1] for c in held if c.startswith("pump:")])
+    smart = smart_money()
+    mkt = market(extra_pump_addrs=[c.split(":", 1)[1] for c in held if c.startswith("pump:")] + list(smart))
+    for cid, m in mkt.items():
+        mint = cid.split(":", 1)[1] if cid.startswith("pump:") else None
+        if mint in smart:
+            m["signal"] = smart[mint]
     if not mkt:
         return
     now = time.time()
@@ -153,7 +179,10 @@ def cycle():
     slots = MAX_POS - len([p for p in open_pos if p["coin"] in held])
     if slots <= 0:
         return
-    cands = [(m["m1h"] + 0.4 * m["m24h"], cid, m) for cid, m in mkt.items()
+    # smart-money and graduation flags rank first; momentum still has to be there
+    # and the liquidity floor still applies -- the flag is a reason to look, not
+    # a licence to skip the rug guard.
+    cands = [((m["m1h"] + 0.4 * m["m24h"]) * (2.0 if m.get("signal") else 1.0), cid, m) for cid, m in mkt.items()
              if cid not in held and _tradeable(cid, m)]
     cands.sort(reverse=True)
     today = datetime.now(ET).strftime("%Y-%m-%d")
@@ -161,7 +190,7 @@ def cycle():
         _write({"type": "mentry", "id": f"{int(now)}-{cid}", "date": today, "coin": cid,
                 "sym": m["sym"], "entry": m["price"], "m1h": round(m["m1h"], 2),
                 "m24h": round(m["m24h"], 2), "score": round(score, 2), "ts": int(now),
-                "source": m.get("source", "coingecko"), "liq": m.get("liq"), "url": m.get("url")})
+                "source": m.get("source", "coingecko"), "liq": m.get("liq"), "url": m.get("url"), "signal": m.get("signal")})
         print(f"[meme-bot] BUY {m['sym']} @ {m['price']} via {m.get('source')} (1h {m['m1h']:+.1f}% 24h {m['m24h']:+.1f}%)", flush=True)
 
 

@@ -499,22 +499,31 @@ def engines_status() -> dict:
     pos = {r["id"]: r for r in rows if r["type"] == "position"}
     oclosed = {r["id"]: r for r in rows if r["type"] == "close"}
     ol = []
+    books: dict = {1: [], 2: []}
     for pid, p in pos.items():
         c = oclosed.get(pid)
         if not c or p.get("kind") != "main" or p.get("cost", 0) > 1000 or not p.get("cost"):
             continue
         ret = c["realized"] / p["cost"]                 # return on premium paid
-        ol.append({"won": c["realized"] > 0, "pnl": round(10 * ret, 2),  # flat $10 bet
-                   "ts": c.get("ts", 0)})
-    acct, ol = walk_account(ol)
-    if ol:
+        books[2 if p.get("v") == 2 else 1].append({"won": c["realized"] > 0, "pnl": round(10 * ret, 2),  # flat $10 bet
+                                                   "ts": c.get("ts", 0)})
+    # v1 is the book that blew up; it stays on the board as history. v2 is the
+    # same desk behind the score>=0.5 / calls-only gates, scored fresh from $100.
+    for ver, label, cfg in ((1, "options v1 (retired)", "main legs, penny OFF, $10/bet — RETIRED 2026-09-20: 25% win, blew the book"),
+                            (2, "options ($100 acct)", "v2: score>=0.5, calls only, $10/bet — forward test from 2026-09-20")):
+        acct, ol = walk_account(books[ver])
+        if not ol and ver == 2:
+            out[label] = {"trades": 0, "wins": 0, "win_rate": None, "pnl": 0.0, "account": 100.0,
+                          "today": {"trades": 0, "wins": 0, "pnl": 0.0}, "daily": [], "config": cfg}
+            continue
+        if not ol:
+            continue
         w = sum(1 for t in ol if t["won"])
         today_o, daily_o = day_split(ol)
-        out["options ($100 acct)"] = {
+        out[label] = {
             "trades": len(ol), "wins": w, "win_rate": round(w / len(ol), 3),
             "pnl": round(acct - 100, 2), "account": round(acct, 2),
-            "today": today_o, "daily": daily_o,
-            "config": "main legs, penny OFF, $10/bet — UNPROVEN: 2nd-half turned red"}
+            "today": today_o, "daily": daily_o, "config": cfg}
     # gamma-pulse: $100 paper account trading the dealer-gamma regime edge
     rows = load("gamma_pulse_paper.jsonl")
     gres = [r for r in rows if r["type"] == "gresolve"]

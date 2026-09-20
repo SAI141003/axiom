@@ -1,23 +1,25 @@
 "use client";
 
+import { TrendingUp, Radio, Globe, ShieldCheck, Sparkles } from "lucide-react";
+
 import { useState } from "react";
 import Link from "next/link";
 import TopNav from "@/components/TopNav";
 
 export const AI_FEATURES = [
-  { id: "stock-analyst", href: "/ai/stock-analyst", icon: "◆", title: "AI STOCK ANALYST",
+  { id: "stock-analyst", href: "/ai/stock-analyst", icon: TrendingUp, title: "AI STOCK ANALYST",
     desc: "Live price, vol, VaR, SMA + news → bull/bear thesis, target range, conviction score.",
     placeholder: "NVDA", inputLabel: "Ticker", accent: "var(--hud-cyan)", glow: "glow-cyan" },
-  { id: "market-intel", href: "/ai/market-intel", icon: "◉", title: "AI MARKET INTELLIGENCE",
+  { id: "market-intel", href: "/ai/market-intel", icon: Radio, title: "AI MARKET INTELLIGENCE",
     desc: "Watchlist headlines scanned — flags only what materially changes your thesis.",
     placeholder: "NVDA, TSLA, BTC-USD", inputLabel: "Watchlist (comma-separated)", accent: "var(--hud-violet)", glow: "glow-violet" },
-  { id: "macro", href: "/ai/macro", icon: "◈", title: "AI MACRO ANALYST",
+  { id: "macro", href: "/ai/macro", icon: Globe, title: "AI MACRO ANALYST",
     desc: "Live SPX, NDX, 10Y, DXY, gold, oil, BTC, VIX → tight morning brief for your book.",
     placeholder: "long US tech + crypto, small gold hedge", inputLabel: "Your portfolio (free text)", accent: "var(--hud-amber)", glow: "glow-amber" },
-  { id: "risk-engine", href: "/ai/risk-engine", icon: "▣", title: "AI RISK ENGINE",
+  { id: "risk-engine", href: "/ai/risk-engine", icon: ShieldCheck, title: "AI RISK ENGINE",
     desc: "Portfolio VaR/CVaR from 1y of live returns + stress tests + cheapest hedges.",
     placeholder: "NVDA 40\nMSFT 30\nBTC-USD 30", inputLabel: "Positions (TICKER WEIGHT per line)", accent: "var(--hud-red)", glow: "glow-red", multiline: true },
-  { id: "alpha-hunter", href: "/ai/alpha-hunter", icon: "▲", title: "AI ALPHA HUNTER",
+  { id: "alpha-hunter", href: "/ai/alpha-hunter", icon: Sparkles, title: "AI ALPHA HUNTER",
     desc: "30-name universe scanned live for vol-normalized anomalies — top 10 ranked by edge.",
     placeholder: "", inputLabel: "", accent: "var(--hud-green)", glow: "glow-green", noInput: true },
 ] as const;
@@ -61,13 +63,13 @@ export default function AiTool({ featureId }: { featureId: AiFeatureId }) {
             <Link key={f.id} href={f.href}
                   className={`hud-chip transition-all ${f.id === feature.id ? "hud-nav-active" : ""}`}
                   style={{ color: f.id === feature.id ? undefined : "var(--hud-muted)" }}>
-              {f.icon} {f.title.replace("AI ", "")}
+              <f.icon size={12} aria-hidden /> {f.title.replace("AI ", "")}
             </Link>
           ))}
         </div>
 
-        <h1 className={`text-xl font-bold tracking-[0.2em] ${feature.glow}`}>
-          {feature.icon} {feature.title}
+        <h1 className={`text-xl font-bold tracking-[0.2em] inline-flex items-center gap-2 ${feature.glow}`}>
+          <feature.icon size={20} aria-hidden /> {feature.title}
         </h1>
         <p className="text-xs mt-1 mb-6" style={{ color: "var(--hud-muted)" }}>{feature.desc}</p>
 

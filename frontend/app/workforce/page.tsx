@@ -50,6 +50,7 @@ export default function WorkforcePage() {
   return (
     <div className="hud-bg min-h-screen">
       <TopNav />
+      <h1 className="sr-only">THE WORKFORCE</h1>
       <main className="max-w-6xl mx-auto p-4 font-mono">
         {/* HUD bar */}
         <div className="flex items-center justify-between flex-wrap gap-3 mb-2 px-2">

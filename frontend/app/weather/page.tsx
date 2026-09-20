@@ -1,5 +1,7 @@
 "use client";
 
+import { Zap } from "lucide-react";
+
 import { useEffect, useState } from "react";
 import TopNav from "@/components/TopNav";
 import { getToggle } from "@/lib/toggles";
@@ -130,7 +132,7 @@ export default function WeatherPage() {
                     <div className="mt-2 px-2 py-1.5 text-[10px] font-bold leading-snug"
                          style={{ background: "rgba(62,207,142,0.08)", border: "1px solid rgba(62,207,142,0.3)",
                                   color: "var(--hud-green)", borderRadius: 8 }}>
-                      ⚡ {r.bestPlay.length > 96 ? r.bestPlay.slice(0, 96) + "…" : r.bestPlay}
+                      <Zap size={11} aria-hidden style={{ display: "inline", verticalAlign: "-1px" }} /> {r.bestPlay.length > 96 ? r.bestPlay.slice(0, 96) + "…" : r.bestPlay}
                     </div>
                   )}
 
