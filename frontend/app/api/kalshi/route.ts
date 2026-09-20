@@ -9,7 +9,7 @@ import crypto from "crypto";
  */
 const HOSTS = [
   "https://api.elections.kalshi.com/trade-api/v2",
-  "https://trading-api.kalshi.com/trade-api/v2",
+  "https://api.elections.kalshi.com/trade-api/v2",
 ];
 
 function kalshiAuthHeaders(method: string, path: string): Record<string, string> {

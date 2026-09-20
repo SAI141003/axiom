@@ -24,7 +24,7 @@ function providers(): Provider[] {
       model: process.env.CEREBRAS_MODEL || "gpt-oss-120b", fallbacks: ["qwen-3-235b-a22b-instruct-2507", "llama-3.3-70b"] },
     { name: "nvidia", key: process.env.NVIDIA_API_KEY,
       base: process.env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1",
-      model: process.env.NVIDIA_MODEL || "google/gemma-4-31b-it" },
+      model: process.env.NVIDIA_MODEL || "z-ai/glm-5.3", fallbacks: ["moonshotai/kimi-k3", "mistralai/mistral-large-2-instruct"] },
   ].filter((p) => !!p.key);
 }
 
