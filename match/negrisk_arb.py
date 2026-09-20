@@ -337,13 +337,30 @@ async def validate_with_clob(opp: NegRiskOpportunity) -> NegRiskOpportunity:
     return opp
 
 
+_REJECT_SEEN: dict = {}
+_REJECT_EVERY_S = 600          # one rejection row per (event, status) per 10 min
+_ROTATE_BYTES = 100 * 1024 * 1024
+
+
 def _log_validation(opp: NegRiskOpportunity) -> None:
-    """Gap journal: raw Gamma edge vs executable CLOB edge, per basket."""
+    """Gap journal: raw Gamma edge vs executable CLOB edge, per basket.
+
+    Every validated basket is logged. Rejections are the same few hundred
+    events failing the same way every tick; unbounded they wrote 7M rows and
+    filled the disk, so they are rate-limited and the file is rotated."""
     global _VALIDATION_LOG
     try:
+        if not opp.validated:
+            key = (opp.event_title, "unquotable" if opp.exec_sum < 0 else "no_edge")
+            now = time.time()
+            if now - _REJECT_SEEN.get(key, 0) < _REJECT_EVERY_S:
+                return
+            _REJECT_SEEN[key] = now
         if _VALIDATION_LOG is None:
             from pathlib import Path
             _VALIDATION_LOG = Path(__file__).resolve().parent.parent / "logs" / "negrisk_validated.jsonl"
+        if _VALIDATION_LOG.exists() and _VALIDATION_LOG.stat().st_size > _ROTATE_BYTES:
+            _VALIDATION_LOG.replace(_VALIDATION_LOG.with_suffix(".jsonl.1"))
         with _VALIDATION_LOG.open("a") as f:
             f.write(json.dumps({
                 "ts": int(time.time()), "event": opp.event_title,
