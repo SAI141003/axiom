@@ -7,16 +7,16 @@ import {
 
 // One palette for every chart on the desk. Indigo is the brand; the rest are
 // chosen to stay distinguishable on the dark ground and to a colour-blind eye.
-export const PALETTE = ["#7c9aff", "#34d399", "#fbbf24", "#f87171", "#c084fc", "#22d3ee", "#a3e635", "#fb923c"];
-export const GREEN = "#34d399";
-export const RED = "#f87171";
+export const PALETTE = ["#38bdf8", "#f5b942", "#22c55e", "#ef4444", "#c084fc", "#7dd3fc", "#a3e635", "#fb923c"];
+export const GREEN = "#22c55e";
+export const RED = "#ef4444";
 
 const tip = {
-  contentStyle: { background: "#0d1017", border: "1px solid #313a4e", borderRadius: 6, fontSize: 11, fontFamily: "inherit" },
-  labelStyle: { color: "#a8b9ff" },
-  itemStyle: { color: "#e8ecf4" },
+  contentStyle: { background: "#0e131d", border: "1px solid #2c3a4f", borderRadius: 6, fontSize: 11, fontFamily: "inherit" },
+  labelStyle: { color: "#7dd3fc" },
+  itemStyle: { color: "#eef2f8" },
 };
-const axis = { stroke: "#6b7488", fontSize: 10, fontFamily: "inherit" };
+const axis = { stroke: "#7d8aa3", fontSize: 10, fontFamily: "inherit" };
 
 export function Card({ title, sub, children, className = "" }: { title: string; sub?: string; children: React.ReactNode; className?: string }) {
   return (
@@ -64,12 +64,12 @@ export function CompareBars({ data, keys, height = 240, format, signed }:
   return (
     <ResponsiveContainer width="100%" height={h}>
       <BarChart data={data} layout="vertical" margin={{ top: 4, right: 12, left: 4, bottom: 0 }} barCategoryGap="28%">
-        <CartesianGrid stroke="#232936" horizontal={false} />
+        <CartesianGrid stroke="#1e2836" horizontal={false} />
         <XAxis type="number" tick={axis} tickFormatter={(v) => (format ? format(v) : v)} />
         <YAxis type="category" dataKey="name" tick={{ ...axis, fontSize: 11 }} width={96} interval={0} />
         <Tooltip {...tip} formatter={(v: any) => (format ? format(Number(v)) : v)} />
         {keys.length > 1 && <Legend wrapperStyle={{ fontSize: 10 }} />}
-        {signed && <ReferenceLine x={0} stroke="#6b7488" />}
+        {signed && <ReferenceLine x={0} stroke="#7d8aa3" />}
         {keys.map((k, i) => (
           <Bar key={k.key} dataKey={k.key} name={k.label} fill={PALETTE[i % PALETTE.length]} radius={[0, 3, 3, 0]}>
             {keys.length === 1 && signed && data.map((d, j) => <Cell key={j} fill={d[k.key] >= 0 ? GREEN : RED} />)}
@@ -86,12 +86,12 @@ export function Lines({ data, keys, height = 260, format, xKey = "date", refY }:
   return (
     <ResponsiveContainer width="100%" height={height}>
       <LineChart data={data} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
-        <CartesianGrid stroke="#232936" vertical={false} />
+        <CartesianGrid stroke="#1e2836" vertical={false} />
         <XAxis dataKey={xKey} tick={axis} minTickGap={24} />
         <YAxis tick={axis} tickFormatter={(v) => (format ? format(v) : v)} domain={["auto", "auto"]} />
         <Tooltip {...tip} formatter={(v: any) => (format ? format(Number(v)) : v)} />
         {keys.length > 1 && <Legend wrapperStyle={{ fontSize: 10 }} />}
-        {refY != null && <ReferenceLine y={refY} stroke="#6b7488" strokeDasharray="4 4" />}
+        {refY != null && <ReferenceLine y={refY} stroke="#7d8aa3" strokeDasharray="4 4" />}
         {keys.map((k, i) => (
           <Line key={k} type="monotone" dataKey={k} stroke={PALETTE[i % PALETTE.length]} dot={false} strokeWidth={1.8} connectNulls />
         ))}

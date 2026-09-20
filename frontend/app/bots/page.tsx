@@ -75,13 +75,13 @@ function Fleet() {
     <div className="flex flex-col gap-4">
       {goat && (
         <div className="hud-glass rounded-2xl p-4 flex flex-wrap items-center gap-4" role="status">
-          <span className="hud-page-icon" style={{ width: 40, height: 40 }} aria-hidden><CloudSun size={18} /></span>
+          <span className="hud-page-icon" style={{ width: 40, height: 40, color: "var(--hud-gold)", background: "var(--hud-gold-soft)", boxShadow: "inset 0 0 0 1px rgba(245,185,66,0.3), 0 0 30px -8px rgba(245,185,66,0.5)" }} aria-hidden><CloudSun size={18} /></span>
           <div className="min-w-0 flex-1">
-            <div className="text-[10px] tracking-[0.22em] font-bold font-mono" style={{ color: "var(--hud-green)" }}>THE MONEY GOAT — WEATHER</div>
+            <div className="text-[10px] tracking-[0.22em] font-bold font-mono" style={{ color: "var(--hud-gold)" }}>THE MONEY GOAT — WEATHER</div>
             <div className="prose-sans text-[12px]" style={{ color: "var(--hud-muted)" }}>station observations vs market buckets · trades only after hour 14 of the day · the one proven edge on the desk</div>
           </div>
           <div className="flex gap-5 tabular-nums font-mono text-right">
-            <div><div className="text-[8px] tracking-widest" style={{ color: "var(--hud-muted)" }}>PROFIT</div><div className="text-2xl font-bold" style={{ color: "var(--hud-green)" }}>+{usd(goat.pnl)}</div></div>
+            <div><div className="text-[8px] tracking-widest" style={{ color: "var(--hud-muted)" }}>PROFIT</div><div className="text-2xl font-bold" style={{ color: "var(--hud-gold)", textShadow: "0 0 24px var(--hud-gold-soft)" }}>+{usd(goat.pnl)}</div></div>
             <div><div className="text-[8px] tracking-widest" style={{ color: "var(--hud-muted)" }}>WIN RATE</div><div className="text-2xl font-bold" style={{ color: "var(--hud-text)" }}>{(goat.winRate * 100).toFixed(0)}%</div></div>
             <div><div className="text-[8px] tracking-widest" style={{ color: "var(--hud-muted)" }}>TRADES</div><div className="text-2xl font-bold" style={{ color: "var(--hud-text)" }}>{goat.trades}</div></div>
             <div><div className="text-[8px] tracking-widest" style={{ color: "var(--hud-muted)" }}>TODAY</div><div className="text-2xl font-bold" style={{ color: (goat.today?.pnl ?? 0) >= 0 ? "var(--hud-green)" : "var(--hud-red)" }}>{goat.today ? `${goat.today.pnl >= 0 ? "+" : ""}${usd(goat.today.pnl)}` : "—"}</div></div>

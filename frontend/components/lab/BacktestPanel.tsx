@@ -148,7 +148,7 @@ export default function BacktestPanel() {
 
         {/* optimizer verdict — honesty about tuning */}
         {opt && (
-          <div className="hud-panel hud-panel-static p-3 mb-4" style={{ borderColor: opt.shipped ? "rgba(52,211,153,0.4)" : "rgba(124,154,255,0.35)" }}>
+          <div className="hud-panel hud-panel-static p-3 mb-4" style={{ borderColor: opt.shipped ? "rgba(52,211,153,0.4)" : "rgba(56,189,248,0.35)" }}>
             <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="text-[11px] font-bold" style={{ color: "var(--hud-text)" }}>WEIGHT OPTIMIZER — {opt.iterations} candidates, daily</span>
               <span className="text-[9px] font-bold px-2 py-0.5 rounded" style={{ color: "#0a0e17", background: opt.shipped ? "var(--hud-green)" : "var(--hud-amber)" }}>

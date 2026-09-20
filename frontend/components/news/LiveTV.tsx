@@ -48,7 +48,7 @@ export default function LiveTV() {
           const on = c.id === active.id;
           return (
             <button key={c.id} role="tab" aria-selected={on} onClick={() => pick(c)} className="flex items-center gap-3 px-3 min-h-[44px] rounded-lg text-left shrink-0 lg:shrink transition-colors cursor-pointer"
-                    style={{ background: on ? "var(--hud-accent-soft)" : "transparent", boxShadow: on ? "inset 0 0 0 1px rgba(124,154,255,0.28)" : "none" }}>
+                    style={{ background: on ? "var(--hud-accent-soft)" : "transparent", boxShadow: on ? "inset 0 0 0 1px rgba(56,189,248,0.28)" : "none" }}>
               <span className="text-[9px] font-mono w-6" style={{ color: "var(--hud-muted)" }}>{c.region}</span>
               <span className="prose-sans text-[13px] font-medium" style={{ color: on ? "var(--hud-accent)" : "var(--hud-text)" }}>{c.name}</span>
               <span className="flex-1" />
