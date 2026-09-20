@@ -71,7 +71,7 @@ export default function JarvisDock() {
               <Sparkles size={15} style={{ color: tone }} aria-hidden />
               <div className="min-w-0">
                 <div className="text-[11px] font-bold tracking-[0.22em] font-mono" style={{ color: "var(--hud-text)" }}>JARVIS</div>
-                <div className="text-[9px] truncate font-mono" style={{ color: "var(--hud-muted)" }}>{j.bridge === "online" ? `on ${PAGE_NAMES[pathname] ?? pathname}` : j.bridge === "connecting" ? "connecting…" : "local fallback — start the bridge for full power"}</div>
+                <div className="text-[9px] truncate font-mono" style={{ color: "var(--hud-muted)" }}>{j.bridge === "online" ? `${j.brainName || "platform AI"} · on ${PAGE_NAMES[pathname] ?? pathname}` : j.bridge === "connecting" ? "connecting…" : "local fallback — start the bridge for full power"}</div>
               </div>
               <div className="flex-1" />
               <button onClick={j.brief} className="hud-btn hud-btn-accent" title="status briefing">BRIEF</button>

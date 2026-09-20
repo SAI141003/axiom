@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export type Msg = { role: "you" | "jarvis"; text: string; tools?: string[]; brain?: "bridge" | "local" };
 export type JarvisState = "idle" | "listening" | "thinking" | "speaking";
@@ -18,6 +19,7 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string } = {}
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [bridge, setBridge] = useState<BridgeState>("connecting");
   const [micOk, setMicOk] = useState<boolean | null>(null);
+  const [brainName, setBrainName] = useState<string>("");
   const voiceRef = useRef(opts.voice ?? true);
   voiceRef.current = opts.voice ?? true;
   const ctxRef = useRef(opts.context);
@@ -25,6 +27,8 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string } = {}
   const ws = useRef<WebSocket | null>(null);
   const rec = useRef<any>(null);
   const wakeRef = useRef(false);
+  const router = useRouter();
+  const routerRef = useRef(router); routerRef.current = router;
 
   const patchLast = useCallback((fn: (m: Msg) => void) => {
     setMsgs((p) => { const n = [...p]; const last = n[n.length - 1]; if (last?.role === "jarvis") fn(last); return n; });
@@ -53,10 +57,13 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string } = {}
         s.onerror = () => s.close();
         s.onmessage = (e) => {
           let m: any; try { m = JSON.parse(e.data); } catch { return; }
-          if (m.type === "delta") patchLast((l) => { l.text += m.text; });
+          if (m.type === "ready" && m.brain) setBrainName(m.brain === "claude" ? "Claude Agent SDK" : "platform AI");
+          else if (m.type === "brain" && typeof m.brain === "string") setBrainName(m.brain.replace(/^(\w+)\/.*?\/?([^/]+)$/, "$1 · $2"));
+          else if (m.type === "delta") patchLast((l) => { l.text += m.text; });
           else if (m.type === "tool") patchLast((l) => { l.tools = [...(l.tools ?? []), m.name]; });
           else if (m.type === "done") { patchLast((l) => { l.text = m.text || l.text; l.brain = "bridge"; }); speak(m.text); }
           else if (m.type === "error") setMsgs((p) => [...p, { role: "jarvis", text: m.text, brain: "bridge" }]);
+          else if (m.type === "ui" && m.op === "navigate" && typeof m.href === "string" && m.href.startsWith("/")) { routerRef.current.push(m.href); window.dispatchEvent(new Event("axiom:jarvis-open")); }
         };
         ws.current = s;
       } catch { setBridge("offline"); }
@@ -102,5 +109,5 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string } = {}
   const stopListening = useCallback(() => { rec.current?.stop(); }, []);
   const setWake = useCallback((on: boolean) => { wakeRef.current = on; if (on) listen(true); else { rec.current?.stop(); rec.current = null; } }, [listen]);
 
-  return { state, msgs, bridge, micOk, ask, forget, listen, stopListening, setWake, brief: () => ask(BRIEF) };
+  return { state, msgs, bridge, brainName, micOk, ask, forget, listen, stopListening, setWake, brief: () => ask(BRIEF) };
 }

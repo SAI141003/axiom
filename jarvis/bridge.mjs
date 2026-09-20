@@ -15,8 +15,22 @@
  *   cd jarvis && npm install && npm start        →  ws://127.0.0.1:8788
  */
 import { WebSocketServer } from "ws";
-import { query, createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
+import { query, createSdkMcpServer, tool as sdkTool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
+
+// ── Two brains, one set of tools ──────────────────────────────────────────────
+// JARVIS_BRAIN=platform (default): our own tool-calling loop on the AI already
+// wired to the desk -- Groq (gpt-oss-120b), then NVIDIA NIM, then OpenAI if a
+// key exists. No dependence on Claude Code. JARVIS_BRAIN=claude keeps the
+// Claude Agent SDK loop as an option. Every tool below is registered once and
+// served to whichever brain is running.
+const REGISTRY = [];
+const tool = (name, description, shape, handler) => {
+  const schema = z.object(shape);
+  REGISTRY.push({ name, description, schema, handler });
+  return sdkTool(name, description, shape, handler);
+};
 import { readFile, writeFile, appendFile, mkdir, open } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -89,13 +103,32 @@ async function deskGet(path) {
   return (await r.text()).slice(0, 14_000);
 }
 
+// ── The pages JARVIS can open by voice, each with the endpoint that feeds it ──
+const PAGES = [
+  ["/", "home", "the desk at a glance", "/api/fleet"], ["/jarvis", "jarvis", "the assistant", null], ["/terminal", "terminal", "order book, signal feed, kill switch", "/api/markets"],
+  ["/brain", "brain", "the reflection loop and daily scoreboard", "/api/brain"], ["/council", "council", "eight role agents debate and rule", "/api/council/review/latest"],
+  ["/workforce", "workforce", "the agent roster", "/api/workforce"], ["/connectome", "connectome wiring", "the desk's nervous system read from the code", "/api/connectome"], ["/bots", "bots fleet", "every paper account on one screen", "/api/fleet"],
+  ["/bots?tab=create", "create a bot", "the Bot OS", "/api/botos"], ["/crypto", "crypto auto-bot", "5-minute crypto engine", "/api/crypto/trades"],
+  ["/weather", "weather", "station observations vs market buckets", "/api/weather/picks"], ["/premarket", "pre-market", "first-20-minute stock picks", "/api/premarket"],
+  ["/options", "options", "chains, vol, Kelly-sized recommendations", "/api/options"], ["/stocks", "stocks", "sizing and factor view", "/api/stocks"],
+  ["/arbitrage", "arbitrage arb", "neg-risk and cross-venue arbitrage", "/api/arb"], ["/live", "markets", "live market list", "/api/markets"],
+  ["/tape", "tape replay", "the flow bot replayed frame by frame", "/api/tape"], ["/lab", "lab research", "backtests, proving ground, scenarios, benchmarks", "/api/backtest-lab"],
+  ["/lab?tab=proving", "proving ground safety", "the fault-injection proof", "/api/proving-ground"], ["/lab?tab=scenario", "scenario", "scenario forecasts", "/api/scenario"],
+  ["/ai", "ai desk", "stock analyst, market intel, risk engine, macro, alpha hunter", null], ["/oracle", "oracle", "the oracle-lag probe", "/api/oracle"],
+  ["/intel", "intel", "news read by the classifier", "/api/intel"], ["/news", "news", "live wall, live summary, the world wire", "/api/world/summary"],
+  ["/world", "world monitor map", "World Monitor: the live map, chokepoints, cables, missions", null], ["/journal", "journal", "every trade, every lesson", "/api/journal"],
+  ["/live-account", "account", "balance, caps, the go-live gate", "/api/live/balance"], ["/venues", "venues", "where a bot can trade from here", "/api/venues"],
+  ["/settings", "keys settings", "API keys and bot switches", null], ["/about", "about sources", "every source, paper, repo and feed", null],
+];
+const PAGE_HREFS = PAGES.map((p) => p[0]);
+
 // ── Every page's data. Read-only; the routes that act are not listed. ─────────
 const DESK_PATHS = ["/api/agents", "/api/ai", "/api/arb", "/api/backtest-lab", "/api/benchmark", "/api/benchmark/industry", "/api/benchmark/kronos",
   "/api/benchmark/market", "/api/benchmark/vol", "/api/bots", "/api/brain", "/api/broker/status", "/api/ccxt-bot", "/api/council", "/api/council/review/latest",
   "/api/council/tuner", "/api/crypto/trades", "/api/crypto/window", "/api/data-desk", "/api/deepchain", "/api/fleet", "/api/flow-bot", "/api/gamma-pulse",
   "/api/intel", "/api/journal", "/api/kalshi", "/api/learned", "/api/live/balance", "/api/markets", "/api/meme-bot", "/api/newsdesk",
   "/api/options", "/api/oracle", "/api/oracle/track", "/api/premarket", "/api/proving-ground", "/api/quotes", "/api/recall", "/api/scenario",
-  "/api/stocks", "/api/stocks-bot", "/api/tape", "/api/valuation", "/api/venues", "/api/weather", "/api/weather-trades", "/api/weather/picks", "/api/workforce"];
+  "/api/stocks", "/api/stocks-bot", "/api/tape", "/api/valuation", "/api/venues", "/api/weather", "/api/weather-trades", "/api/weather/picks", "/api/workforce", "/api/world", "/api/world/summary", "/api/botos"];
 
 // Files JARVIS may read: source only, inside the repo, never secrets.
 const UNREADABLE = /(^|\/)\.env|\.key$|\.pem$|id_rsa|(^|\/)\.claude\/|(^|\/)\.git\/|(^|\/)node_modules\/|(^|\/)\.venv\//;
@@ -107,9 +140,17 @@ function safePath(p) {
 
 // Paper bots JARVIS may start, stop or restart. The dashboard and the live
 // executor are not on the list.
-const CONTROLLABLE = /^com\.polymarket\.(dryrun\.[a-z0-9]+|autotuner|data\.openbb|newsdesk\.poll|eod\.council|jarvis)$/;
+const CONTROLLABLE = /^com\.polymarket\.(dryrun\.[a-z0-9]+|autotuner|data\.openbb|data\.pumpsmart|newsdesk\.poll|eod\.council|jarvis|worldmonitor)$/;
+
+let uiSend = (m) => {};   // the open socket's sender, set per turn, so navigate can reach the browser
 
 const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
+  tool("navigate", "Open a page of the desk in the user's browser. Use when asked to open, show, go to, or take me to a screen. Pick the href from this list by meaning: " + PAGES.map((p) => `${p[0]} (${p[1]}: ${p[2]})`).join("; ") + ". After navigating, fetch that page's live data with desk_api (the endpoint is returned) and describe what is on the screen now in three sentences, figures first.",
+    { href: z.enum(PAGE_HREFS) }, async ({ href }) => {
+      const p = PAGES.find((x) => x[0] === href);
+      uiSend({ type: "ui", op: "navigate", href });
+      return text({ opened: href, page: p?.[1], about: p?.[2], live_data_endpoint: p?.[3] ?? "none — describe the page from its purpose", next: "call desk_api on the endpoint, then narrate" });
+    }),
   tool("fleet_status", "Every paper account: balance, P&L, trades, win rate, today, config; fleet totals; days of forward test.", {}, async () => {
     const s = await data("engine_status.json"); const f = await data("forward_perf.json"); const e = s?.engines ?? {};
     return text({ as_of: s?.ts, days_tracked: f?.days_tracked, accounts: Object.entries(e).map(([k, v]) => ({ name: k, account: v.account, pnl: v.pnl, trades: v.trades, win_rate: v.win_rate, today: v.today, config: v.config })) });
@@ -300,6 +341,7 @@ You speak for the desk's own data and act only on the user's instruction.
 WHAT YOU CAN REACH
 - Every page's data (desk_api), every news outlet the desk reads (news), the fleet (fleet_status, morning_brief, fleet_control), the Bot OS (create_bot, list_bots, set_bot — the user can say "create a bot that…" and you build it from a spec, on paper), research (backtest_results, safety_proof, propose_strategy, scenario_forecast, run_backtest, venues), the tests (run_tests), and the source code to read (read_code, search_code).
 - Memory: memory.md below is what you were told to keep. remember() adds to it; recall() searches past conversations and your research notes. The conversation itself resumes across restarts, so you may refer to earlier turns.
+- Opening screens: when asked to open, show, go to or take me to a page, call navigate with the right href, then desk_api on the endpoint it returns, then tell the user what is live on that screen — figures first, three sentences. Do this from any page.
 - Working memory: keep desk_state.md dense and current. Before a long task, read it; after a briefing, a study, or any change, rewrite it with update_desk_state. Compact notes you carry forward are worth more than re-reading everything.
 - Second brain: second_opinion (GPT-6 Astra, if configured) for a cross-check on a hard judgement. Desk numbers never come from it.
 - Research: arxiv_search, scholar_search, web_search and read_url reach the free corners of the internet. When asked to research, or when a book is losing and you want to know why: search, READ at least two sources with read_url, cite them (title, authors, URL), and save the findings with write_note. Never cite a paper you did not open. End research with one concrete next step for the desk — a propose_fix, a propose_strategy, or a plain recommendation.
@@ -322,31 +364,92 @@ ${memory}`;
 }
 
 async function loadState() { try { return JSON.parse(await readFile(STATE, "utf-8")); } catch { return {}; } }
+
+// ── The platform brain: an OpenAI-compatible tool-calling loop ───────────────
+const THREAD = join(HERE, "thread.json");
+async function loadThread() { try { return JSON.parse(await readFile(THREAD, "utf-8")); } catch { return []; } }
+async function saveThread(msgs) { await writeFile(THREAD, JSON.stringify(msgs.slice(-40))); }
+
+async function providers() {
+  const env = { ...(await dotenv()), ...(await (async () => { const o = {}; for (const l of (await readText(join(ROOT, "frontend", ".env.local"))).split("\n")) { const m = l.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/); if (m && m[2]) o[m[1]] = m[2].replace(/^["']|["']$/g, ""); } return o; })()) };
+  return [
+    env.GROQ_API_KEY && { name: "groq", base: "https://api.groq.com/openai/v1", key: env.GROQ_API_KEY, models: [env.GROQ_MODEL || "openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b"] },
+    env.NVIDIA_API_KEY && { name: "nvidia", base: env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1", key: env.NVIDIA_API_KEY, models: [env.NVIDIA_MODEL_TOOLS || "nvidia/nemotron-3-super-120b-a12b", "moonshotai/kimi-k3", "z-ai/glm-5.3", "nvidia/llama-3.1-nemotron-70b-instruct", "mistralai/mistral-large-2-instruct"] },
+    env.OPENAI_API_KEY && { name: "openai", base: "https://api.openai.com/v1", key: env.OPENAI_API_KEY, models: [env.OPENAI_MODEL || "gpt-6-astra", "gpt-5"] },
+  ].filter(Boolean);
+}
+const picked = new Map();
+async function chat(messages, tools) {
+  const errs = [];
+  for (const p of await providers()) {
+    for (const model of [picked.get(p.name), ...p.models].filter((v, i, a) => v && a.indexOf(v) === i)) {
+      try {
+        const r = await fetch(`${p.base}/chat/completions`, { method: "POST", signal: AbortSignal.timeout(p.name === "nvidia" ? 120_000 : 60_000),
+          headers: { "content-type": "application/json", authorization: `Bearer ${p.key}` },
+          body: JSON.stringify({ model, messages, tools, tool_choice: "auto", max_tokens: 1400, temperature: 0.3 }) });
+        const j = await r.json();
+        if (r.ok && j.choices?.[0]?.message) { picked.set(p.name, model); return { msg: j.choices[0].message, brain: `${p.name}/${model}` }; }
+        errs.push(`${p.name}/${model} ${r.status} ${JSON.stringify(j.error ?? "").slice(0, 80)}`);
+        if (![400, 404, 410, 429, 503].includes(r.status)) break;   // rate limits and retired models are per model: try the next
+      } catch (e) { errs.push(`${p.name}/${model} ${String(e.message).slice(0, 60)}`); break; }
+    }
+  }
+  throw new Error("no platform brain answered: " + errs.join(" | "));
+}
+async function platformTurn(q, send) {
+  const tools = REGISTRY.map((t) => ({ type: "function", function: { name: t.name, description: t.description.slice(0, 420), parameters: zodToJsonSchema(t.schema, { target: "openApi3" }) } }));
+  const history = await loadThread();
+  const messages = [{ role: "system", content: await systemPrompt() }, ...history, { role: "user", content: q }];
+  let answer = "", brain = "";
+  for (let step = 0; step < 24; step++) {
+    const { msg, brain: b } = await chat(messages, tools); brain = b;
+    messages.push({ role: "assistant", content: msg.content ?? "", ...(msg.tool_calls ? { tool_calls: msg.tool_calls } : {}) });
+    if (!msg.tool_calls?.length) { answer = msg.content ?? ""; if (answer) send({ type: "delta", text: answer }); break; }
+    for (const call of msg.tool_calls) {
+      const t = REGISTRY.find((x) => x.name === call.function.name);
+      let args = {}; try { args = JSON.parse(call.function.arguments || "{}"); } catch {}
+      send({ type: "tool", name: call.function.name });
+      let out;
+      if (!t) out = "unknown tool";
+      else { const parsed = t.schema.safeParse(args); if (!parsed.success) out = `bad arguments: ${parsed.error.issues.map((i) => i.path.join(".") + " " + i.message).join("; ")}`; else { try { const r = await t.handler(parsed.data); out = (r.content ?? []).map((c) => c.text ?? "").join("\n"); if (r.isError) out = "ERROR: " + out; } catch (e) { out = "tool failed: " + String(e.message).slice(0, 200); } } }
+      messages.push({ role: "tool", tool_call_id: call.id, content: String(out).slice(0, 24_000) });
+    }
+  }
+  await saveThread(messages.slice(1));   // everything but the system prompt
+  return { answer: answer || "I could not complete that.", brain };
+}
+const BRAIN = (process.env.JARVIS_BRAIN || "platform").toLowerCase();
 async function saveState(s) { await writeFile(STATE, JSON.stringify(s)); }
 
-const TOOLS = ["fleet_status", "backtest_results", "safety_proof", "venues", "desk_api", "news", "morning_brief", "read_code", "search_code", "propose_fix",
+const TOOLS = ["navigate", "fleet_status", "backtest_results", "safety_proof", "venues", "desk_api", "news", "morning_brief", "read_code", "search_code", "propose_fix",
   "arxiv_search", "scholar_search", "web_search", "read_url", "write_note", "second_opinion", "update_desk_state", "health_check", "scenario_forecast", "propose_strategy", "run_backtest", "run_tests", "fleet_control", "create_bot", "list_bots", "set_bot", "remember", "recall"];
 const ALLOWED = TOOLS.map((t) => `mcp__axiom__${t}`);
 
 const wss = new WebSocketServer({ port: PORT, host: "127.0.0.1" });
-console.log(`[jarvis] AXIOM bridge v2 on ws://127.0.0.1:${PORT}  (desk: ${DESK})`);
+console.log(`[jarvis] AXIOM bridge v3 on ws://127.0.0.1:${PORT}  (desk: ${DESK}, brain: ${BRAIN === "claude" ? "Claude Agent SDK" : "platform — Groq / NVIDIA / OpenAI, own loop"})`);
 
 wss.on("connection", (ws, req) => {
   const origin = req.headers.origin ?? "";
   if (!/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) { ws.close(1008, "origin"); return; }
   const send = (m) => { if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(m)); };
-  send({ type: "ready", tools: TOOLS });
+  send({ type: "ready", tools: TOOLS, brain: BRAIN === "claude" ? "claude" : "platform" });
 
   let busy = false;
   ws.on("message", async (raw) => {
     let m; try { m = JSON.parse(String(raw)); } catch { return; }
-    if (m.type === "forget") { await saveState({}); send({ type: "done", text: "Conversation reset. Memory notes kept." }); return; }
+    if (m.type === "forget") { await saveState({}); await saveThread([]); send({ type: "done", text: "Conversation reset. Memory notes kept." }); return; }
     if (m.type !== "ask" || typeof m.text !== "string" || !m.text.trim()) return;
     if (busy) { send({ type: "error", text: "still thinking" }); return; }
-    busy = true;
+    busy = true; uiSend = send;
     const q = m.text.slice(0, 4000);
     let answer = "", sessionId = null;
     const state = await loadState();
+    if (BRAIN !== "claude") {
+      try { const r = await platformTurn(q, send); answer = r.answer; send({ type: "brain", brain: r.brain }); }
+      catch (e) { answer = `Platform brain error: ${String(e.message ?? e).slice(0, 220)}`; send({ type: "error", text: answer }); }
+      await appendFile(JOURNAL, compact({ ts: new Date().toISOString(), q, a: answer }) + "\n").catch(() => {});
+      send({ type: "done", text: answer }); busy = false; return;
+    }
     try {
       const session = query({ prompt: q, options: {
         systemPrompt: await systemPrompt(), mcpServers: { axiom }, allowedTools: ALLOWED,
