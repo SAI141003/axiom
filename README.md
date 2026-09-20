@@ -107,6 +107,8 @@ library on your existing login, the pattern from
 | `read_code` · `search_code` · `propose_fix` | read the source, diagnose, and write an exact before/after proposal to `jarvis/proposals/` for a human to apply |
 | `remember` · `recall` | a memory: `memory.md` holds standing notes; the conversation itself resumes across restarts; `recall` also searches its research notes |
 | `arxiv_search` · `scholar_search` · `web_search` · `read_url` · `write_note` | **research**: arXiv, Semantic Scholar and the open web, read directly (HTML and PDF), cited, and saved as notes. Asked why short-dated calls lose, it read four sources and cited Bryzgalova, Pavlova & Sikorskaya (J. Finance 2023) in 95 seconds |
+| `health_check` | probes all 17 feeds and every service, with latency; the weekly freshness study (Sundays 04:40) then searches for API changes, new models and new papers, and writes what should be updated |
+| `second_opinion` · `update_desk_state` | an optional second brain (GPT-6 Astra via `OPENAI_API_KEY`) for cross-checks, and a dense working model of the desk carried between steps — the method ARC Prize found behind Astra's 62.7% → 99.9% jump |
 | `create_bot` · `list_bots` · `set_bot` | **the Bot OS**: say *"create a bot that…"* and it writes a spec the runner trades on paper from $100 within the hour |
 
 It is instructed to answer only from tools, to speak in short plain prose, and to be

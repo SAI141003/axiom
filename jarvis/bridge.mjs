@@ -34,6 +34,11 @@ const STATE = join(HERE, "state.json");
 const PROPOSALS = join(HERE, "proposals");
 const NOTES = join(HERE, "notes");
 const PERSONA = join(HERE, "persona.md");
+const DESK_STATE = join(HERE, "desk_state.md");
+// Optional second brain. GPT-6 Astra (OpenAI, Sept 2026) or any OpenAI-compatible model:
+// set OPENAI_API_KEY (and OPENAI_MODEL, default gpt-6-astra) in .env. Loaded here so the
+// key never enters the browser or the prompt.
+async function dotenv() { const out = {}; for (const l of (await readText(join(ROOT, ".env"))).split("\n")) { const m = l.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*(#.*)?$/); if (m && m[2]) out[m[1]] = m[2].replace(/^["']|["']$/g, ""); } return out; }
 
 // ── Research: the free corners of the internet, read directly ────────────────
 const strip = (html) => html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, " ").trim();
@@ -186,6 +191,45 @@ const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
       await mkdir(NOTES, { recursive: true });
       const name = `${new Date().toISOString().slice(0, 10)}-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50)}.md`;
       await writeFile(join(NOTES, name), `# ${title}\n\n_${new Date().toISOString()}_\n\n${body}\n`); return text(`note saved: jarvis/notes/${name}`); }),
+  tool("second_opinion", "Ask the optional second brain (GPT-6 Astra via the OpenAI API, if OPENAI_API_KEY is set in .env) one self-contained question and get its answer verbatim. Use for a cross-check on a hard judgement, never as a source of desk numbers — those come from the desk's own tools. Says so if not configured.",
+    { question: z.string().min(5).max(6000) }, async ({ question }) => {
+      const env = await dotenv(); const key = env.OPENAI_API_KEY; const model = env.OPENAI_MODEL || "gpt-6-astra";
+      if (!key) return text("second brain not configured: add OPENAI_API_KEY (and optionally OPENAI_MODEL) to .env", true);
+      try {
+        const r = await fetch("https://api.openai.com/v1/chat/completions", { method: "POST", signal: AbortSignal.timeout(120_000),
+          headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+          body: JSON.stringify({ model, messages: [{ role: "system", content: "You are a careful quantitative-finance reviewer. Be concrete and brief. Do not invent numbers." }, { role: "user", content: question }] }) });
+        const j = await r.json();
+        if (!r.ok) return text(`second brain error (${model}): ${JSON.stringify(j.error ?? j).slice(0, 300)}`, true);
+        return text({ model, answer: j.choices?.[0]?.message?.content ?? "" });
+      } catch (e) { return text(`second brain unreachable: ${String(e.message).slice(0, 120)}`, true); } }),
+  tool("update_desk_state", "Rewrite jarvis/desk_state.md: a DENSE, compact symbolic state of the desk — the facts you would otherwise re-derive every time. One line per item: bot → book, P&L, win rate, status; open problems; standing decisions; what last night's study found; pending proposals. Under 60 lines. Do this at the end of every briefing and every study, and whenever a fact changes. Replace the whole file; do not append.",
+    { state: z.string().min(20).max(8000) }, async ({ state }) => { await writeFile(DESK_STATE, `# Desk state — ${new Date().toISOString()}\n\n${state}\n`); return text("desk state updated"); }),
+  tool("health_check", "Probe every external feed and service the desk depends on, right now: exchange data, Polymarket, weather, meme feeds, news, research APIs, the bridge's own services. Returns ok/degraded/down per item with latency and a one-line reason. Run this in the morning brief when asked 'is everything working', and in the weekly freshness study.", {}, async () => {
+    const probes = [
+      ["Kraken OHLCV (CCXT)", "https://api.kraken.com/0/public/OHLC?pair=XBTUSD&interval=1440", (t) => t.includes('"error":[]')],
+      ["Polymarket Gamma", "https://gamma-api.polymarket.com/events?limit=1&active=true", (t) => t.startsWith("[")],
+      ["Polymarket CLOB", "https://clob.polymarket.com/time", (t) => /^\d+/.test(t)],
+      ["Kalshi", "https://trading-api.kalshi.com/trade-api/v2/markets?limit=1", (t) => t.includes(markets)],
+      ["Binance", "https://api.binance.com/api/v3/ping", (t) => t.trim() === "{}"],
+      ["Open-Meteo ensemble", "https://ensemble-api.open-meteo.com/v1/ensemble?latitude=52.3&longitude=4.8&daily=temperature_2m_max&models=icon_seamless&forecast_days=1", (t) => t.includes("temperature_2m_max")],
+      ["aviationweather METAR", "https://aviationweather.gov/api/data/metar?ids=EHAM&format=json", (t) => t.includes("EHAM")],
+      ["CoinGecko", "https://api.coingecko.com/api/v3/ping", (t) => t.includes("gecko_says")],
+      ["DexScreener", "https://api.dexscreener.com/token-boosts/top/v1", (t) => t.startsWith("[")],
+      ["Yahoo Finance", "https://query1.finance.yahoo.com/v8/finance/chart/NVDA?range=1d&interval=1d", (t) => t.includes('"chart"')],
+      ["Google News RSS", "https://news.google.com/rss/search?q=bitcoin&hl=en-US&gl=US&ceid=US:en", (t) => t.includes("<item>")],
+      ["arXiv API", "https://export.arxiv.org/api/query?search_query=all:momentum&max_results=1", (t) => t.includes("<entry>")],
+      ["Semantic Scholar", "https://api.semanticscholar.org/graph/v1/paper/search?query=momentum&limit=1&fields=title", (t) => t.includes('"data"')],
+      ["DuckDuckGo search", "https://html.duckduckgo.com/html/?q=arc+agi", (t) => t.includes("result__a")],
+      ["YouTube live embed", "https://www.youtube.com/embed/live_stream?channel=UCIALMKvObZNtJ6AmdCLP7Lg", (t) => t.includes("<html")],
+      ["Dashboard", `${DESK}/api/fleet`, (t) => t.includes('"accounts"')],
+    ];
+    const out = await Promise.all(probes.map(async ([name, url, ok]) => { const t0 = Date.now(); try { const r = await fetch(url, { signal: AbortSignal.timeout(15_000), headers: { "User-Agent": "Mozilla/5.0 (AXIOM health)" } }); const t = await r.text(); return { name, status: r.ok && ok(t) ? "ok" : "degraded", http: r.status, ms: Date.now() - t0 }; } catch (e) { return { name, status: "down", ms: Date.now() - t0, reason: String(e.message).slice(0, 80) }; } }));
+    let pump = "unknown"; try { const WSc = (await import("ws")).default; pump = await new Promise((res) => { const w = new WSc("wss://pumpportal.fun/api/data"); const t = setTimeout(() => { w.terminate(); res("down"); }, 8000); w.on("open", () => { clearTimeout(t); w.close(); res("ok"); }); w.on("error", () => { clearTimeout(t); res("down"); }); }); } catch { pump = "down"; }
+    out.push({ name: "PumpPortal stream", status: pump });
+    const services = (await sh("launchctl", ["list"])).split("\n").filter((l) => l.includes("com.polymarket")).map((l) => { const [pid, code, name] = l.trim().split(/\s+/); return { name: name.replace("com.polymarket.", ""), running: pid !== "-" || code === "0" }; });
+    return text({ as_of: new Date().toISOString(), feeds: out, services_down: services.filter((x) => !x.running).map((x) => x.name), services_total: services.length });
+  }),
   tool("scenario_forecast", "Scenario engine on a ticker: 20,000 Monte-Carlo futures with live evidence → UP/DOWN, P(up), conviction. ~10s.",
     { symbol: z.string().regex(/^[A-Za-z]{1,5}$/), horizon_days: z.number().int().min(1).max(126).default(21) },
     async ({ symbol, horizon_days }) => text(await sh(PY, [join(ROOT, "signals", "scenario_engine.py"), symbol.toUpperCase(), String(horizon_days)], 60_000))),
@@ -245,13 +289,19 @@ const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
 async function systemPrompt() {
   const memory = await readText(MEMORY, await readText(join(HERE, "memory.example.md"), "(empty)"));
   const persona = await readText(PERSONA, "");
+  const state = await readText(DESK_STATE, "(no desk state yet — build it with update_desk_state after your first briefing)");
   return `${persona}
+
+DESK STATE (your compact working model — trust it, verify with tools when it matters, and keep it current with update_desk_state)
+${state.slice(0, 6000)}
 
 You speak for the desk's own data and act only on the user's instruction.
 
 WHAT YOU CAN REACH
 - Every page's data (desk_api), every news outlet the desk reads (news), the fleet (fleet_status, morning_brief, fleet_control), the Bot OS (create_bot, list_bots, set_bot — the user can say "create a bot that…" and you build it from a spec, on paper), research (backtest_results, safety_proof, propose_strategy, scenario_forecast, run_backtest, venues), the tests (run_tests), and the source code to read (read_code, search_code).
 - Memory: memory.md below is what you were told to keep. remember() adds to it; recall() searches past conversations and your research notes. The conversation itself resumes across restarts, so you may refer to earlier turns.
+- Working memory: keep desk_state.md dense and current. Before a long task, read it; after a briefing, a study, or any change, rewrite it with update_desk_state. Compact notes you carry forward are worth more than re-reading everything.
+- Second brain: second_opinion (GPT-6 Astra, if configured) for a cross-check on a hard judgement. Desk numbers never come from it.
 - Research: arxiv_search, scholar_search, web_search and read_url reach the free corners of the internet. When asked to research, or when a book is losing and you want to know why: search, READ at least two sources with read_url, cite them (title, authors, URL), and save the findings with write_note. Never cite a paper you did not open. End research with one concrete next step for the desk — a propose_fix, a propose_strategy, or a plain recommendation.
 
 HOW TO ANSWER
@@ -275,7 +325,7 @@ async function loadState() { try { return JSON.parse(await readFile(STATE, "utf-
 async function saveState(s) { await writeFile(STATE, JSON.stringify(s)); }
 
 const TOOLS = ["fleet_status", "backtest_results", "safety_proof", "venues", "desk_api", "news", "morning_brief", "read_code", "search_code", "propose_fix",
-  "arxiv_search", "scholar_search", "web_search", "read_url", "write_note", "scenario_forecast", "propose_strategy", "run_backtest", "run_tests", "fleet_control", "create_bot", "list_bots", "set_bot", "remember", "recall"];
+  "arxiv_search", "scholar_search", "web_search", "read_url", "write_note", "second_opinion", "update_desk_state", "health_check", "scenario_forecast", "propose_strategy", "run_backtest", "run_tests", "fleet_control", "create_bot", "list_bots", "set_bot", "remember", "recall"];
 const ALLOWED = TOOLS.map((t) => `mcp__axiom__${t}`);
 
 const wss = new WebSocketServer({ port: PORT, host: "127.0.0.1" });
