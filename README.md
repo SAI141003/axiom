@@ -16,9 +16,9 @@ Python 3.14 · Next.js 14 · CCXT 4.5 · OpenBB · 24 pages · 30 bots + your ow
 ## What AXIOM is
 
 AXIOM started as a Polymarket high-frequency bot and grew into a full research desk:
-a backtest engine, a fault-injection proving ground, 29 paper-trading daemons, a
-23-page dashboard over live market data — and **JARVIS**, a voice that answers for all
-of it from the data, running on your Claude Code login.
+a backtest engine, a fault-injection proving ground, 30 paper-trading daemons plus the
+ones you describe into existence, a 26-page dashboard over live market data — and
+**JARVIS**, a voice that answers for all of it from the data, on the platform's own AI.
 
 It is built around one rule: **an idea does not ship unless it survives data it has
 never seen.** Every strategy runs through a train/holdout split and walk-forward folds.
@@ -75,7 +75,7 @@ All three are verified to pass from a clean clone with only `requirements-core.t
 ### Optional: wake JARVIS
 
 ```bash
-cd jarvis && npm install && npm start      # ws://127.0.0.1:8788 — uses your Claude Code login
+cd jarvis && npm install && npm start      # ws://127.0.0.1:8788 — Groq / NVIDIA keys from .env
 ```
 
 Open **/jarvis**, tap the reactor, and ask. Without the bridge the page still answers the
@@ -87,9 +87,10 @@ common questions from the desk's data files.
 
 The desk has a voice. **/jarvis** is an arc-reactor HUD with browser-native speech in and
 out (no key), a wake word (*"hey Jarvis"*), and a streaming transcript. Its brain is the
-[Claude Agent SDK](https://docs.claude.com/en/docs/claude-code) — Claude Code run as a
-library on your existing login, the pattern from
-[adewaskar/jarvis](https://github.com/adewaskar/jarvis) — with the desk exposed as tools:
+desk's own tool-calling loop over the AI already connected to the platform — Groq first,
+NVIDIA NIM next, OpenAI if a key exists (the bridge architecture follows
+[adewaskar/jarvis](https://github.com/adewaskar/jarvis); the Claude Agent SDK loop remains
+an option) — with the desk exposed as tools:
 
 | Tool | Answers |
 |---|---|
