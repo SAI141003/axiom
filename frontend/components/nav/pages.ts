@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Home, Sparkles, Terminal, Brain, Users, Briefcase, Bot, Zap, CloudSun, Sun, LineChart, TrendingUp, Layers, Globe, Activity,
-  FlaskConical, Cpu, Eye, Radio, Newspaper, BookOpen, Wallet, ShieldCheck, KeyRound,
+  FlaskConical, Cpu, Eye, Radio, Newspaper, BookOpen, Wallet, ShieldCheck, KeyRound, Network,
 } from "lucide-react";
 
 export type Page = { href: string; label: string; hint: string; icon: LucideIcon; keywords?: string };
@@ -18,6 +18,7 @@ export const GROUPS: Group[] = [
     { href: "/brain",     label: "Brain",     hint: "the reflection loop and daily scoreboard", icon: Brain, keywords: "lessons thompson allocation" },
     { href: "/council",   label: "Council",   hint: "eight role agents debate and rule",       icon: Users, keywords: "agents debate risk manager" },
     { href: "/workforce", label: "Workforce", hint: "the agent roster",                        icon: Briefcase },
+    { href: "/connectome", label: "Connectome", hint: "the desk's nervous system, read from the code, lit by today's activity", icon: Network, keywords: "wiring graph brain map modules" },
   ]},
   { label: "Trade", pages: [
     { href: "/bots",      label: "Bots",      hint: "every paper account on one screen",       icon: Bot, keywords: "fleet flow meme gamma stocks weather strategy" },
@@ -35,7 +36,8 @@ export const GROUPS: Group[] = [
     { href: "/ai",        label: "AI Desk",   hint: "stock analyst, market intel, risk engine, macro, alpha hunter", icon: Cpu },
     { href: "/oracle",    label: "Oracle",    hint: "the oracle-lag probe, Brier-scored",       icon: Eye },
     { href: "/intel",     label: "Intel",     hint: "news read by the classifier",             icon: Radio, keywords: "sentiment materiality" },
-    { href: "/news",      label: "News",      hint: "every outlet the desk reads",             icon: Newspaper },
+    { href: "/news",      label: "News",      hint: "live wall, live summary, the world wire",  icon: Newspaper, keywords: "tv video headlines wire" },
+    { href: "/world",     label: "World",     hint: "World Monitor, whole: the live map, chokepoints, cables, exchanges, missions", icon: Globe, keywords: "map monitor geopolitics situation room" },
     { href: "/journal",   label: "Journal",   hint: "every trade, every lesson",               icon: BookOpen },
   ]},
   { label: "Account", pages: [

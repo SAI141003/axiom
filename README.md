@@ -125,6 +125,12 @@ out of its reach by construction. A sample turn, verbatim:
 > Sharpe at negative zero point eight two. The engine's verdict is overfit and rejected
 > because it won on the training fold but lost on holdout.
 
+**JARVIS runs on the platform's own AI.** The bridge has its own tool-calling loop on
+Groq (`gpt-oss-120b`) with NVIDIA NIM (Nemotron-3 Super 120B, Kimi K3, GLM-5.3) as fallback
+and OpenAI if a key exists — 5-second answers, every tool, voice navigation, memory in
+`thread.json` and `desk_state.md`. No dependence on Claude Code; set `JARVIS_BRAIN=claude`
+to use the Claude Agent SDK loop instead.
+
 JARVIS has a written character (`jarvis/persona.md`) — calm, precise, proof over hype,
 loyal to the owner and honest with him — and a **night study**: every day at 04:10 it looks
 at the fleet unattended, picks the weakest book, reads the literature on why that kind of
@@ -265,6 +271,8 @@ justify deploying capital. See [DISCLAIMER.md](DISCLAIMER.md).
 | **/council** | eight role agents debate a thesis and rule; every ruling Brier-scored |
 | **/bots → + Create a bot** | the Bot OS: describe a bot in words (JARVIS writes the spec) or set the dials; it trades on paper from $100 and shows its own book |
 | **/news** | live television from ten channels (free YouTube streams), then the **World Wire** — 76 feeds from World Monitor's open catalog across markets, crypto, energy, crisis and geopolitics — above every classified headline |
+| **/connectome** | the desk's nervous system read from the code — 148 nodes, 178 wires, 23 senses — lit by the last 24 hours, after the fruit-fly connectome (Google/Janelia, *Cell*, Sept 2026) |
+| **/world** | our own situation map: exchanges open now, chokepoints, USGS quakes, headline pressure by region; World Monitor self-hosted underneath, optional |
 | **/about** | every source this desk is built from — 104 entries: 25 repositories, 34 papers and models, 21 data feeds, 6 venue citations, 18 libraries — each with where it is used and what came of it, every path verified |
 
 Eleven former pages became tabs of `/bots` and `/lab`; their old URLs redirect.

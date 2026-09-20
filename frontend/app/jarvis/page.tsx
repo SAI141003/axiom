@@ -37,14 +37,14 @@ export default function JarvisPage() {
             <div className="text-[11px] tracking-[0.35em] font-bold font-mono" style={{ color: tone }} aria-live="polite">{j.state.toUpperCase()}</div>
             <p className="prose-sans text-[12px] text-center" style={{ color: "var(--hud-muted)" }}>Tap the reactor to talk, or type. Say <em>“hey Jarvis”</em> alone and you get the briefing.</p>
             <div className="w-full flex flex-col gap-1.5">
-              <Row icon={Sparkles} label="Brain" value={j.bridge === "online" ? "Claude Code bridge" : j.bridge === "connecting" ? "connecting…" : "local fallback"} tone={j.bridge === "online" ? "var(--hud-green)" : j.bridge === "connecting" ? "var(--hud-muted)" : "var(--hud-amber)"} />
+              <Row icon={Sparkles} label="Brain" value={j.bridge === "online" ? (j.brainName || "platform AI") : j.bridge === "connecting" ? "connecting…" : "local fallback"} tone={j.bridge === "online" ? "var(--hud-green)" : j.bridge === "connecting" ? "var(--hud-muted)" : "var(--hud-amber)"} />
               <Toggle icon={voice ? Volume2 : VolumeX} label="Voice out" on={voice} onChange={setVoice} />
               <Toggle icon={Radio} label="Wake word “hey Jarvis”" on={wake} onChange={toggleWake} />
             </div>
             {j.micOk === false && <p className="prose-sans text-[11px] text-center" style={{ color: "var(--hud-red)" }}>Microphone unavailable — use Chrome or Edge in a real window and allow the mic.</p>}
             {j.bridge === "offline" && (
               <div className="hud-panel hud-panel-static p-3 prose-sans text-[11px] leading-relaxed" style={{ color: "var(--hud-muted)" }}>
-                Full JARVIS runs on your Claude Code login: <code className="font-mono" style={{ color: "var(--hud-text)" }}>cd jarvis && npm start</code>. Until then I answer from the desk&apos;s data files.
+                Full JARVIS runs on the platform&apos;s own AI (Groq / NVIDIA): <code className="font-mono" style={{ color: "var(--hud-text)" }}>cd jarvis && npm start</code>. Until then I answer from the desk&apos;s data files.
               </div>
             )}
           </section>

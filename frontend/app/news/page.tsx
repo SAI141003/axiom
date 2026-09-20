@@ -5,7 +5,8 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import TopNav from "@/components/TopNav";
 import EngineBanner from "@/components/EngineBanner";
-import LiveTV from "@/components/news/LiveTV";
+import VideoWall from "@/components/news/VideoWall";
+import LiveSummary from "@/components/news/LiveSummary";
 import WorldWire from "@/components/news/WorldWire";
 import { Newspaper } from "lucide-react";
 
@@ -51,7 +52,7 @@ export default function NewsDeskPage() {
   return (
     <div className="hud-bg">
       <TopNav />
-      <main className="max-w-6xl mx-auto p-6 font-mono">
+      <main className="max-w-7xl mx-auto p-6 font-mono">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
           <h1 className="text-xl font-bold tracking-[0.2em] glow-cyan inline-flex items-center gap-2"><Newspaper size={20} aria-hidden /> WORLD NEWS DESK</h1>
           <p className="text-xs mt-1 mb-4" style={{ color: "var(--hud-muted)" }}>
@@ -60,7 +61,10 @@ export default function NewsDeskPage() {
           </p>
           <EngineBanner engine="news-lag (niche)" />
         </motion.div>
-        <LiveTV />
+        <div className="grid lg:grid-cols-[1fr_340px] gap-4 mb-8 items-start">
+          <VideoWall />
+          <LiveSummary />
+        </div>
         <WorldWire />
 
         <form className="flex gap-2 mb-5" onSubmit={(e) => { e.preventDefault(); load(q || undefined); }}>
