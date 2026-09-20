@@ -7,7 +7,7 @@ but disagree by more than the combined round-trip fee (~4%), the gap is a
 genuine cross-platform statistical arbitrage.
 
 Kalshi public REST API — no authentication required for market listings.
-Base: https://trading-api.kalshi.com/trade-api/v2
+Base: https://api.elections.kalshi.com/trade-api/v2
 
 Inspired by Fincept Terminal's PolymarketService + Kalshi binary options integration.
 """
@@ -25,7 +25,7 @@ from persist.redis_state import cache_get as _rc_get, cache_set as _rc_set
 
 log = logging.getLogger(__name__)
 
-KALSHI_BASE   = "https://trading-api.kalshi.com/trade-api/v2"
+KALSHI_BASE   = "https://api.elections.kalshi.com/trade-api/v2"
 _MIN_EDGE     = 0.03    # minimum edge after all fees
 _MATCH_THRESH = 0.28    # Jaccard similarity to accept a match
 _CACHE_TTL    = 90      # seconds

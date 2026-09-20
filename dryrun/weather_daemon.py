@@ -133,6 +133,10 @@ async def metar_observed_max(s: aiohttp.ClientSession, icao: str,
     return float(round(max(temps))), len(temps)
 
 
+_ENSEMBLE_CACHE: dict = {}
+ENSEMBLE_TTL_S = 6 * 3600
+
+
 async def ensemble_member_maxes(s: aiohttp.ClientSession, lat: float, lon: float,
                                 event_date: str, now_key: str, is_f: bool):
     """
@@ -140,11 +144,24 @@ async def ensemble_member_maxes(s: aiohttp.ClientSession, lat: float, lon: float
     ECMWF + GFS ensembles (~80 members) — a real probability distribution
     instead of a Gaussian guess.
     """
-    params = {"latitude": lat, "longitude": lon, "hourly": "temperature_2m",
-              "models": "ecmwf_ifs025,gfs025", "forecast_days": 3, "timezone": "auto"}
-    if is_f:
-        params["temperature_unit"] = "fahrenheit"
-    d = await jget(s, "https://ensemble-api.open-meteo.com/v1/ensemble", params=params)
+    # Ensembles update every 6-12h; we were fetching ~40 cities x 80 members x
+    # 3 days hourly every 30 minutes and hit Open-Meteo's daily limit, which
+    # silently dropped the bot to its Gaussian fallback. Cache the raw response
+    # per city for 6h and re-slice the remaining hours from it.
+    ck = (round(lat, 2), round(lon, 2), is_f)
+    hit = _ENSEMBLE_CACHE.get(ck)
+    if hit and time.time() - hit[0] < ENSEMBLE_TTL_S:
+        d = hit[1]
+    else:
+        params = {"latitude": lat, "longitude": lon, "hourly": "temperature_2m",
+                  "models": "ecmwf_ifs025,gfs025", "forecast_days": 2, "timezone": "auto"}
+        if is_f:
+            params["temperature_unit"] = "fahrenheit"
+        d = await jget(s, "https://ensemble-api.open-meteo.com/v1/ensemble", params=params)
+        if d and d.get("hourly"):
+            _ENSEMBLE_CACHE[ck] = (time.time(), d)
+        elif hit:
+            d = hit[1]          # rate-limited or down: a stale ensemble beats a Gaussian guess
     h = (d or {}).get("hourly") or {}
     times = h.get("time") or []
     idx = [i for i, t in enumerate(times)

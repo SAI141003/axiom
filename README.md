@@ -126,6 +126,16 @@ out of its reach by construction. A sample turn, verbatim:
 > Sharpe at negative zero point eight two. The engine's verdict is overfit and rejected
 > because it won on the training fold but lost on holdout.
 
+**One model per job, so no single model can slow or break the desk:**
+
+| Job | Model | Key |
+|---|---|---|
+| JARVIS brain (tools, voice, navigation) | NVIDIA **Nemotron-3 Super 120B** · fallbacks Kimi K3, Mistral Large 2 | `NVIDIA_API_KEY_JARVIS` (dedicated) |
+| JARVIS second opinion | NVIDIA **Nemotron-3 Ultra 550B** (or GPT-6 Astra if `OPENAI_API_KEY`) | dedicated |
+| Dashboard LLM — news cards, council heads, AI Desk, live summary | Groq **gpt-oss-120b** → NIM **GLM-5.3** → Kimi K3 | `GROQ_API_KEY`, `NVIDIA_API_KEY` |
+| News classifier (Python) | NIM **Gemma-4 31B** | `NVIDIA_API_KEY` |
+| MiroFish swarm micro-agents | NIM **Llama-3.1 8B** (0.25s each) | `NVIDIA_API_KEY` |
+
 **JARVIS runs on the platform's own AI.** The bridge has its own tool-calling loop on
 Groq (`gpt-oss-120b`) with NVIDIA NIM (Nemotron-3 Super 120B, Kimi K3, GLM-5.3) as fallback
 and OpenAI if a key exists — 5-second answers, every tool, voice navigation, memory in

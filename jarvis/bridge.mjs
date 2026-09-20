@@ -234,10 +234,13 @@ const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
       await writeFile(join(NOTES, name), `# ${title}\n\n_${new Date().toISOString()}_\n\n${body}\n`); return text(`note saved: jarvis/notes/${name}`); }),
   tool("second_opinion", "Ask the optional second brain (GPT-6 Astra via the OpenAI API, if OPENAI_API_KEY is set in .env) one self-contained question and get its answer verbatim. Use for a cross-check on a hard judgement, never as a source of desk numbers — those come from the desk's own tools. Says so if not configured.",
     { question: z.string().min(5).max(6000) }, async ({ question }) => {
-      const env = await dotenv(); const key = env.OPENAI_API_KEY; const model = env.OPENAI_MODEL || "gpt-6-astra";
-      if (!key) return text("second brain not configured: add OPENAI_API_KEY (and optionally OPENAI_MODEL) to .env", true);
+      const env = await dotenv();
+      const useOpenAI = !!env.OPENAI_API_KEY;
+      const key = useOpenAI ? env.OPENAI_API_KEY : (env.NVIDIA_API_KEY_JARVIS || env.NVIDIA_API_KEY);
+      const model = useOpenAI ? (env.OPENAI_MODEL || "gpt-6-astra") : (env.NVIDIA_MODEL_JARVIS_DEEP || "nvidia/nemotron-3-ultra-550b-a55b");
+      if (!key) return text("second brain not configured: add OPENAI_API_KEY or an NVIDIA key to .env", true);
       try {
-        const r = await fetch("https://api.openai.com/v1/chat/completions", { method: "POST", signal: AbortSignal.timeout(120_000),
+        const r = await fetch(`${useOpenAI ? "https://api.openai.com/v1" : "https://integrate.api.nvidia.com/v1"}/chat/completions`, { method: "POST", signal: AbortSignal.timeout(180_000),
           headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
           body: JSON.stringify({ model, messages: [{ role: "system", content: "You are a careful quantitative-finance reviewer. Be concrete and brief. Do not invent numbers." }, { role: "user", content: question }] }) });
         const j = await r.json();
@@ -251,7 +254,7 @@ const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
       ["Kraken OHLCV (CCXT)", "https://api.kraken.com/0/public/OHLC?pair=XBTUSD&interval=1440", (t) => t.includes('"error":[]')],
       ["Polymarket Gamma", "https://gamma-api.polymarket.com/events?limit=1&active=true", (t) => t.startsWith("[")],
       ["Polymarket CLOB", "https://clob.polymarket.com/time", (t) => /^\d+/.test(t)],
-      ["Kalshi", "https://trading-api.kalshi.com/trade-api/v2/markets?limit=1", (t) => t.includes(markets)],
+      ["Kalshi", "https://api.elections.kalshi.com/trade-api/v2/markets?limit=1", (t) => t.includes(markets)],
       ["Binance", "https://api.binance.com/api/v3/ping", (t) => t.trim() === "{}"],
       ["Open-Meteo ensemble", "https://ensemble-api.open-meteo.com/v1/ensemble?latitude=52.3&longitude=4.8&daily=temperature_2m_max&models=icon_seamless&forecast_days=1", (t) => t.includes("temperature_2m_max")],
       ["aviationweather METAR", "https://aviationweather.gov/api/data/metar?ids=EHAM&format=json", (t) => t.includes("EHAM")],
@@ -372,9 +375,13 @@ async function saveThread(msgs) { await writeFile(THREAD, JSON.stringify(msgs.sl
 
 async function providers() {
   const env = { ...(await dotenv()), ...(await (async () => { const o = {}; for (const l of (await readText(join(ROOT, "frontend", ".env.local"))).split("\n")) { const m = l.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/); if (m && m[2]) o[m[1]] = m[2].replace(/^["']|["']$/g, ""); } return o; })()) };
+  // JARVIS's own NIM key first (no contention with the classifier, no free-tier
+  // rate limits), then Groq for speed, then the shared NIM key, then OpenAI.
+  const nvKey = env.NVIDIA_API_KEY_JARVIS || env.NVIDIA_API_KEY;
+  const nvModels = [env.NVIDIA_MODEL_JARVIS || env.NVIDIA_MODEL_TOOLS || "nvidia/nemotron-3-super-120b-a12b", "moonshotai/kimi-k3", "nvidia/nemotron-3-ultra-550b-a55b", "mistralai/mistral-large-2-instruct"];
   return [
+    nvKey && { name: "nvidia", base: env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1", key: nvKey, models: nvModels },
     env.GROQ_API_KEY && { name: "groq", base: "https://api.groq.com/openai/v1", key: env.GROQ_API_KEY, models: [env.GROQ_MODEL || "openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b"] },
-    env.NVIDIA_API_KEY && { name: "nvidia", base: env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1", key: env.NVIDIA_API_KEY, models: [env.NVIDIA_MODEL_TOOLS || "nvidia/nemotron-3-super-120b-a12b", "moonshotai/kimi-k3", "z-ai/glm-5.3", "nvidia/llama-3.1-nemotron-70b-instruct", "mistralai/mistral-large-2-instruct"] },
     env.OPENAI_API_KEY && { name: "openai", base: "https://api.openai.com/v1", key: env.OPENAI_API_KEY, models: [env.OPENAI_MODEL || "gpt-6-astra", "gpt-5"] },
   ].filter(Boolean);
 }
