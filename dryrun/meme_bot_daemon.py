@@ -54,8 +54,17 @@ def _write(rec):
 # Bonding-curve pairs carry dexId "pumpfun"; graduated ones "pumpswap". These are
 # fresh tokens, so a liquidity floor is the rug guard: below it a "momentum"
 # candle is one whale, and the exit fill would not exist.
-PUMP_MIN_LIQ_USD = 25_000
+PUMP_MIN_LIQ_USD = 50_000
 PUMP_MIN_VOL24_USD = 250_000
+# v2 gates from the autopsy of 2026-09-19/20 (20 trades since the wake, -$87.46,
+# of which pump.fun -$85.94 and the "graduated" flag 0-for-4, -$77):
+PUMP_STAKE = 5.0          # a fifth of the majors' stake: these can go to zero inside one cycle
+PUMP_MAX_POS = 1          # one launch at a time
+PUMP_MIN_AGE_H = 6        # no pairs younger than six hours -- the launch spike is not momentum
+PUMP_MAX_1H = 40.0        # a +87,289% hour is a top, not a trend
+PUMP_GRAD_COOLDOWN_H = 24 # a graduation is the insiders' exit; wait a day before it can qualify
+LOSER_COOLDOWN_H = 24     # no re-entry into a coin that just lost
+BOOK_VERSION = 2
 DEX = "https://api.dexscreener.com"
 
 
@@ -90,6 +99,7 @@ def pump_market(extra_addrs=()):
             out[key] = {"sym": pr["baseToken"]["symbol"].upper(), "price": float(px),
                         "m1h": ch.get("h1") or 0.0, "m24h": ch.get("h24") or 0.0,
                         "vol": (pr.get("volume") or {}).get("h24") or 0, "liq": liq,
+                        "age_h": (time.time() - (pr.get("pairCreatedAt") or 0) / 1000) / 3600 if pr.get("pairCreatedAt") else 0,
                         "source": "pump.fun", "url": pr.get("url")}
     return out
 
@@ -136,10 +146,15 @@ def market(extra_pump_addrs=()):
 
 
 def _tradeable(cid, m):
-    """Entry filter. Majors need real volume; pump.fun tokens also need a liquidity floor."""
+    """Entry filter. Majors need real volume; pump.fun tokens need liquidity, age,
+    momentum that is a trend rather than a spike, and no fresh graduation."""
     if not (m["m1h"] > 1.0 and m["m24h"] > 0):
         return False
     if cid.startswith("pump:"):
+        if m["m1h"] > PUMP_MAX_1H or m.get("age_h", 0) < PUMP_MIN_AGE_H:
+            return False
+        if m.get("signal") == "graduated":          # cooldown, not a buy
+            return False
         return m["vol"] >= PUMP_MIN_VOL24_USD and m.get("liq", 0) >= PUMP_MIN_LIQ_USD
     return m["vol"] > 3e6
 
@@ -168,7 +183,7 @@ def cycle():
         held_h = (now - p["ts"]) / 3600
         if m["m1h"] < -1.5 or held_h >= MAX_HOLD_H:
             ret = m["price"] / p["entry"] - 1
-            pnl = round(STAKE * ret, 2)
+            pnl = round(p.get("stake", STAKE) * ret, 2)
             _write({"type": "mclose", "id": p["id"], "coin": p["coin"], "sym": p["sym"],
                     "exit": m["price"], "pnl": pnl, "won": pnl > 0,
                     "reason": "reversal" if m["m1h"] < -1.5 else "max-hold", "ts": int(now)})
@@ -179,15 +194,20 @@ def cycle():
     slots = MAX_POS - len([p for p in open_pos if p["coin"] in held])
     if slots <= 0:
         return
-    # smart-money and graduation flags rank first; momentum still has to be there
-    # and the liquidity floor still applies -- the flag is a reason to look, not
-    # a licence to skip the rug guard.
+    # smart-money buyer flags rank first (graduations are excluded above);
+    # momentum still has to be there and the liquidity floor still applies.
+    recent_losers = {r["coin"] for r in rows if r["type"] == "mclose" and r.get("pnl", 0) < 0 and now - r["ts"] < LOSER_COOLDOWN_H * 3600}
+    pump_open = sum(1 for p in open_pos if p["coin"] in held and p["coin"].startswith("pump:"))
     cands = [((m["m1h"] + 0.4 * m["m24h"]) * (2.0 if m.get("signal") else 1.0), cid, m) for cid, m in mkt.items()
-             if cid not in held and _tradeable(cid, m)]
+             if cid not in held and cid not in recent_losers and _tradeable(cid, m)
+             and not (cid.startswith("pump:") and pump_open >= PUMP_MAX_POS)]
     cands.sort(reverse=True)
     today = datetime.now(ET).strftime("%Y-%m-%d")
     for score, cid, m in cands[:slots]:
-        _write({"type": "mentry", "id": f"{int(now)}-{cid}", "date": today, "coin": cid,
+        stake = PUMP_STAKE if cid.startswith("pump:") else STAKE
+        if cid.startswith("pump:"):
+            pump_open += 1
+        _write({"type": "mentry", "id": f"{int(now)}-{cid}", "date": today, "coin": cid, "stake": stake, "v": BOOK_VERSION,
                 "sym": m["sym"], "entry": m["price"], "m1h": round(m["m1h"], 2),
                 "m24h": round(m["m24h"], 2), "score": round(score, 2), "ts": int(now),
                 "source": m.get("source", "coingecko"), "liq": m.get("liq"), "url": m.get("url"), "signal": m.get("signal")})
