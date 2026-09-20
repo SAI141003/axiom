@@ -1,5 +1,7 @@
 "use client";
 
+import { Brain, TrendingUp } from "lucide-react";
+
 import { useEffect, useState } from "react";
 
 /**
@@ -133,7 +135,7 @@ export default function BenchmarkPanel() {
         {kro?.rows?.length > 0 && (
           <div className="hud-panel hud-panel-static p-4 mb-6" style={{ borderColor: "rgba(167,139,250,0.4)" }}>
             <div className="text-[11px] tracking-widest font-bold mb-1" style={{ color: "#a78bfa" }}>
-              🧠 FOUNDATION MODEL vs US — KRONOS-BASE (102M, 12B candles)
+              <Brain size={12} aria-hidden style={{ display: "inline", verticalAlign: "-2px" }} /> FOUNDATION MODEL vs US — KRONOS-BASE (102M, 12B candles)
             </div>
             <div className="text-[9px] mb-3" style={{ color: "var(--hud-muted)" }}>
               {kro.task} · {kro.predictions} out-of-sample predictions · {kro.tickers} tickers
@@ -163,7 +165,7 @@ export default function BenchmarkPanel() {
         {vol?.ranking?.length > 0 && (
           <div className="hud-panel hud-panel-static p-4 mb-6" style={{ borderColor: "rgba(34,211,238,0.35)" }}>
             <div className="text-[11px] tracking-widest font-bold mb-1" style={{ color: "var(--hud-cyan)" }}>
-              📈 VOLATILITY FORECAST vs GARCH / EWMA
+              <TrendingUp size={12} aria-hidden style={{ display: "inline", verticalAlign: "-2px" }} /> VOLATILITY FORECAST vs GARCH / EWMA
             </div>
             <div className="text-[9px] mb-3" style={{ color: "var(--hud-muted)" }}>
               {vol.task} · {vol.predictions} OOS predictions · {vol.tickers} tickers

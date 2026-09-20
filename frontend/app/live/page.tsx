@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import TopNav from "@/components/TopNav";
+import { Globe } from "lucide-react";
 
 interface GammaMarket {
   question: string;
@@ -82,7 +83,7 @@ export default function LiveMarketsPage() {
       <main className="max-w-6xl mx-auto p-6 font-mono">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-xl font-bold tracking-[0.2em] glow-green">◉ LIVE MARKETS</h1>
+            <h1 className="inline-flex items-center gap-2 text-xl font-bold tracking-[0.2em] glow-green"><Globe size={20} aria-hidden /> LIVE MARKETS</h1>
             <p className="text-xs mt-1" style={{ color: "var(--hud-muted)" }}>
               Top markets by volume · auto-refreshes every 30s
               {lastUpdate && ` · updated ${lastUpdate.toLocaleTimeString()}`}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import TopNav from "@/components/TopNav";
+import { Layers } from "lucide-react";
 
 interface ArbPair {
   polyQuestion: string;
@@ -58,7 +59,7 @@ export default function ArbitragePage() {
     <div className="hud-bg">
       <TopNav />
       <main className="max-w-6xl mx-auto p-6 font-mono">
-        <h1 className="text-xl font-bold tracking-[0.2em] glow-cyan">⇄ CROSS-VENUE ARBITRAGE</h1>
+        <h1 className="inline-flex items-center gap-2 text-xl font-bold tracking-[0.2em] glow-cyan"><Layers size={20} aria-hidden /> CROSS-VENUE ARBITRAGE</h1>
         <p className="text-xs mt-1 mb-6" style={{ color: "var(--hud-muted)" }}>
           Complete baskets priced at EXECUTABLE asks, net of both venues&apos; fee curves —
           a pair is an arb only if YES on one venue + NO on the other costs &lt; $1.

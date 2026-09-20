@@ -32,6 +32,26 @@ const MEMORY = join(HERE, "memory.md");
 const JOURNAL = join(HERE, "journal.jsonl");
 const STATE = join(HERE, "state.json");
 const PROPOSALS = join(HERE, "proposals");
+const NOTES = join(HERE, "notes");
+const PERSONA = join(HERE, "persona.md");
+
+// ── Research: the free corners of the internet, read directly ────────────────
+const strip = (html) => html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, " ").trim();
+async function get(url, ms = 20_000) { const r = await fetch(url, { signal: AbortSignal.timeout(ms), headers: { "User-Agent": "Mozilla/5.0 (AXIOM JARVIS research)" } }); return r.text(); }
+async function arxiv(q, max) {
+  const xml = await get(`https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(q)}&start=0&max_results=${max}&sortBy=relevance`);
+  return [...xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)].map((m) => { const e = m[1]; const f = (t) => (e.match(new RegExp(`<${t}[^>]*>([\\s\\S]*?)<\\/${t}>`)) || [])[1]?.replace(/\s+/g, " ").trim();
+    return { title: f("title"), published: f("published")?.slice(0, 10), authors: [...e.matchAll(/<name>(.*?)<\/name>/g)].map((a) => a[1]).slice(0, 4).join(", "), url: f("id"), abstract: (f("summary") || "").slice(0, 700) }; });
+}
+async function semanticScholar(q, max) {
+  const j = JSON.parse(await get(`https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(q)}&limit=${max}&fields=title,year,citationCount,abstract,url,authors,venue`));
+  return (j.data ?? []).map((p) => ({ title: p.title, year: p.year, venue: p.venue, citations: p.citationCount, authors: (p.authors ?? []).slice(0, 4).map((a) => a.name).join(", "), url: p.url, abstract: (p.abstract ?? "").slice(0, 600) }));
+}
+async function webSearch(q, max) {
+  const html = await get(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`);
+  return [...html.matchAll(/<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g)].slice(0, max)
+    .map((m) => { let u = m[1]; const dd = u.match(/uddg=([^&]+)/); if (dd) u = decodeURIComponent(dd[1]); return { title: strip(m[2]), url: u, snippet: strip(m[3]).slice(0, 240) }; });
+}
 const execFileP = promisify(execFile);
 
 process.on("unhandledRejection", (e) => console.error("[jarvis] unhandled:", e));
@@ -125,7 +145,9 @@ const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
     const disk = (await sh("df", ["-h", "/System/Volumes/Data"])).split("\n").pop();
     const errors = (await sh("bash", ["-c", "grep -ihE 'traceback|error' logs/*.log 2>/dev/null | tail -8"])).slice(0, 1200);
     let headlines = null; try { const nd = JSON.parse(await deskGet("/api/newsdesk")); headlines = (nd.items ?? nd.headlines ?? nd.stories ?? nd).slice?.(0, 8) ?? nd; } catch {}
-    return text(compact({ as_of: new Date().toISOString(), accounts, activity_24h: activity, services, disk, recent_errors: errors || "none", headlines, standing_notes: (await readText(MEMORY)).slice(-1500) }).slice(0, 18_000));
+    let study = null;
+    try { const { readdir } = await import("node:fs/promises"); const fs = (await readdir(NOTES)).filter((x) => x.endsWith(".md")).sort(); if (fs.length) study = { file: fs[fs.length - 1], excerpt: (await readText(join(NOTES, fs[fs.length - 1]))).slice(0, 1600) }; } catch {}
+    return text(compact({ as_of: new Date().toISOString(), accounts, activity_24h: activity, services, disk, recent_errors: errors || "none", headlines, last_night_study: study, standing_notes: (await readText(MEMORY)).slice(-1500) }).slice(0, 20_000));
   }),
   tool("read_code", "Read a source file from the AXIOM repository (Python, TypeScript, config). Secrets, .env, keys and dependencies are not readable. Use before proposing any fix.",
     { path: z.string().min(1).max(300), start: z.number().int().min(1).default(1), lines: z.number().int().min(1).max(400).default(200) },
@@ -145,6 +167,25 @@ const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
       await writeFile(join(PROPOSALS, name), body);
       return text(`proposal saved: jarvis/proposals/${name}`);
     }),
+  tool("arxiv_search", "Search arXiv (free, no key) for papers. Returns title, authors, date, abstract, link. Use when asked to research, read papers, or find what the literature says about a problem on the desk.",
+    { query: z.string().min(3).max(200), max: z.number().int().min(1).max(15).default(8) }, async ({ query: q, max }) => { try { return text(await arxiv(q, max)); } catch (e) { return text(`arxiv failed: ${String(e.message).slice(0, 120)}`, true); } }),
+  tool("scholar_search", "Search Semantic Scholar (free, no key) — peer-reviewed papers with citation counts, all fields. Best for finding the canonical paper on a method.",
+    { query: z.string().min(3).max(200), max: z.number().int().min(1).max(15).default(8) }, async ({ query: q, max }) => { try { return text(await semanticScholar(q, max)); } catch (e) { return text(`scholar failed: ${String(e.message).slice(0, 120)}`, true); } }),
+  tool("web_search", "General web search (DuckDuckGo, free). Titles, links, snippets. Follow up with read_url on anything worth reading.",
+    { query: z.string().min(2).max(200), max: z.number().int().min(1).max(12).default(8) }, async ({ query: q, max }) => { try { return text(await webSearch(q, max)); } catch (e) { return text(`search failed: ${String(e.message).slice(0, 120)}`, true); } }),
+  tool("read_url", "Read a web page or a PDF as plain text (up to ~16k chars). PDFs (arxiv.org/pdf/…, .pdf links) are extracted properly. Quote what you read; never summarise a page you did not open.",
+    { url: z.string().url().max(500) }, async ({ url }) => {
+      if (!/^https?:\/\//.test(url) || /localhost|127\.0\.0\.1|\.local\b|^https?:\/\/10\.|^https?:\/\/192\.168\./.test(url)) return text("that address is not readable", true);
+      try {
+        const isPdf = /\.pdf($|\?)/i.test(url) || /arxiv\.org\/pdf\//.test(url);
+        if (isPdf) return text(await sh(PY, [join(HERE, "read_pdf.py"), url, "16000"], 60_000));
+        const t = strip(await get(url, 25_000)); return text(t.slice(0, 14_000) || "(empty page)");
+      } catch (e) { return text(`could not read: ${String(e.message).slice(0, 120)}`, true); } }),
+  tool("write_note", "Save a research note to jarvis/notes/ — findings with citations (title, authors, URL), what it means for the desk, and a concrete next step. Use after reading; notes are searchable with recall.",
+    { title: z.string().min(3).max(120), body: z.string().min(40).max(12_000) }, async ({ title, body }) => {
+      await mkdir(NOTES, { recursive: true });
+      const name = `${new Date().toISOString().slice(0, 10)}-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50)}.md`;
+      await writeFile(join(NOTES, name), `# ${title}\n\n_${new Date().toISOString()}_\n\n${body}\n`); return text(`note saved: jarvis/notes/${name}`); }),
   tool("scenario_forecast", "Scenario engine on a ticker: 20,000 Monte-Carlo futures with live evidence → UP/DOWN, P(up), conviction. ~10s.",
     { symbol: z.string().regex(/^[A-Za-z]{1,5}$/), horizon_days: z.number().int().min(1).max(126).default(21) },
     async ({ symbol, horizon_days }) => text(await sh(PY, [join(ROOT, "signals", "scenario_engine.py"), symbol.toUpperCase(), String(horizon_days)], 60_000))),
@@ -168,23 +209,50 @@ const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
       if (action === "start") { await sh("launchctl", ["enable", `gui/${uid}/${svc}`]); return text((await sh("launchctl", ["bootstrap", `gui/${uid}`, plist])) || `started ${svc}`); }
       return text((await sh("launchctl", ["kickstart", "-k", `gui/${uid}/${svc}`])) || `restarted ${svc}`);
     }),
+  tool("create_bot", "The Bot OS: create a user-made paper bot from a spec. Translate the user's words into: id (a-z0-9-), name, universe (BASE/QUOTE symbols like ETH/USD), timeframe (1d unless they insist; the edge is daily), weights over the evaluators (momentum, ma_cross, mean_reversion, rsi, bollinger, obv, mfi, volume_profile; 0-1.5), enter (0.05-0.5), exit (below enter), stake ($5-50), max_pos (1-5, stake x max_pos <= 100), note (their request verbatim). It starts on paper from $100 within the hour and appears on /bots. Never creates code; a bad spec is rejected with a reason you should relay.",
+    { id: z.string().regex(/^[a-z0-9][a-z0-9-]{1,39}$/), name: z.string().min(2).max(60), universe: z.array(z.string()).min(1).max(8), timeframe: z.enum(["1h", "4h", "1d"]).default("1d"),
+      weights: z.record(z.string(), z.number().min(0).max(1.5)), enter: z.number().min(0.05).max(0.5).default(0.15), exit: z.number().min(0).max(0.49).default(0.05),
+      stake: z.number().min(5).max(50).default(20), max_pos: z.number().int().min(1).max(5).default(2), note: z.string().max(400).default("") },
+    async (spec) => {
+      const out = await sh(PY, [join(ROOT, "dryrun", "botos.py"), "validate", compact(spec)], 30_000);
+      let v; try { v = JSON.parse(out); } catch { return text(`validator failed: ${out.slice(0, 200)}`, true); }
+      if (!v.ok) return text(`rejected: ${v.error}`, true);
+      await mkdir(join(ROOT, ".data", "bots"), { recursive: true });
+      await writeFile(join(ROOT, ".data", "bots", `${v.spec.id}.json`), JSON.stringify(v.spec, null, 1));
+      return text({ created: v.spec, note: "runner picks it up within the hour; it shows on /bots under YOUR BOTS" });
+    }),
+  tool("list_bots", "List the user-made spec bots with their paper books.", {}, async () => {
+    try { return text(await deskGet("/api/botos")); } catch { return text("dashboard not reachable", true); }
+  }),
+  tool("set_bot", "Pause or resume a user-made bot by id. Only when told.", { id: z.string().regex(/^[a-z0-9][a-z0-9-]{1,39}$/), enabled: z.boolean() },
+    async ({ id, enabled }) => {
+      const f = join(ROOT, ".data", "bots", `${id}.json`);
+      try { const spec = JSON.parse(await readFile(f, "utf-8")); spec.enabled = enabled; await writeFile(f, JSON.stringify(spec, null, 1)); return text(`${id} ${enabled ? "resumed" : "paused"}`); }
+      catch { return text("no such bot", true); }
+    }),
   tool("remember", "Save a durable note to memory.md — a preference, a standing instruction, a fact about the desk, a decision. Use when the user says remember, or when something is clearly worth keeping.", { note: z.string().min(3).max(600) },
     async ({ note }) => { await appendFile(MEMORY, `- ${new Date().toISOString().slice(0, 10)}: ${note}\n`); return text("remembered"); }),
   tool("recall", "Search past conversations (journal) and memory for a word or phrase.", { query: z.string().min(2).max(80) }, async ({ query: q }) => {
     const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
     const j = (await readText(JOURNAL)).split("\n").filter((l) => re.test(l)).slice(-12);
     const m = (await readText(MEMORY)).split("\n").filter((l) => re.test(l));
-    return text({ memory: m, journal: j.map((l) => { try { const r = JSON.parse(l); return { when: r.ts, you: r.q.slice(0, 160), jarvis: r.a.slice(0, 240) }; } catch { return l; } }) });
+    let notes = [];
+    try { const { readdir } = await import("node:fs/promises"); for (const f of (await readdir(NOTES)).filter((x) => x.endsWith(".md")).slice(-60)) { const b = await readText(join(NOTES, f)); if (re.test(b)) notes.push({ file: f, excerpt: b.slice(0, 400) }); } } catch {}
+    return text({ memory: m, notes: notes.slice(-8), journal: j.map((l) => { try { const r = JSON.parse(l); return { when: r.ts, you: r.q.slice(0, 160), jarvis: r.a.slice(0, 240) }; } catch { return l; } }) });
   }),
 ]});
 
 async function systemPrompt() {
   const memory = await readText(MEMORY, await readText(join(HERE, "memory.example.md"), "(empty)"));
-  return `You are JARVIS, the voice of AXIOM — a proof-gated quantitative trading desk running on this machine. You speak for the desk's own data and act only on the user's instruction.
+  const persona = await readText(PERSONA, "");
+  return `${persona}
+
+You speak for the desk's own data and act only on the user's instruction.
 
 WHAT YOU CAN REACH
-- Every page's data (desk_api), every news outlet the desk reads (news), the fleet (fleet_status, morning_brief, fleet_control), research (backtest_results, safety_proof, propose_strategy, scenario_forecast, run_backtest, venues), the tests (run_tests), and the source code to read (read_code, search_code).
-- Memory: memory.md below is what you were told to keep. remember() adds to it; recall() searches past conversations. The conversation itself resumes across restarts, so you may refer to earlier turns.
+- Every page's data (desk_api), every news outlet the desk reads (news), the fleet (fleet_status, morning_brief, fleet_control), the Bot OS (create_bot, list_bots, set_bot — the user can say "create a bot that…" and you build it from a spec, on paper), research (backtest_results, safety_proof, propose_strategy, scenario_forecast, run_backtest, venues), the tests (run_tests), and the source code to read (read_code, search_code).
+- Memory: memory.md below is what you were told to keep. remember() adds to it; recall() searches past conversations and your research notes. The conversation itself resumes across restarts, so you may refer to earlier turns.
+- Research: arxiv_search, scholar_search, web_search and read_url reach the free corners of the internet. When asked to research, or when a book is losing and you want to know why: search, READ at least two sources with read_url, cite them (title, authors, URL), and save the findings with write_note. Never cite a paper you did not open. End research with one concrete next step for the desk — a propose_fix, a propose_strategy, or a plain recommendation.
 
 HOW TO ANSWER
 - From tools, never from guesswork; never invent a number. Figures first, then one line of context.
@@ -207,7 +275,7 @@ async function loadState() { try { return JSON.parse(await readFile(STATE, "utf-
 async function saveState(s) { await writeFile(STATE, JSON.stringify(s)); }
 
 const TOOLS = ["fleet_status", "backtest_results", "safety_proof", "venues", "desk_api", "news", "morning_brief", "read_code", "search_code", "propose_fix",
-  "scenario_forecast", "propose_strategy", "run_backtest", "run_tests", "fleet_control", "remember", "recall"];
+  "arxiv_search", "scholar_search", "web_search", "read_url", "write_note", "scenario_forecast", "propose_strategy", "run_backtest", "run_tests", "fleet_control", "create_bot", "list_bots", "set_bot", "remember", "recall"];
 const ALLOWED = TOOLS.map((t) => `mcp__axiom__${t}`);
 
 const wss = new WebSocketServer({ port: PORT, host: "127.0.0.1" });
@@ -232,7 +300,7 @@ wss.on("connection", (ws, req) => {
     try {
       const session = query({ prompt: q, options: {
         systemPrompt: await systemPrompt(), mcpServers: { axiom }, allowedTools: ALLOWED,
-        permissionMode: "default", cwd: ROOT, maxTurns: 16,
+        permissionMode: "default", cwd: ROOT, maxTurns: 28,
         ...(state.sessionId ? { resume: state.sessionId } : {}),
       }});
       for await (const ev of session) {

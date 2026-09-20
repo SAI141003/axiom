@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import TopNav from "@/components/TopNav";
 import PageHeader from "@/components/PageHeader";
-import { Bot } from "lucide-react";
+import { Bot, CloudSun } from "lucide-react";
 import { Card, Kpi, DonutChart, CompareBars, Lines, Tabs, usd } from "@/components/charts";
 import CcxtBotPanel from "@/components/bots/CcxtBotPanel";
 import FlowBotPanel from "@/components/bots/FlowBotPanel";
@@ -12,9 +12,11 @@ import GammaPulsePanel from "@/components/bots/GammaPulsePanel";
 import StocksBotPanel from "@/components/bots/StocksBotPanel";
 import MemeBotPanel from "@/components/bots/MemeBotPanel";
 import WeatherBotPanel from "@/components/bots/WeatherBotPanel";
+import BotFactory from "@/components/bots/BotFactory";
 
 const TABS = [
   { id: "fleet", label: "FLEET" },
+  { id: "create", label: "+ CREATE A BOT" },
   { id: "strategy", label: "STRATEGY" },
   { id: "flow", label: "FLOW" },
   { id: "gamma", label: "GAMMA" },
@@ -42,6 +44,7 @@ function Bots() {
       <PageHeader icon={Bot} title="BOT FLEET">every paper account on one screen · $100 each · forward-tested in the open · no real money</PageHeader>
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
       {tab === "fleet" && <Fleet />}
+      {tab === "create" && <BotFactory />}
       {tab === "strategy" && <CcxtBotPanel />}
       {tab === "flow" && <FlowBotPanel />}
       {tab === "gamma" && <GammaPulsePanel />}
@@ -65,10 +68,26 @@ function Fleet() {
   const pnlBars = accounts.map((a) => ({ name: a.name, pnl: a.pnl ?? 0 }));
   const winBars = accounts.map((a) => ({ name: a.name, win: (a.winRate ?? 0) * 100, trades: a.trades ?? 0 }));
   const equity: any[] = d?.equity ?? [];
+  const goat = (d?.probes ?? []).find((p: any) => /weather/i.test(p.name));
   const keys = accounts.map((a) => a.name).filter((k) => equity.some((row) => row[k] != null));
 
   return (
     <div className="flex flex-col gap-4">
+      {goat && (
+        <div className="hud-glass rounded-2xl p-4 flex flex-wrap items-center gap-4" role="status">
+          <span className="hud-page-icon" style={{ width: 40, height: 40 }} aria-hidden><CloudSun size={18} /></span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] tracking-[0.22em] font-bold font-mono" style={{ color: "var(--hud-green)" }}>THE MONEY GOAT — WEATHER</div>
+            <div className="prose-sans text-[12px]" style={{ color: "var(--hud-muted)" }}>station observations vs market buckets · trades only after hour 14 of the day · the one proven edge on the desk</div>
+          </div>
+          <div className="flex gap-5 tabular-nums font-mono text-right">
+            <div><div className="text-[8px] tracking-widest" style={{ color: "var(--hud-muted)" }}>PROFIT</div><div className="text-2xl font-bold" style={{ color: "var(--hud-green)" }}>+{usd(goat.pnl)}</div></div>
+            <div><div className="text-[8px] tracking-widest" style={{ color: "var(--hud-muted)" }}>WIN RATE</div><div className="text-2xl font-bold" style={{ color: "var(--hud-text)" }}>{(goat.winRate * 100).toFixed(0)}%</div></div>
+            <div><div className="text-[8px] tracking-widest" style={{ color: "var(--hud-muted)" }}>TRADES</div><div className="text-2xl font-bold" style={{ color: "var(--hud-text)" }}>{goat.trades}</div></div>
+            <div><div className="text-[8px] tracking-widest" style={{ color: "var(--hud-muted)" }}>TODAY</div><div className="text-2xl font-bold" style={{ color: (goat.today?.pnl ?? 0) >= 0 ? "var(--hud-green)" : "var(--hud-red)" }}>{goat.today ? `${goat.today.pnl >= 0 ? "+" : ""}${usd(goat.today.pnl)}` : "—"}</div></div>
+          </div>
+        </div>
+      )}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Kpi label="FLEET BALANCE" value={t ? usd(t.account) : "—"} tone={t && t.pnl >= 0 ? "good" : "bad"} sub={t ? `started at $${t.start}` : ""} />
         <Kpi label="FLEET P&L" value={t ? `${t.pnl >= 0 ? "+" : ""}${usd(t.pnl)}` : "—"} tone={t && t.pnl >= 0 ? "good" : "bad"} sub={t ? `${t.trades} trades` : ""} />
@@ -117,7 +136,7 @@ function Fleet() {
       </Card>
 
       {d?.probes?.length > 0 && (
-        <Card title="EDGE PROBES" sub="research engines scored on their own terms, not on a $100 book">
+        <Card title="RESEARCH BOOKS" sub="engines scored on their own terms, not on a $100 book — weather is the one that earns">
           <div className="grid md:grid-cols-2 gap-2 text-[11px]">
             {d.probes.map((p: any) => (
               <div key={p.key} className="flex justify-between gap-3 px-3 py-1.5 rounded min-w-0" style={{ background: "rgba(255,255,255,0.02)" }}>

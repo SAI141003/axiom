@@ -38,6 +38,16 @@ UA = {"User-Agent": "Mozilla/5.0"}
 STOP_LOSS = -0.55       # close at the bid once down 55% of premium
 PROFIT_TARGET = 0.80    # take profit once up 80% of premium
 
+# v2 gates, from the autopsy of the first 104 main legs (2026-09-20):
+#   score < 0.5  -> 58 legs, 16% win, -36% mean: over half the book, nearly all
+#                   of the bleed. Legs at 0.5+ were 37% win, +10% mean.
+#   PUT          -> 0 of 28 won. Not one.
+# In-sample the two gates turn -$164 into +$44 on a flat $10 bet. That is a
+# hypothesis, not a result: the forward test on the v2 book is the judge.
+MIN_SCORE = 0.5
+ALLOW_PUTS = False
+BOOK_VERSION = 2
+
 
 def log_write(rec: dict) -> None:
     with LOG.open("a") as f:
@@ -92,6 +102,9 @@ async def open_positions(s: aiohttp.ClientSession, date: str) -> None:
         sym = res["symbol"]
         rec, sz = res.get("recommendation"), res.get("sizing")
         if rec and sz and res["direction"] in ("CALL", "PUT"):
+            score = (res.get("metrics") or {}).get("score") or 0.0
+            if score < MIN_SCORE or (res["direction"] == "PUT" and not ALLOW_PUTS):
+                continue
             contracts = sz.get("contracts", 0)
             pid = f"{date}-{sym}-{rec['strike']}{rec['type'][0]}-{res['expiry']}"
             entry = rec.get("ask") or rec["mid"]          # buyers pay the ask
@@ -108,7 +121,7 @@ async def open_positions(s: aiohttp.ClientSession, date: str) -> None:
                            "opt_type": rec["type"], "strike": rec["strike"],
                            "expiry": res["expiry"], "entry": entry,
                            "contracts": contracts, "cost": round(entry * 100 * contracts, 2),
-                           "kind": "main", "score": res["metrics"]["score"], "ts": int(time.time())})
+                           "kind": "main", "score": score, "v": BOOK_VERSION, "ts": int(time.time())})
                 n += 1
         # Penny picks are DISABLED: forward test proved them negative-EV
         # lottery tickets (12% win rate, -$2780 net over 69 legs). Deep-OTM

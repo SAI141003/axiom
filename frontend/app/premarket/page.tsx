@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import TopNav from "@/components/TopNav";
+import { Sun } from "lucide-react";
 import { getToggle } from "@/lib/toggles";
 
 interface Result {
@@ -80,7 +81,7 @@ export default function PreMarketPage() {
       <main className="max-w-6xl mx-auto p-6 font-mono">
         <div className="flex items-end justify-between flex-wrap gap-3 mb-2">
           <div>
-            <h1 className="text-xl font-bold tracking-[0.2em] glow-green">◭ PRE-MARKET SCANNER</h1>
+            <h1 className="inline-flex items-center gap-2 text-xl font-bold tracking-[0.2em] glow-green"><Sun size={20} aria-hidden /> PRE-MARKET SCANNER</h1>
             <p className="text-xs mt-1 flex items-center gap-2" style={{ color: "var(--hud-muted)" }}>
               <span className="hud-led inline-block" style={{ color: "var(--hud-green)", background: "var(--hud-green)", width: 6, height: 6 }} />
               LIVE — prices tick every 10s, no refresh needed.

@@ -1,5 +1,7 @@
 "use client";
 
+import { Zap } from "lucide-react";
+
 import { useEffect, useState } from "react";
 
 /**
@@ -31,7 +33,7 @@ export default function EngineBanner({ engine }: { engine: string }) {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <div className="text-[10px] tracking-widest font-bold" style={{ color: "var(--hud-cyan)" }}>
-            ⚡ LIVE ENGINE — {engine.toUpperCase()}
+            <Zap size={11} aria-hidden style={{ display: "inline", verticalAlign: "-1px" }} /> LIVE ENGINE — {engine.toUpperCase()}
           </div>
           <div className="text-[9px] mt-0.5" style={{ color: "var(--hud-muted)" }}>{e.config}</div>
         </div>

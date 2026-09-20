@@ -42,6 +42,7 @@ export const GROUPS: Group[] = [
     { href: "/live-account", label: "Account", hint: "balance, caps, the go-live gate",        icon: Wallet, keywords: "live balance caps" },
     { href: "/venues",    label: "Venues",    hint: "where a bot can trade from here",         icon: ShieldCheck, keywords: "hyperliquid kraken polymarket jupiter" },
     { href: "/settings",  label: "Keys",      hint: "API keys and bot switches",               icon: KeyRound, keywords: "settings env" },
+    { href: "/about",     label: "About",     hint: "every source, paper, repo and feed — where it is used and what came of it", icon: BookOpen, keywords: "sources papers credits research about" },
   ]},
 ];
 

@@ -6,7 +6,7 @@
 Prediction markets · crypto · equities · options in one dashboard, one safety model.
 
 <sub>
-Python 3.14 · Next.js 14 · CCXT 4.5 · OpenBB · 23 pages · 29 bots · JARVIS · MIT
+Python 3.14 · Next.js 14 · CCXT 4.5 · OpenBB · 24 pages · 30 bots + your own · JARVIS · MIT
 </sub>
 
 </div>
@@ -105,7 +105,9 @@ library on your existing login, the pattern from
 | `morning_brief` | say *"hey Jarvis"* and nothing else: fleet P&L today and overall, who traded, anything broken, disk, the headlines that matter |
 | `fleet_control` | start, stop, restart or read the log of any **paper** bot — never the dashboard or the live executor |
 | `read_code` · `search_code` · `propose_fix` | read the source, diagnose, and write an exact before/after proposal to `jarvis/proposals/` for a human to apply |
-| `remember` · `recall` | a memory: `memory.md` holds standing notes; the conversation itself resumes across restarts |
+| `remember` · `recall` | a memory: `memory.md` holds standing notes; the conversation itself resumes across restarts; `recall` also searches its research notes |
+| `arxiv_search` · `scholar_search` · `web_search` · `read_url` · `write_note` | **research**: arXiv, Semantic Scholar and the open web, read directly (HTML and PDF), cited, and saved as notes. Asked why short-dated calls lose, it read four sources and cited Bryzgalova, Pavlova & Sikorskaya (J. Finance 2023) in 95 seconds |
+| `create_bot` · `list_bots` · `set_bot` | **the Bot OS**: say *"create a bot that…"* and it writes a spec the runner trades on paper from $100 within the hour |
 
 It is instructed to answer only from tools, to speak in short plain prose, and to be
 honest about losses. It **does not edit code** — when asked for a fix it reads the source
@@ -120,6 +122,11 @@ out of its reach by construction. A sample turn, verbatim:
 > negative fifteen point five percent — slightly better in absolute terms but with a worse
 > Sharpe at negative zero point eight two. The engine's verdict is overfit and rejected
 > because it won on the training fold but lost on holdout.
+
+JARVIS has a written character (`jarvis/persona.md`) — calm, precise, proof over hype,
+loyal to the owner and honest with him — and a **night study**: every day at 04:10 it looks
+at the fleet unattended, picks the weakest book, reads the literature on why that kind of
+strategy loses, writes a cited note, and leaves one concrete proposal for the morning brief.
 
 If the bridge is not running, **/api/jarvis** answers the common questions with no model
 at all, straight from `.data/`. The page works either way.
@@ -254,6 +261,9 @@ justify deploying capital. See [DISCLAIMER.md](DISCLAIMER.md).
 | **/tape** | the flow bot replayed frame by frame — bias, CVD, block trades, book imbalance next to the decision it made, after [hftengine](https://github.com/mirkovicdev/HFTENGINE) |
 | **/terminal** | the Bloomberg-style desk: order book, signal feed, kill switch |
 | **/council** | eight role agents debate a thesis and rule; every ruling Brier-scored |
+| **/bots → + Create a bot** | the Bot OS: describe a bot in words (JARVIS writes the spec) or set the dials; it trades on paper from $100 and shows its own book |
+| **/news** | live television from ten channels (free YouTube streams) above every classified headline |
+| **/about** | every source this desk is built from — 104 entries: 25 repositories, 34 papers and models, 21 data feeds, 6 venue citations, 18 libraries — each with where it is used and what came of it, every path verified |
 
 Eleven former pages became tabs of `/bots` and `/lab`; their old URLs redirect.
 
@@ -343,7 +353,10 @@ Everything is a plain Python module. No hidden daemons, no magic.
 ```bash
 ./.venv/bin/python dryrun/flow_bot_daemon.py       # order-flow bot (10-min cadence)
 ./.venv/bin/python dryrun/ccxt_strategy_daemon.py  # daily BTC/ETH/SOL blend
-./.venv/bin/python dryrun/meme_bot_daemon.py       # meme momentum — CoinGecko majors + pump.fun launches
+./.venv/bin/python dryrun/meme_bot_daemon.py       # meme momentum — CoinGecko majors + pump.fun, smart-money flagged
+./.venv/bin/python signals/pump_smart_money.py     # pump.fun creator/graduation tracker (buyer-level with a funded key)
+./.venv/bin/python dryrun/botos.py once            # run every user-made bot one cycle
+./.venv/bin/python dryrun/options_daemon.py        # options v2: score>=0.5, calls only (v1 retired at $0)
 ./.venv/bin/python dryrun/flow_bot_daemon.py       # also writes logs/flow_tape.jsonl for /tape
 ./.venv/bin/python dryrun/options_daemon.py        # options scanner
 ./.venv/bin/python dryrun/forward_snapshot.py      # daily scoreboard across all accounts

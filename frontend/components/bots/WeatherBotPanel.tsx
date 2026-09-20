@@ -1,5 +1,7 @@
 "use client";
 
+import { Target } from "lucide-react";
+
 import { useEffect, useState } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from "recharts";
 import EngineBanner from "@/components/EngineBanner";
@@ -189,7 +191,7 @@ function WeatherPicks() {
          style={{ borderColor: "rgba(52,211,153,0.45)" }}>
       <div className="flex items-center justify-between mb-1">
         <div className="text-[11px] tracking-widest font-bold" style={{ color: "var(--hud-green)" }}>
-          🎯 LIVE PICKS — BUY THESE EXACTLY
+          <Target size={12} aria-hidden style={{ display: "inline", verticalAlign: "-2px" }} /> LIVE PICKS — BUY THESE EXACTLY
         </div>
         <div className="text-[9px]" style={{ color: "var(--hud-muted)" }}>
           gate entry≥{d?.gate?.min ?? "…"} · edge≤{d?.gate?.max ?? "…"} · refreshes 60s
