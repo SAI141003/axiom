@@ -61,7 +61,7 @@ export default function ScenarioPanel() {
     <div className="">
       <main className="max-w-4xl mx-auto p-6 font-mono">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-          <h1 className="text-xl font-bold tracking-[0.25em] glow-cyan text-center">◇ COMPANY SCENARIO</h1>
+          <h2 className="text-xl font-bold tracking-[0.25em] glow-cyan text-center">COMPANY SCENARIO</h2>
           <p className="text-[11px] mt-1 mb-4 text-center" style={{ color: "var(--hud-muted)" }}>
             superposition of 20,000 real-vol futures → interference of live evidence → measured verdict · Brier-scored
           </p>

@@ -18,7 +18,7 @@ export default function ProvingGroundPanel() {
   return (
     <div className="">
       <main className="max-w-5xl mx-auto p-6 font-mono">
-        <h1 className="text-xl font-bold tracking-[0.25em] glow-cyan text-center">🛡 PROVING GROUND</h1>
+        <h2 className="text-xl font-bold tracking-[0.25em] glow-cyan text-center">PROVING GROUND</h2>
         <p className="text-[11px] mt-1 mb-4 text-center" style={{ color: "var(--hud-muted)" }}>
           both bots run every fault — fills, rejects, slippage, timeouts, liquidations, rug-pulls, cap breaches — until every safety invariant holds. Full hands, hard floor.
         </p>

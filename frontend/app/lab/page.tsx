@@ -3,6 +3,8 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import TopNav from "@/components/TopNav";
+import PageHeader from "@/components/PageHeader";
+import { FlaskConical } from "lucide-react";
 import { Card, Kpi, DonutChart, CompareBars, Lines, Tabs, pct, usd } from "@/components/charts";
 import BacktestPanel from "@/components/lab/BacktestPanel";
 import ProvingGroundPanel from "@/components/lab/ProvingGroundPanel";
@@ -36,10 +38,7 @@ function Lab() {
 
   return (
     <main className="max-w-6xl mx-auto p-6 font-mono">
-      <h1 className="text-xl font-bold tracking-[0.25em] glow-cyan text-center">⚗ RESEARCH LAB</h1>
-      <p className="text-[11px] mt-1 mb-5 text-center break-words" style={{ color: "var(--hud-muted)" }}>
-        backtests · fault-injection proving ground · scenario forecasts · model benchmarks · macro data — one desk
-      </p>
+      <PageHeader icon={FlaskConical} title="RESEARCH LAB">backtests · fault-injection proving ground · scenario forecasts · model benchmarks · macro data — one desk</PageHeader>
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
       {tab === "overview" && <Overview />}
       {tab === "backtest" && <BacktestPanel />}

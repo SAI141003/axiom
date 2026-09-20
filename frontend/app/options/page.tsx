@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import TopNav from "@/components/TopNav";
+import { LineChart } from "lucide-react";
 import EngineBanner from "@/components/EngineBanner";
 import { getToggle } from "@/lib/toggles";
 
@@ -204,7 +205,7 @@ export default function OptionsPage() {
     <div className="hud-bg">
       <TopNav />
       <main className="max-w-6xl mx-auto p-6 font-mono">
-        <h1 className="text-xl font-bold tracking-[0.2em] glow-violet">⬙ OPTIONS DESK</h1>
+        <h1 className="text-xl font-bold tracking-[0.2em] glow-violet inline-flex items-center gap-2"><LineChart size={20} aria-hidden /> OPTIONS DESK</h1>
         <p className="text-xs mt-1 mb-6 flex items-center gap-2" style={{ color: "var(--hud-muted)" }}>
           {results.length > 0 && (
             <span className="hud-led inline-block" style={{ color: "var(--hud-green)", background: "var(--hud-green)", width: 6, height: 6 }} />

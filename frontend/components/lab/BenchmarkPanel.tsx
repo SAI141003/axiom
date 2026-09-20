@@ -28,7 +28,7 @@ export default function BenchmarkPanel() {
   return (
     <div className="">
       <main className="max-w-5xl mx-auto p-6 font-mono">
-        <h1 className="text-xl font-bold tracking-[0.25em] glow-cyan text-center">▤ MODEL BENCHMARK</h1>
+        <h2 className="text-xl font-bold tracking-[0.25em] glow-cyan text-center">MODEL BENCHMARK</h2>
         <p className="text-[11px] mt-1 mb-2 text-center" style={{ color: "var(--hud-muted)" }}>
           every engine vs. the baseline it must beat + the relevant research · real records, self-scored
         </p>

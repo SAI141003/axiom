@@ -32,7 +32,9 @@ export async function GET() {
   const history: any[] = forward?.history ?? [];
   const equity = history.map((h) => {
     const row: Record<string, any> = { date: h.date };
-    for (const [k, v] of Object.entries<any>(h.accounts ?? {})) row[k.replace(" ($100 acct)", "")] = v.account;
+    // Snapshots before the loss-floor fix recorded balances below zero; a
+    // $100 account cannot owe money, so history is floored the same way.
+    for (const [k, v] of Object.entries<any>(h.accounts ?? {})) row[k.replace(" ($100 acct)", "")] = Math.max(0, v.account ?? 0);
     return row;
   });
 

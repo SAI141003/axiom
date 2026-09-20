@@ -7,6 +7,7 @@ import {
   XAxis, YAxis, Tooltip, ReferenceLine, Cell,
 } from "recharts";
 import TopNav from "@/components/TopNav";
+import { BookOpen } from "lucide-react";
 
 /**
  * SYSTEM JOURNAL — trading-journal dashboard over the brain's real record:
@@ -99,7 +100,7 @@ export default function JournalPage() {
         <motion.div {...fadeUp} transition={{ duration: 0.4 }}
                     className="hud-panel hud-panel-static px-5 py-3 mb-4 flex items-center justify-between flex-wrap gap-4">
           <div>
-            <div className="text-sm font-bold tracking-[0.25em] glow-cyan">▤ SYSTEM JOURNAL</div>
+            <h1 className="text-sm font-bold tracking-[0.25em] glow-cyan inline-flex items-center gap-2"><BookOpen size={14} aria-hidden /> SYSTEM JOURNAL</h1>
             <div className="text-[9px]" style={{ color: "var(--hud-muted)" }}>paper record · written by the brain · nothing forecast</div>
           </div>
           {[

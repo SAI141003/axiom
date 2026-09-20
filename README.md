@@ -124,6 +124,12 @@ out of its reach by construction. A sample turn, verbatim:
 If the bridge is not running, **/api/jarvis** answers the common questions with no model
 at all, straight from `.data/`. The page works either way.
 
+JARVIS is not confined to its page. A reactor sits in the corner of **every** page; click it
+(or press **⌘J**) and the assistant slides in already knowing which page you are on and
+which endpoint feeds it — *"what am I looking at?"* and *"why is this red?"* just work.
+**⌘K** opens a command palette: type a page name to jump, or type a question and press
+enter to ask. The home page opens with a briefing strip.
+
 ---
 
 ## What it has been through

@@ -15,7 +15,7 @@ export default function FlowBotPanel() {
   return (
     <div className="">
       <main className="max-w-4xl mx-auto p-6 font-mono">
-        <h1 className="text-xl font-bold tracking-[0.25em] glow-cyan text-center">🌊 FLOW BOT</h1>
+        <h2 className="text-xl font-bold tracking-[0.25em] glow-cyan text-center">FLOW BOT</h2>
         <p className="text-[11px] mt-1 mb-4 text-center" style={{ color: "var(--hud-muted)" }}>
           reads the live tape the pros read · Cumulative Delta + Big Trades + DOM · buys strong buy-flow, exits on the flip · intraday · $100 paper, no keys
         </p>

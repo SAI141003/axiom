@@ -3,6 +3,8 @@
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import TopNav from "@/components/TopNav";
+import PageHeader from "@/components/PageHeader";
+import { Bot } from "lucide-react";
 import { Card, Kpi, DonutChart, CompareBars, Lines, Tabs, usd } from "@/components/charts";
 import CcxtBotPanel from "@/components/bots/CcxtBotPanel";
 import FlowBotPanel from "@/components/bots/FlowBotPanel";
@@ -37,10 +39,7 @@ function Bots() {
   const setTab = (id: string) => router.replace(id === "fleet" ? "/bots" : `/bots?tab=${id}`, { scroll: false });
   return (
     <main className="max-w-6xl mx-auto p-6 font-mono">
-      <h1 className="text-xl font-bold tracking-[0.25em] glow-cyan text-center">⬡ BOT FLEET</h1>
-      <p className="text-[11px] mt-1 mb-5 text-center break-words" style={{ color: "var(--hud-muted)" }}>
-        every paper account on one screen · $100 each · forward-tested in the open · no real money
-      </p>
+      <PageHeader icon={Bot} title="BOT FLEET">every paper account on one screen · $100 each · forward-tested in the open · no real money</PageHeader>
       <Tabs tabs={TABS} active={tab} onChange={setTab} />
       {tab === "fleet" && <Fleet />}
       {tab === "strategy" && <CcxtBotPanel />}

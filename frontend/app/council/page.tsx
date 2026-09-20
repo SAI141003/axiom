@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import TopNav from "@/components/TopNav";
+import PageHeader from "@/components/PageHeader";
+import { Users } from "lucide-react";
 
 /**
  * THE COUNCIL — pixel-terminal deliberation room, two modes:
@@ -24,11 +26,7 @@ export default function CouncilPage() {
     <div className="hud-bg min-h-screen">
       <TopNav />
       <main className="max-w-4xl mx-auto p-6 font-mono">
-        <h1 className="text-xl font-bold tracking-[0.3em] text-center glow-cyan"
-            style={{ textShadow: "0 0 2px #22d3ee" }}>▚ THE COUNCIL ▞</h1>
-        <p className="text-[11px] mt-1 mb-4 text-center" style={{ color: "var(--hud-muted)" }}>
-          oracle + named agents · deliberate · vote · one ruling
-        </p>
+        <PageHeader icon={Users} title="THE COUNCIL">oracle + named agents · deliberate · vote · one ruling</PageHeader>
 
         {/* pixel tab switch */}
         <div className="flex justify-center gap-0 mb-6">
