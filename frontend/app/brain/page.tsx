@@ -143,7 +143,7 @@ export default function BrainPage() {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1 }}
                     className="absolute top-3 left-1/2 -translate-x-1/2 text-center pointer-events-none"
                     style={{ zIndex: 4 }}>
-          <div className="text-lg font-bold tracking-[0.5em] glow-cyan font-mono">THE BRAIN</div>
+          <h1 className="text-lg font-bold tracking-[0.5em] glow-cyan font-mono">THE BRAIN</h1>
           <div className="text-[10px] font-mono" style={{ color: "var(--hud-muted)" }}>
             perception → attribution → memory → bounded action
           </div>

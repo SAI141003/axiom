@@ -42,7 +42,7 @@ export default function WeatherBotPanel() {
       <main className="max-w-6xl mx-auto p-6 font-mono">
         <EngineBanner engine="weather (late-day)" />
         <WeatherPicks />
-        <h1 className="text-xl font-bold tracking-[0.2em]">AUTO-BOT 2 · WEATHER</h1>
+        <h2 className="text-xl font-bold tracking-[0.2em]">AUTO-BOT 2 · WEATHER</h2>
         <p className="text-xs mt-1 mb-6" style={{ color: "var(--hud-muted)" }}>
           Trades server-side 24/7 — no browser needed. One $10 paper trade per flagged edge at the
           real market price (station METAR + 82-member ensemble model). Resolves on official

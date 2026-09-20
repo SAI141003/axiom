@@ -1,14 +1,11 @@
 import Link from "next/link";
 import TopNav from "@/components/TopNav";
+import LiveStats from "@/components/home/LiveStats";
+import BriefStrip from "@/components/home/BriefStrip";
+import { ArrowRight } from "lucide-react";
+import { PAGES } from "@/components/nav/pages";
 
 export const metadata = { title: "AXIOM — quant research & paper-trading desk" };
-
-const STATS = [
-  { k: "PAPER BOTS", v: "6", sub: "forward-tested, $100 each" },
-  { k: "SAFETY ASSERTIONS", v: "10,500", sub: "0 failures" },
-  { k: "EXCHANGE REACH", v: "100+", sub: "via CCXT, non-custodial" },
-  { k: "MODE", v: "DRY-RUN", sub: "no live orders" },
-];
 
 const MODULES: {
   href: string; title: string; desc: string; tag: string; live?: boolean;
@@ -89,9 +86,10 @@ const MODULES: {
 
 export default function Home() {
   return (
-    <div className="hud-bg min-h-screen">
+    <div className="hud-bg min-h-screen relative">
+      <div className="hud-ambient" aria-hidden />
       <TopNav />
-      <main className="max-w-6xl mx-auto px-6 py-16 font-mono">
+      <main className="relative max-w-6xl mx-auto px-6 py-14 font-mono">
 
         {/* Hero */}
         <header className="mb-10">
@@ -104,23 +102,15 @@ export default function Home() {
           <h1 className="hud-gradient-text text-5xl sm:text-6xl font-extrabold tracking-[0.14em] leading-none">
             AXIOM
           </h1>
-          <p className="text-[14px] mt-5 max-w-2xl leading-relaxed" style={{ color: "var(--hud-muted)" }}>
+          <p className="prose-sans text-[15px] mt-5 max-w-[62ch] leading-relaxed" style={{ color: "var(--hud-muted)" }}>
             A quant research and paper-trading desk. Real market data, a walk-forward backtester,
             a scenario-proven safety floor, and a stable of bots under continuous forward-test —
             each one keeping an honest scorecard it can&apos;t fudge.
           </p>
         </header>
 
-        {/* Stats strip */}
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-12">
-          {STATS.map((s) => (
-            <div key={s.k} className="hud-panel hud-panel-static px-4 py-3">
-              <div className="text-[9px] tracking-[0.18em]" style={{ color: "var(--hud-muted)" }}>{s.k}</div>
-              <div className="text-2xl font-bold mt-1 tabular-nums hud-gradient-text">{s.v}</div>
-              <div className="text-[9px] mt-0.5" style={{ color: "var(--hud-muted)" }}>{s.sub}</div>
-            </div>
-          ))}
-        </section>
+        <BriefStrip />
+        <LiveStats />
 
         {/* Modules */}
         <div className="flex items-center gap-3 mb-4">
@@ -146,12 +136,13 @@ export default function Home() {
                   </span>
                 )}
               </div>
-              <div className="flex items-center justify-between gap-2 mb-1.5">
+              <div className="flex items-center gap-2.5 mb-2">
+                {(() => { const Icon = PAGES.find((p) => p.href === m.href)?.icon; return Icon ? <span className="hud-page-icon" style={{ width: 32, height: 32, borderRadius: 9 }} aria-hidden><Icon size={16} /></span> : null; })()}
                 <div className="text-[15px] font-bold" style={{ color: "var(--hud-text)" }}>{m.title}</div>
-                <span className="text-[13px] opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200"
-                      style={{ color: "var(--hud-accent)" }} aria-hidden>→</span>
+                <span className="flex-1" />
+                <ArrowRight size={14} className="opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200" style={{ color: "var(--hud-accent)" }} aria-hidden />
               </div>
-              <p className="text-[11px] leading-relaxed" style={{ color: "var(--hud-muted)" }}>
+              <p className="prose-sans text-[12.5px] leading-relaxed" style={{ color: "var(--hud-muted)" }}>
                 {m.desc}
               </p>
             </Link>
@@ -159,7 +150,7 @@ export default function Home() {
         </div>
 
         {/* Safety line */}
-        <p className="mt-12 text-[10px] leading-relaxed max-w-3xl" style={{ color: "var(--hud-muted)" }}>
+        <p className="prose-sans mt-12 text-[11.5px] leading-relaxed max-w-[70ch]" style={{ color: "var(--hud-muted)" }}>
           <span style={{ color: "var(--hud-amber)" }}>Dry-run by default</span> — no live orders. Per-order and daily
           caps, a trade-only key model that can&apos;t withdraw, and an independent kill switch. Educational only, not financial advice.
         </p>

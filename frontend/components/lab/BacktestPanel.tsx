@@ -38,7 +38,7 @@ export default function BacktestPanel() {
   return (
     <div className="">
       <main className="max-w-4xl mx-auto p-6 font-mono">
-        <h1 className="text-xl font-bold tracking-[0.25em] glow-cyan text-center">🧪 BACKTEST LAB</h1>
+        <h2 className="text-xl font-bold tracking-[0.25em] glow-cyan text-center">BACKTEST LAB</h2>
         <p className="text-[11px] mt-1 mb-4 text-center" style={{ color: "var(--hud-muted)" }}>
           OctoBot-style engine · real OHLCV via CCXT · fees + slippage + no look-ahead · walk-forward validated. Measurement, not trading.
         </p>

@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import TopNav from "@/components/TopNav";
+import PageHeader from "@/components/PageHeader";
+import { Activity } from "lucide-react";
 import { Card, Kpi, Lines, CompareBars } from "@/components/charts";
 
 const fmtT = (ts: number) => new Date(ts * 1000).toLocaleString([], { month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -41,10 +43,7 @@ export default function TapePage() {
     <div className="hud-bg min-h-screen">
       <TopNav />
       <main className="max-w-6xl mx-auto p-6 font-mono">
-        <h1 className="text-xl font-bold tracking-[0.25em] glow-cyan text-center">▤ TAPE REPLAY</h1>
-        <p className="text-[11px] mt-1 mb-5 text-center break-words" style={{ color: "var(--hud-muted)" }}>
-          what the flow bot saw and what it did, frame by frame · CVD, block trades, book imbalance · the way hftbacktest replays a session
-        </p>
+        <PageHeader icon={Activity} title="TAPE REPLAY">what the flow bot saw and what it did, frame by frame · CVD, block trades, book imbalance · the way hftbacktest replays a session</PageHeader>
 
         <div className="flex flex-wrap items-center gap-2 mb-4">
           {(d?.symbols ?? []).map((s: string) => (

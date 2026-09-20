@@ -369,3 +369,83 @@ h1.glow-red   { color: var(--hud-red); }
 main { overflow-x: clip; }
 h1 { overflow-wrap: anywhere; }
 .recharts-wrapper { max-width: 100%; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   AXIOM DESIGN SYSTEM v3 — cinematic dark, one accent, data in mono, prose
+   in a humanist sans. Glass for anything that floats (nav, menus, dock,
+   palette). Every interactive primitive has a focus ring, a press response
+   and a 44px reach. Motion respects prefers-reduced-motion.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.prose-sans { font-family: "Fira Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; letter-spacing: 0; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+/* Floating surfaces */
+.hud-glass {
+  background: linear-gradient(180deg, rgba(23,27,36,0.92), rgba(15,18,25,0.94));
+  backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid rgba(124,154,255,0.16);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 30px 80px -30px rgba(0,0,0,0.85), 0 0 0 1px rgba(0,0,0,0.4);
+}
+.hud-glass-bar {
+  background: linear-gradient(180deg, rgba(13,16,23,0.86), rgba(10,12,17,0.72));
+  backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border-bottom: 1px solid var(--hud-border);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.03), 0 8px 24px -16px rgba(0,0,0,0.8);
+}
+
+/* Interactive primitives */
+.hud-navbtn, .hud-btn, .hud-icon-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 36px; border-radius: 8px; cursor: pointer; user-select: none;
+  color: var(--hud-muted); background: transparent; border: 1px solid transparent;
+  transition: color 0.18s var(--hud-ease), background 0.18s var(--hud-ease), border-color 0.18s var(--hud-ease), transform 0.12s var(--hud-ease);
+}
+.hud-navbtn { padding: 0 10px; }
+.hud-navbtn:hover, .hud-btn:hover, .hud-icon-btn:hover { color: var(--hud-text); background: rgba(255,255,255,0.045); }
+.hud-navbtn[data-active] { color: var(--hud-accent); background: var(--hud-accent-soft); box-shadow: inset 0 0 0 1px rgba(124,154,255,0.28); }
+.hud-navbtn:active, .hud-btn:active, .hud-icon-btn:active { transform: scale(0.97); }
+.hud-btn { padding: 0 12px; font: 600 10px/1 "JetBrains Mono", ui-monospace, monospace; letter-spacing: 0.14em; text-transform: uppercase; border-color: var(--hud-border); }
+.hud-btn-accent { color: var(--hud-accent); border-color: rgba(124,154,255,0.45); }
+.hud-btn-accent:hover { background: var(--hud-accent-soft); color: var(--hud-accent-2); }
+.hud-btn:disabled, .hud-icon-btn:disabled { opacity: 0.42; cursor: not-allowed; transform: none; }
+.hud-icon-btn { width: 40px; height: 40px; min-height: 40px; }
+.hud-icon-btn-accent { color: var(--hud-accent); }
+.hud-input {
+  min-height: 44px; padding: 0 14px; border-radius: 10px; font-size: 14px;
+  color: var(--hud-text); background: rgba(255,255,255,0.03); border: 1px solid var(--hud-border);
+  transition: border-color 0.18s var(--hud-ease), box-shadow 0.18s var(--hud-ease);
+}
+.hud-input::placeholder { color: var(--hud-muted); }
+.hud-input:focus { outline: none; border-color: rgba(124,154,255,0.55); box-shadow: 0 0 0 3px rgba(124,154,255,0.16); }
+.hud-kbd { display: inline-flex; align-items: center; min-width: 20px; height: 18px; padding: 0 5px; border-radius: 4px; font: 500 10px/1 "JetBrains Mono", monospace; color: var(--hud-muted); background: rgba(255,255,255,0.05); border: 1px solid var(--hud-border); }
+
+/* Focus: visible for keyboard, never for mouse */
+:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 2px; border-radius: 6px; }
+button, a, [role="button"], [role="option"], [role="tab"], input[type="range"] { cursor: pointer; touch-action: manipulation; }
+input, textarea, select { cursor: text; }
+
+/* Page header: icon + title + one line, the same on every page */
+.hud-page-head { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; margin-bottom: 20px; }
+.hud-page-icon { display: inline-grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; color: var(--hud-accent); background: var(--hud-accent-soft); box-shadow: inset 0 0 0 1px rgba(124,154,255,0.22), 0 0 30px -8px var(--hud-glow); }
+.hud-page-head h1 { font: 700 20px/1.2 "JetBrains Mono", ui-monospace, monospace; letter-spacing: 0.25em; color: var(--hud-accent); margin: 4px 0 0; }
+.hud-page-head p { font-size: 12.5px; line-height: 1.55; color: var(--hud-muted); max-width: 62ch; margin: 0; }
+
+/* Ambient light — the cinematic layer. Two slow blobs behind the hero. */
+.hud-ambient { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.hud-ambient::before, .hud-ambient::after {
+  content: ""; position: absolute; width: 60vw; height: 60vw; max-width: 900px; max-height: 900px; border-radius: 50%;
+  filter: blur(90px); opacity: 0.32; will-change: transform;
+}
+.hud-ambient::before { left: -18vw; top: -30vw; background: radial-gradient(circle, rgba(124,154,255,0.55), transparent 62%); animation: drift1 26s ease-in-out infinite alternate; }
+.hud-ambient::after  { right: -22vw; top: -14vw; background: radial-gradient(circle, rgba(85,104,230,0.45), transparent 62%); animation: drift2 32s ease-in-out infinite alternate; }
+@keyframes drift1 { from { transform: translate3d(0,0,0) } to { transform: translate3d(9vw, 6vw, 0) } }
+@keyframes drift2 { from { transform: translate3d(0,0,0) } to { transform: translate3d(-8vw, 8vw, 0) } }
+
+/* Tabs meet the 44px reach */
+[role="tab"] { min-height: 36px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
+  .hud-ambient::before, .hud-ambient::after { animation: none; }
+}

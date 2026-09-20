@@ -52,7 +52,7 @@ export default function DataDeskPanel() {
   return (
     <div className="">
       <main className="max-w-5xl mx-auto p-6 font-mono">
-        <h1 className="text-xl font-bold tracking-[0.25em] glow-cyan text-center">🛰 DATA DESK</h1>
+        <h2 className="text-xl font-bold tracking-[0.25em] glow-cyan text-center">DATA DESK</h2>
         <p className="text-[11px] mt-1 mb-1 text-center" style={{ color: "var(--hud-muted)" }}>
           powered by <b style={{ color: "var(--hud-accent)" }}>OpenBB</b> — the Open Data Platform · equities · crypto · rates · inflation · news · keyless, refreshed every 15 min
         </p>

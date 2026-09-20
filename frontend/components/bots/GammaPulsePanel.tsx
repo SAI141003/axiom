@@ -14,7 +14,7 @@ export default function GammaPulsePanel() {
   return (
     <div className="">
       <main className="max-w-4xl mx-auto p-6 font-mono">
-        <h1 className="text-xl font-bold tracking-[0.25em] glow-cyan text-center">◭ GAMMA PULSE</h1>
+        <h2 className="text-xl font-bold tracking-[0.25em] glow-cyan text-center">GAMMA PULSE</h2>
         <p className="text-[11px] mt-1 mb-4 text-center" style={{ color: "var(--hud-muted)" }}>
           dealer-gamma regime for stocks &amp; options · above zero-γ dampens (revert) · below amplifies (momentum) · $100 paper test
         </p>

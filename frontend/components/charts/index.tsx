@@ -55,20 +55,23 @@ export function DonutChart({ data, height = 220, valueLabel }: { data: { name: s
   );
 }
 
+// Bars run horizontally: category names get a full row each, so they never
+// collide however long they are or however narrow the card is.
 export function CompareBars({ data, keys, height = 240, format, signed }:
   { data: any[]; keys: { key: string; label: string }[]; height?: number; format?: (v: number) => string; signed?: boolean }) {
   if (!data?.length) return <Empty />;
+  const h = Math.max(height, data.length * (keys.length > 1 ? 44 : 34) + 40);
   return (
-    <ResponsiveContainer width="100%" height={height}>
-      <BarChart data={data} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
-        <CartesianGrid stroke="#232936" vertical={false} />
-        <XAxis dataKey="name" tick={axis} interval={0} />
-        <YAxis tick={axis} tickFormatter={(v) => (format ? format(v) : v)} />
+    <ResponsiveContainer width="100%" height={h}>
+      <BarChart data={data} layout="vertical" margin={{ top: 4, right: 12, left: 4, bottom: 0 }} barCategoryGap="28%">
+        <CartesianGrid stroke="#232936" horizontal={false} />
+        <XAxis type="number" tick={axis} tickFormatter={(v) => (format ? format(v) : v)} />
+        <YAxis type="category" dataKey="name" tick={{ ...axis, fontSize: 11 }} width={96} interval={0} />
         <Tooltip {...tip} formatter={(v: any) => (format ? format(Number(v)) : v)} />
         {keys.length > 1 && <Legend wrapperStyle={{ fontSize: 10 }} />}
-        {signed && <ReferenceLine y={0} stroke="#6b7488" />}
+        {signed && <ReferenceLine x={0} stroke="#6b7488" />}
         {keys.map((k, i) => (
-          <Bar key={k.key} dataKey={k.key} name={k.label} fill={PALETTE[i % PALETTE.length]} radius={[3, 3, 0, 0]}>
+          <Bar key={k.key} dataKey={k.key} name={k.label} fill={PALETTE[i % PALETTE.length]} radius={[0, 3, 3, 0]}>
             {keys.length === 1 && signed && data.map((d, j) => <Cell key={j} fill={d[k.key] >= 0 ? GREEN : RED} />)}
           </Bar>
         ))}

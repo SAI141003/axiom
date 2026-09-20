@@ -440,7 +440,7 @@ function BreadcrumbBar({ activeView, onViewChange }: { activeView: View; onViewC
         <Link href="/" title="Back to AXIOM home"
               className="flex items-center h-full px-4 border-r border-bb-border flex-shrink-0 hover:opacity-80 transition-opacity"
               style={{ background: "var(--bb-amber)" }}>
-          <span style={{ color: "#0b0d12", fontWeight: 800, fontSize: 11, letterSpacing: "0.18em" }}>◂ POLY-HFT</span>
+          <h1 style={{ color: "#0b0d12", fontWeight: 800, fontSize: 11, letterSpacing: "0.18em", margin: 0 }}>◂ AXIOM TERMINAL</h1>
         </Link>
         {/* Nav tabs */}
         <div className="flex items-center h-full">
