@@ -379,11 +379,17 @@ async function providers() {
   // JARVIS's own NIM key first (no contention with the classifier, no free-tier
   // rate limits), then Groq for speed, then the shared NIM key, then OpenAI.
   const nvKey = env.NVIDIA_API_KEY_JARVIS || env.NVIDIA_API_KEY;
-  const nvModels = [env.NVIDIA_MODEL_JARVIS || env.NVIDIA_MODEL_TOOLS || "nvidia/nemotron-3-super-120b-a12b", "moonshotai/kimi-k3", "nvidia/nemotron-3-ultra-550b-a55b", "mistralai/mistral-large-2-instruct"];
+  const nvModels = [env.NVIDIA_MODEL_JARVIS || env.NVIDIA_MODEL_TOOLS || "nvidia/nemotron-3-super-120b-a12b", "deepseek-ai/deepseek-v4-flash-0731", "mistralai/mistral-large-2-instruct", "nvidia/nemotron-3-ultra-550b-a55b"];   // measured: Super 5-7s, DeepSeek 5-19s, Kimi/GLM 48-90s
   // Speed first: Groq answers in 0.2-0.5s but allows 8k tokens/min on the free
   // tier, so every turn is kept small (see platformTurn). NIM is the deep bench.
   return [
+    // Cerebras: 2,600 tok/s and a 60k tokens/min budget -- the fast lane.
+    env.CEREBRAS_API_KEY && { name: "cerebras", base: "https://api.cerebras.ai/v1", key: env.CEREBRAS_API_KEY, models: [env.CEREBRAS_MODEL_JARVIS || "gpt-oss-120b", "qwen-3.8-27b"] },
     env.GROQ_API_KEY && { name: "groq", base: "https://api.groq.com/openai/v1", key: env.GROQ_API_KEY, models: [env.GROQ_MODEL_JARVIS || "qwen/qwen3.8-27b", "openai/gpt-oss-120b", "openai/gpt-oss-20b"] },
+    env.MISTRAL_API_KEY && { name: "mistral", base: "https://api.mistral.ai/v1", key: env.MISTRAL_API_KEY, models: [env.MISTRAL_MODEL || "mistral-medium-latest", "mistral-small-latest", "mistral-large-latest"] },
+    env.GEMINI_API_KEY && /^AIza/.test(env.GEMINI_API_KEY) && { name: "gemini", base: "https://generativelanguage.googleapis.com/v1beta/openai", key: env.GEMINI_API_KEY, models: [env.GEMINI_MODEL || "gemini-2.5-flash", "gemini-2.5-flash-lite"] },
+    env.SILICONFLOW_API_KEY && { name: "siliconflow", base: "https://api.siliconflow.com/v1", key: env.SILICONFLOW_API_KEY, models: [env.SILICONFLOW_MODEL || "Qwen/Qwen3-8B"] },
+    env.ZHIPU_API_KEY && { name: "zhipu", base: "https://open.bigmodel.cn/api/paas/v4", key: env.ZHIPU_API_KEY, models: [env.ZHIPU_MODEL || "glm-4.7-flash", "glm-4.5-flash"] },
     nvKey && { name: "nvidia", base: env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1", key: nvKey, models: nvModels },
     env.OPENAI_API_KEY && { name: "openai", base: "https://api.openai.com/v1", key: env.OPENAI_API_KEY, models: [env.OPENAI_MODEL || "gpt-6-astra", "gpt-5"] },
   ].filter(Boolean);
