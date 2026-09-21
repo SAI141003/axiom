@@ -6,7 +6,7 @@
 Prediction markets · crypto · equities · options in one dashboard, one safety model.
 
 <sub>
-Python 3.14 · Next.js 14 · CCXT 4.5 · OpenBB · 24 pages · 30 bots + your own · JARVIS · MIT
+Python 3.14 · Next.js 14 · CCXT 4.5 · OpenBB · 24 pages · 30 bots + your own · AXIOM, the mind · MIT
 </sub>
 
 </div>
@@ -18,7 +18,7 @@ Python 3.14 · Next.js 14 · CCXT 4.5 · OpenBB · 24 pages · 30 bots + your ow
 AXIOM started as a Polymarket high-frequency bot and grew into a full research desk:
 a backtest engine, a fault-injection proving ground, 30 paper-trading daemons plus the
 ones you describe into existence, a 26-page dashboard over live market data — and
-**JARVIS**, a voice that answers for all of it from the data, on the platform's own AI.
+**AXIOM itself** — the mind of the desk, a voice that answers for all of it from the data, on the platform's own AI, listening on every page.
 
 It is built around one rule: **an idea does not ship unless it survives data it has
 never seen.** Every strategy runs through a train/holdout split and walk-forward folds.
@@ -37,7 +37,7 @@ failures** — rejected orders, timeouts, partial fills, slippage blowouts, dupl
 
 ## Contents
 
-[Quick start](#quick-start) · [JARVIS](#jarvis) · [What it has been through](#what-it-has-been-through) ·
+[Quick start](#quick-start) · [AXIOM, the mind](#axiom-the-mind) · [What it has been through](#what-it-has-been-through) ·
 [Results](#results) · [Polymarket](#polymarket-the-origin) · [Commands](#command-reference) ·
 [Agents & skills](#agents--skills) · [Going live](#going-live) · [Safety](#safety-model) ·
 [Credits](#tools--repos-combined) · [Security](#security)
@@ -72,21 +72,22 @@ needed for the ML bots; you do not need it to evaluate the system.
 
 All three are verified to pass from a clean clone with only `requirements-core.txt`.
 
-### Optional: wake JARVIS
+### Optional: wake the mind
 
 ```bash
 cd jarvis && npm install && npm start      # ws://127.0.0.1:8788 — Groq / NVIDIA keys from .env
 ```
 
-Open **/jarvis**, tap the reactor, and ask. Without the bridge the page still answers the
-common questions from the desk's data files.
+Open any page and say **"hey Axiom"** (or open **/mind** and type). Without the bridge the
+page still answers the common questions from the desk's data files.
 
 ---
 
-## JARVIS
+## AXIOM, the mind
 
-The desk has a voice. **/jarvis** is an arc-reactor HUD with browser-native speech in and
-out (no key), a wake word (*"hey Jarvis"*), and a streaming transcript. Its brain is the
+The desk has a mind and a voice. **/mind** is the brain scene — the live connectome of
+the desk's agents — with browser-native speech in and out (no key), an always-on wake
+word (*"hey Axiom"*, on every page, no tapping), and a streaming transcript. Its brain is the
 desk's own tool-calling loop over the AI already connected to the platform — Groq first,
 NVIDIA NIM next, OpenAI if a key exists (the bridge architecture follows
 [adewaskar/jarvis](https://github.com/adewaskar/jarvis); the Claude Agent SDK loop remains
@@ -103,7 +104,7 @@ an option) — with the desk exposed as tools:
 | `run_backtest` · `run_tests` | refresh the backtest; run the suite and a safety round |
 | `desk_api` | **every page's data** — 49 read-only endpoints: positions, journal, council, options, weather picks, markets, quotes |
 | `news` | **every outlet the desk reads** — Reuters, BBC, NYT, CoinDesk, Cointelegraph, TechCrunch, Ars Technica, Google News topics — plus a live search |
-| `morning_brief` | say *"hey Jarvis"* and nothing else: fleet P&L today and overall, who traded, anything broken, disk, the headlines that matter |
+| `morning_brief` | say *"hey Axiom"* and nothing else: fleet P&L today and overall, who traded, anything broken, disk, the headlines that matter |
 | `fleet_control` | start, stop, restart or read the log of any **paper** bot — never the dashboard or the live executor |
 | `read_code` · `search_code` · `propose_fix` | read the source, diagnose, and write an exact before/after proposal to `jarvis/proposals/` for a human to apply |
 | `remember` · `recall` | a memory: `memory.md` holds standing notes; the conversation itself resumes across restarts; `recall` also searches its research notes |
@@ -120,7 +121,7 @@ out of its reach by construction. A sample turn, verbatim:
 > *"Try a strategy that is pure momentum plus RSI, weights 1.2 and 0.9, and tell me
 > honestly whether it beats what we ship out of sample."*
 >
-> **JARVIS:** No, it does not beat the default out of sample. Your momentum plus RSI blend
+> **AXIOM:** No, it does not beat the default out of sample. Your momentum plus RSI blend
 > returned negative fourteen point five percent on holdout versus the shipped strategy's
 > negative fifteen point five percent — slightly better in absolute terms but with a worse
 > Sharpe at negative zero point eight two. The engine's verdict is overfit and rejected
@@ -130,31 +131,34 @@ out of its reach by construction. A sample turn, verbatim:
 
 | Job | Model | Key |
 |---|---|---|
-| JARVIS brain (tools, voice, navigation) | NVIDIA **Nemotron-3 Super 120B** · fallbacks Kimi K3, Mistral Large 2 | `NVIDIA_API_KEY_JARVIS` (dedicated) |
-| JARVIS second opinion | NVIDIA **Nemotron-3 Ultra 550B** (or GPT-6 Astra if `OPENAI_API_KEY`) | dedicated |
-| Dashboard LLM — news cards, council heads, AI Desk, live summary | Groq **gpt-oss-120b** → NIM **GLM-5.3** → Kimi K3 | `GROQ_API_KEY`, `NVIDIA_API_KEY` |
+| AXIOM brain (tools, voice, navigation) | Groq **gpt-oss-120b** / Qwen 3.8 27B → NVIDIA **Nemotron-3 Super 120B** · fallbacks gpt-oss-20b, DeepSeek V4 Flash | `GROQ_API_KEY`, `NVIDIA_API_KEY_JARVIS` (dedicated) |
+| AXIOM second opinion | NVIDIA **Nemotron-3 Ultra 550B** (or GPT-6 Astra if `OPENAI_API_KEY`) | dedicated |
+| Dashboard LLM — news cards, council heads, AI Desk, live summary | Groq **gpt-oss-120b** → Qwen 3.8 27B → NIM **Nemotron-3 Super 120B** → gpt-oss-20b | `GROQ_API_KEY`, `NVIDIA_API_KEY` |
 | News classifier (Python) | NIM **Gemma-4 31B** | `NVIDIA_API_KEY` |
-| MiroFish swarm micro-agents | NIM **Llama-3.1 8B** (0.25s each) | `NVIDIA_API_KEY` |
+| MiroFish swarm micro-agents | NIM **gpt-oss-20b** (≈2s each, 72 personas in parallel) | `NVIDIA_API_KEY` |
 
-**JARVIS runs on the platform's own AI.** The bridge has its own tool-calling loop on
-Groq (`gpt-oss-120b`) with NVIDIA NIM (Nemotron-3 Super 120B, Kimi K3, GLM-5.3) as fallback
+**AXIOM runs on the platform's own AI.** The bridge has its own tool-calling loop on
+Groq (`gpt-oss-120b`) with NVIDIA NIM (Nemotron-3 Super 120B, gpt-oss-20b, DeepSeek V4 Flash) as fallback
 and OpenAI if a key exists — 5-second answers, every tool, voice navigation, memory in
 `thread.json` and `desk_state.md`. No dependence on Claude Code; set `JARVIS_BRAIN=claude`
 to use the Claude Agent SDK loop instead.
 
-JARVIS has a written character (`jarvis/persona.md`) — calm, precise, proof over hype,
+AXIOM has a written character (`jarvis/persona.md`) — calm, precise, proof over hype,
 loyal to the owner and honest with him — and a **night study**: every day at 04:10 it looks
 at the fleet unattended, picks the weakest book, reads the literature on why that kind of
 strategy loses, writes a cited note, and leaves one concrete proposal for the morning brief.
 
-If the bridge is not running, **/api/jarvis** answers the common questions with no model
+If the bridge is not running, **/api/jarvis** (kept under its original name) answers the common questions with no model
 at all, straight from `.data/`. The page works either way.
 
-JARVIS is not confined to its page. A reactor sits in the corner of **every** page; click it
-(or press **⌘J**) and the assistant slides in already knowing which page you are on and
-which endpoint feeds it — *"what am I looking at?"* and *"why is this red?"* just work.
-**⌘K** opens a command palette: type a page name to jump, or type a question and press
-enter to ask. The home page opens with a briefing strip.
+AXIOM is not confined to its page. It listens on **every** page — say *"hey Axiom"* and it
+wakes, already knowing which page you are on and which endpoint feeds it — *"what am I
+looking at?"*, *"open the bots and tell me who is winning"*, *"why is this red?"* just work.
+A brain orb in the corner (or **⌘J**) opens the same conversation by hand. **⌘K** opens a
+command palette: type a page name to jump, or type a question and press enter to ask.
+The home page is the system screen: the reactor, the fleet and weather gauges, diagnostics,
+every screen, the live world summary — and when you arrive after six hours away, AXIOM
+briefs you unprompted.
 
 ---
 
@@ -168,7 +172,7 @@ paper-trading system, and the following is what it has actually been subjected t
 | **Fault scenarios** | 35 distinct failure modes × 300 runs = **10,500 assertions, 0 failures** |
 | **Unit tests** | 26, passing |
 | **Paper trades executed** | **892 trades** across 5 independent `$100` accounts |
-| **Continuous forward test** | **17 days** of uninterrupted daily-tracked operation |
+| **Continuous forward test** | **19 days** of uninterrupted daily-tracked operation (scoreboard since 2026-08-14) |
 | **Backtest grid** | 9 symbol × timeframe cells, 720 candles each, walk-forward validated |
 | **Strategy variants tested** | 5 (4 rejected out-of-sample, 1 shipped) |
 | **Bots written** | 29 paper daemons, run as supervised `launchd` services |
@@ -259,12 +263,19 @@ per_symbol_report.json → "per-symbol routing does NOT beat both globals
 
 ### Forward test — the honest status
 
-The paper fleet has run **17 consecutive days / 892 trades** across five `$100` accounts.
-That is a real operational track record: the bots, the data feeds, the accounting and the
-daily scoreboard all work unattended.
+The paper fleet has run **19 consecutive days / 694 trades** on six `$100` accounts (two
+earlier books — options v1 and meme v1 — blew up, were retired on 2026-09-20 and stay on the
+board as history; their gated v2 successors start fresh from `$100`). That is a real
+operational track record: the bots, the data feeds, the accounting and the daily scoreboard
+all work unattended.
 
-**It has not yet demonstrated a profitable edge.** Forward results to date are net negative
-and the research is ongoing. Treat AXIOM as a research platform, not a money printer —
+**The fleet as a whole has not yet demonstrated a profitable edge.** Forward results to
+date are net negative and the research is ongoing. The one book that is ahead is the
+Polymarket **weather** bot: every trade it has placed since its favorites gate went live on
+2026-07-26 — **268 resolved, 83% won, +$76 after fees** — counted exactly as placed, no
+retroactive filter (the ungated era before it lost $213 and is shown as *weather v1*).
+Every number on the dashboard is computed from the trade logs at request time; nothing is
+typed in. Treat AXIOM as a research platform, not a money printer —
 the live path exists and is documented below, but the project's own data does not yet
 justify deploying capital. See [DISCLAIMER.md](DISCLAIMER.md).
 
@@ -274,13 +285,13 @@ justify deploying capital. See [DISCLAIMER.md](DISCLAIMER.md).
 
 | Page | What it is |
 |---|---|
-| **/jarvis** | the voice — see [JARVIS](#jarvis) |
+| **/mind** | the mind — see [AXIOM, the mind](#axiom-the-mind) |
 | **/bots** | the whole fleet on one screen: capital donut, P&L and win-rate comparison bars, every account's equity curve, then each bot's open book as a tab |
 | **/lab** | research on one desk: edge donut, strategy-variant comparison, grid vs buy-and-hold, the anti-overfit chart, the equity curve, all 35 fault scenarios — then Backtest, Proving Ground, Scenario, Benchmarks and Data Desk as tabs |
 | **/tape** | the flow bot replayed frame by frame — bias, CVD, block trades, book imbalance next to the decision it made, after [hftengine](https://github.com/mirkovicdev/HFTENGINE) |
 | **/terminal** | the Bloomberg-style desk: order book, signal feed, kill switch |
 | **/council** | eight role agents debate a thesis and rule; every ruling Brier-scored |
-| **/bots → + Create a bot** | the Bot OS: describe a bot in words (JARVIS writes the spec) or set the dials; it trades on paper from $100 and shows its own book |
+| **/bots → + Create a bot** | the Bot OS: describe a bot in words (AXIOM writes the spec) or set the dials; it trades on paper from $100 and shows its own book |
 | **/news** | live television from ten channels (free YouTube streams), then the **World Wire** — 76 feeds from World Monitor's open catalog across markets, crypto, energy, crisis and geopolitics — above every classified headline |
 | **/connectome** | the desk's nervous system read from the code — 148 nodes, 178 wires, 23 senses — lit by the last 24 hours, after the fruit-fly connectome (Google/Janelia, *Cell*, Sept 2026) |
 | **/world** | our own situation map: exchanges open now, chokepoints, USGS quakes, headline pressure by region; World Monitor self-hosted underneath, optional |
@@ -504,7 +515,7 @@ AXIOM stands on a lot of other people's work. Full credit:
 | [**Hyperliquid SDK**](https://github.com/hyperliquid-dex/hyperliquid-python-sdk) | MIT | Perps adapter |
 | [**Jupiter**](https://station.jup.ag/) | — | Solana spot routing |
 | [**DexScreener API**](https://docs.dexscreener.com/) | — | Keyless [pump.fun](https://pump.fun) pair data (price, 1h/24h, volume, liquidity) for the meme bot, with a liquidity floor as the rug guard |
-| [**Claude Agent SDK**](https://docs.claude.com/en/docs/claude-code) | — | JARVIS's brain, on your Claude Code login |
+| [**Claude Agent SDK**](https://docs.claude.com/en/docs/claude-code) | — | optional brain for AXIOM (`JARVIS_BRAIN=claude`), on your Claude Code login |
 
 ### Architectural influences
 
@@ -517,9 +528,9 @@ AXIOM stands on a lot of other people's work. Full credit:
 | [**brodyautomates/polymarket-pipeline**](https://github.com/brodyautomates/polymarket-pipeline) | Prediction-market ingestion patterns |
 | [**koala73/worldmonitor**](https://github.com/koala73/worldmonitor) (AGPL-3.0) | The open feed catalog behind the World Wire, and the ops-room signal palette |
 | [**mirkovicdev/hftengine**](https://github.com/mirkovicdev/HFTENGINE) | The replay-console idea — show what the engine *saw* next to what it *did*, frame by frame, and say plainly what is modelled. Became `/tape` and the flow bot's frame log |
-| [**adewaskar/jarvis**](https://github.com/adewaskar/jarvis) | The bridge architecture: Claude Code as a library over a local WebSocket, in-process MCP tools, the browser as face and voice. Became `jarvis/bridge.mjs` and `/jarvis` |
+| [**adewaskar/jarvis**](https://github.com/adewaskar/jarvis) | The bridge architecture: Claude Code as a library over a local WebSocket, in-process MCP tools, the browser as face and voice. Became `jarvis/bridge.mjs` and `/mind` |
 | [**TradingAgents**](https://github.com/TauricResearch/TradingAgents) ([Xiao et al. 2024](https://arxiv.org/abs/2412.20138)) | A desk of role agents that debate before a call, with a risk manager between trader and book. The Council already worked this way; the paper's missing seat, **Vault — Risk Manager**, was added |
-| [**Automate Strategy Finding with LLM**](https://github.com/kouzhizhuo/Automate-Strategy-Finding-with-LLM-in-Quant-investment) ([Kou et al., EMNLP 2025](https://arxiv.org/abs/2409.06289)) | A model proposes factors, a backtester filters them. Became `backtest/propose.py` and JARVIS's `propose_strategy` — the honest version, where nothing ships unless it wins on holdout |
+| [**Automate Strategy Finding with LLM**](https://github.com/kouzhizhuo/Automate-Strategy-Finding-with-LLM-in-Quant-investment) ([Kou et al., EMNLP 2025](https://arxiv.org/abs/2409.06289)) | A model proposes factors, a backtester filters them. Became `backtest/propose.py` and AXIOM's `propose_strategy` — the honest version, where nothing ships unless it wins on holdout |
 | [**HARLF**](https://github.com/franjgs/llm-rl-finance-trader) ([arXiv 2507.18560](https://arxiv.org/abs/2507.18560)) · [**FinBERT**](https://github.com/ProsusAI/finBERT) | Sentiment as a portfolio input. AXIOM's news classifier already produces direction and materiality; coupling that to allocation is **not shipped** — it would need to win out-of-sample first, like everything else here |
 
 > These are studied as references and cloned locally. They are **gitignored**, keep their

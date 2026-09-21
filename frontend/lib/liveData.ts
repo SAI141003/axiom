@@ -70,6 +70,11 @@ function parseGammaItem(item: any): Market | null {
       }
     } catch { /* keep 0.5 */ }
 
+    let tokenId: string | undefined;
+    try {
+      const ids: string[] = typeof item.clobTokenIds === "string" ? JSON.parse(item.clobTokenIds) : (item.clobTokenIds ?? []);
+      tokenId = ids[0];
+    } catch { /* no token */ }
     const tags    = Array.isArray(item.tags) ? item.tags : [];
     const endDate = item.endDate ?? item.end_date_iso ?? null;
 
@@ -84,6 +89,7 @@ function parseGammaItem(item: any): Market | null {
       end_date:      endDate ?? undefined,
       linked_asset:  detectLinkedAsset(question) ?? undefined,
       change_24h:    0,
+      token_id:      tokenId,
     };
   } catch {
     return null;

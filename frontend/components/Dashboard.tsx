@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { initWebSocket, destroyWebSocket } from "@/lib/websocket";
-import { startMockFeed, stopMockFeed, seedSpotPrices } from "@/lib/mockFeed";
+import { startDeskFeed, stopDeskFeed } from "@/lib/deskFeed";
 import { fetchGammaMarkets, fetchBinancePrices } from "@/lib/liveData";
 import MarketList from "./MarketList";
 import OrderBook from "./OrderBook";
@@ -43,7 +43,6 @@ const FN_KEYS = [
   { key: "F7",  label: "ANLYT",  id: "analytics" },
   { key: "F8",  label: "KILL",   id: "kill"      },
   { key: "F9",  label: "ARB",    id: "arb"       },
-  { key: "F10", label: "SIM",    id: "sim"       },
 ];
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -55,12 +54,10 @@ export default function Dashboard() {
   const wsConnected       = useTradingStore((s) => s.stats.ws_connected);
 
   const [activeView,    setActiveView   ] = useState<View>("markets");
-  const [simRunning,    setSimRunning   ] = useState(false);
   const [helpOpen,      setHelpOpen     ] = useState(false);
   const [killConfirm,   setKillConfirm  ] = useState(false);
   const [loadingMarkets,setLoadingMarkets] = useState(true);
 
-  const simStarted  = useRef(false);
   const killTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Startup: fetch live Gamma markets + Binance prices, then try WS ─────────
@@ -72,11 +69,6 @@ export default function Dashboard() {
       fetchGammaMarkets(50),
       fetchBinancePrices(),
     ]).then(([markets, prices]) => {
-      // Seed live spot prices into mockFeed so crypto binary opps are realistic
-      if (Object.keys(prices).length > 0) {
-        seedSpotPrices(prices);
-      }
-
       if (markets.length > 0) {
         store.setMarkets(markets);
         store.selectMarket(markets[0]);
@@ -107,26 +99,14 @@ export default function Dashboard() {
       setLoadingMarkets(false);
     });
 
-    // 2. Try backend WS
+    // 2. The desk feed (real paper books, CLOB, tape, fleet risk) plus the
+    //    optional live-bot WS. There is no simulation anywhere in this terminal.
+    startDeskFeed();
     initWebSocket();
 
-    // NO silent mock fallback — the terminal shows real data or an OFFLINE
-    // state. Simulation only ever starts via the explicit F10 toggle, and is
-    // clearly labelled. (A silent fake feed is worse than an honest gap.)
-    const timer = setTimeout(() => {
-      if (!useTradingStore.getState().stats.ws_connected) {
-        useTradingStore.getState().addLog({
-          level: "WARNING",
-          message: "Backend WS offline (ws://localhost:8765) — live bot telemetry unavailable. Press F10 for an explicitly-labelled sim feed.",
-          ts: Date.now(),
-        });
-      }
-    }, 1500);
-
     return () => {
-      clearTimeout(timer);
       destroyWebSocket();
-      stopMockFeed();
+      stopDeskFeed();
     };
   }, []);
 
@@ -171,16 +151,12 @@ export default function Dashboard() {
           useTradingStore.getState().addLog({ level: "ERROR", message: "Kill switch ACTIVATED — all orders halted", ts: Date.now() });
         }
         break;
-      case "sim":
-        if (simRunning) { stopMockFeed(); setSimRunning(false); }
-        else            { startMockFeed(); setSimRunning(true); }
-        break;
     }
-  }, [killActive, killConfirm, activateKillSwitch, simRunning]);
+  }, [killActive, killConfirm, activateKillSwitch]);
 
   if (loadingMarkets) {
     return (
-      <div className="flex flex-col h-screen w-screen bg-bb-bg items-center justify-center gap-4">
+      <div className="flex flex-col h-screen w-full bg-bb-bg items-center justify-center gap-4">
         <div className="animate-pulse-dot" style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--bb-amber)" }} />
         <span className="num" style={{ color: "var(--bb-amber)", fontSize: 12, letterSpacing: "0.18em" }}>LOADING LIVE MARKETS…</span>
         <span className="text-bb-muted" style={{ fontSize: 9 }}>Fetching from Polymarket Gamma API</span>
@@ -190,7 +166,7 @@ export default function Dashboard() {
 
   return (
     <div className={clsx(
-      "flex flex-col h-screen w-screen bg-bb-bg overflow-hidden",
+      "flex flex-col h-screen w-full bg-bb-bg overflow-hidden",
       killActive && "kill-border",
     )}>
       <BreadcrumbBar activeView={activeView} onViewChange={setActiveView} />
@@ -206,7 +182,7 @@ export default function Dashboard() {
         {activeView === "risk"      && <RiskView />}
         {activeView === "signals"   && <SignalsView />}
         {activeView === "pnl"       && <PnLView />}
-        {activeView === "analytics" && <AnalyticsView wsConnected={wsConnected} simRunning={simRunning} />}
+        {activeView === "analytics" && <AnalyticsView wsConnected={wsConnected} />}
         {activeView === "arb"       && <ArbView />}
         {activeView === "mirofish"  && <MiroFishView />}
         {activeView === "markets"   && <MainView />}
@@ -216,7 +192,6 @@ export default function Dashboard() {
         activeView={activeView}
         killActive={killActive}
         killConfirm={killConfirm}
-        simRunning={simRunning}
         wsConnected={wsConnected}
         onFnKey={handleFnKey}
       />
@@ -318,7 +293,7 @@ function PnLView() {
   );
 }
 
-function AnalyticsView({ wsConnected, simRunning }: { wsConnected: boolean; simRunning: boolean }) {
+function AnalyticsView({ wsConnected }: { wsConnected: boolean }) {
   const { stats, logs } = useTradingStore((s) => ({ stats: s.stats, logs: s.logs }));
 
   const LOG_COLORS: Record<string, string> = {
@@ -366,9 +341,7 @@ function AnalyticsView({ wsConnected, simRunning }: { wsConnected: boolean; simR
               <span className={clsx("text-2xs", wsConnected ? "text-bb-green" : "text-bb-red")}>
                 {wsConnected ? "● WS LIVE" : "● WS OFFLINE"}
               </span>
-              <span className={clsx("text-2xs", simRunning ? "text-bb-amber" : "text-bb-muted")}>
-                {simRunning ? "● SIM ON" : "○ SIM OFF"}
-              </span>
+              <span className="text-2xs text-bb-green">● REAL BOOKS</span>
             </div>
           </div>
           <div className="flex-1 overflow-y-auto font-mono">
@@ -553,11 +526,10 @@ function BBField({ label, value, color }: { label: string; value: string; color?
 
 // ── F-key bar ─────────────────────────────────────────────────────────────────
 
-function FunctionKeyBar({ activeView, killActive, killConfirm, simRunning, wsConnected, onFnKey }: {
+function FunctionKeyBar({ activeView, killActive, killConfirm, wsConnected, onFnKey }: {
   activeView:  View;
   killActive:  boolean;
   killConfirm: boolean;
-  simRunning:  boolean;
   wsConnected: boolean;
   onFnKey:     (id: string) => void;
 }) {
@@ -580,8 +552,7 @@ function FunctionKeyBar({ activeView, killActive, killConfirm, simRunning, wsCon
     <div className="bb-fnbar">
       {FN_KEYS.map(({ key, label, id }) => {
         const isKill   = id === "kill";
-        const isSim    = id === "sim";
-        const isActive = VIEW_TO_FN[activeView] === id || (isKill && killConfirm) || (isSim && simRunning);
+        const isActive = VIEW_TO_FN[activeView] === id || (isKill && killConfirm);
 
         return (
           <button key={key} className="bb-fn" onClick={() => onFnKey(id)}>
@@ -599,7 +570,7 @@ function FunctionKeyBar({ activeView, killActive, killConfirm, simRunning, wsCon
                 ? { color: "var(--bb-red)" }
                 : {}
             }>
-              {isKill && killActive ? "RESUME" : isKill && killConfirm ? "CONFIRM?" : isSim && simRunning ? "SIM ON" : label}
+              {isKill && killActive ? "RESUME" : isKill && killConfirm ? "CONFIRM?" : label}
             </span>
           </button>
         );
@@ -621,7 +592,7 @@ function FunctionKeyBar({ activeView, killActive, killConfirm, simRunning, wsCon
         })}
       </div>
 
-      {/* WS / SIM status */}
+      {/* WS status */}
       <div className="flex items-center gap-4 px-3 border-l border-bb-border" style={{ height: "100%" }}>
         <div className="flex items-center gap-1.5">
           <div className={wsConnected ? "animate-pulse-dot" : "animate-blink"}
@@ -630,9 +601,6 @@ function FunctionKeyBar({ activeView, killActive, killConfirm, simRunning, wsCon
             {wsConnected ? `WS ${stats.ws_latency_ms}ms` : "WS OFFLINE"}
           </span>
         </div>
-        {simRunning && (
-          <span style={{ color: "var(--bb-amber)", fontSize: 9, letterSpacing: "0.08em" }}>● SIM</span>
-        )}
       </div>
 
       {/* Kill / uptime / mode */}
@@ -677,7 +645,6 @@ const HELP_ENTRIES: [string, string][] = [
   ["F7",  "Jump to Analytics view"],
   ["F8",  "Kill switch — press twice within 5 s to confirm"],
   ["F9",  "Jump to Arbitrage scanner"],
-  ["F10", "Toggle mock data simulation on/off"],
 ];
 
 function HelpOverlay({ onClose }: { onClose: () => void }) {

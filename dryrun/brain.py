@@ -446,29 +446,35 @@ def engines_status() -> dict:
             "pnl": round(sum(t["pnl"] for t in g), 2),
             "today": today, "daily": daily,
             "config": f"UP·quiet, {_tuned('oraclelag','MIN_ENTRY',0.45)}≤ask≤{_tuned('oraclelag','MAX_ENTRY',0.62)}, meta+Kelly"}
-    # weather: late-day favorites config (entry≥0.50, h≥14, edge≤0.20)
+    # weather: the book is every trade the daemon actually placed once the
+    # favorites gate went live (2026-07-26, entry>=0.70). No retroactive filter —
+    # a filter applied to history is a backtest, not a forward test. The
+    # ungated era before it stays on the board as history, losses included.
+    WEATHER_GATE_TS = 1784998800  # 2026-07-26 00:00 UTC
     rows = load("dryrun_weather.jsonl")
     res = {r["slug"]: r for r in rows if r["type"] == "resolve"}
-    wt = []
+    wbooks: dict = {"v1": [], "v2": []}
     for t in rows:
-        if (t["type"] == "wtrade" and t["slug"] in res
-                and t.get("entry", 0) >= _tuned("weather", "ENTRY_MIN", 0.70)
-                and abs(t.get("edge", 0)) <= _tuned("weather", "EDGE_CAP", 0.15)):
-            r = res[t["slug"]]
-            wb = t["low"] == r["winning_low"] and t["high"] == r["winning_high"]
-            win = wb if t["side"] == "YES" else not wb
-            e, stk = t["entry"], t["stake"]
-            fee = stk * 0.018 * 4 * e * (1 - e)          # same fee model the tuner uses
-            wt.append({"won": win, "ts": t.get("ts", 0),
-                       "pnl": round((stk * (1 / e - 1) if win else -stk) - fee, 2)})
-    if wt:
+        if t["type"] != "wtrade" or t["slug"] not in res:
+            continue
+        r = res[t["slug"]]
+        wb = t["low"] == r["winning_low"] and t["high"] == r["winning_high"]
+        win = wb if t["side"] == "YES" else not wb
+        e, stk = t["entry"], t["stake"]
+        fee = stk * 0.018 * 4 * e * (1 - e)          # same fee model the tuner uses
+        wbooks["v2" if t.get("ts", 0) >= WEATHER_GATE_TS else "v1"].append(
+            {"won": win, "ts": t.get("ts", 0), "pnl": round((stk * (1 / e - 1) if win else -stk) - fee, 2)})
+    for ver, label, cfg in (("v1", "weather v1 (retired)", "ungated buckets, any entry — RETIRED 2026-07-26: lost the edge to longshots"),
+                            ("v2", "weather (late-day)", f"favorites entry≥{_tuned('weather','ENTRY_MIN',0.70)}, edge≤{_tuned('weather','EDGE_CAP',0.15)}, h≥14 — live since 2026-07-26")):
+        wt = wbooks[ver]
+        if not wt:
+            continue
         w = sum(1 for t in wt if t["won"])
         today_w, daily_w = day_split(wt)
-        out["weather (late-day)"] = {
+        out[label] = {
             "trades": len(wt), "wins": w, "win_rate": round(w / len(wt), 3),
             "pnl": round(sum(t["pnl"] for t in wt), 2),
-            "today": today_w, "daily": daily_w,
-            "config": f"favorites entry≥{_tuned('weather','ENTRY_MIN',0.70)}, edge≤{_tuned('weather','EDGE_CAP',0.15)}"}
+            "today": today_w, "daily": daily_w, "config": cfg}
     # news-lag (brody-pipeline architecture): niche <$500K, direction+materiality
     rows = load("dryrun_newslag.jsonl")
     nt = {r["slug"]: r for r in rows if r["type"] == "ntrade"}

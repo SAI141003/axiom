@@ -5,39 +5,8 @@ import type {
   RiskState, WorkerHealth, LogEntry, SystemStats, ArbOpportunity,
 } from "./types";
 
-// No hardcoded markets — populated at runtime from Gamma API.
-
-function generateMockHistory(basePrice: number, n = 60): PricePoint[] {
-  const now = Date.now();
-  return Array.from({ length: n }, (_, i) => {
-    const t = now - (n - i) * 60_000;
-    const noise = (Math.random() - 0.5) * 0.04;
-    const trend = Math.sin(i / 10) * 0.02;
-    const price = Math.max(0.02, Math.min(0.98, basePrice + noise + trend));
-    return { ts: t, yes_price: price, no_price: 1 - price, volume: Math.random() * 50000 + 5000 };
-  });
-}
-
-function generateMockOrderBook(midPrice: number): OrderBook {
-  const spread = 0.02 + Math.random() * 0.01;
-  const asks: OrderBook["bids"] = Array.from({ length: 8 }, (_, i) => ({
-    price: midPrice + (i + 1) * 0.005 + spread / 2,
-    size: Math.random() * 5000 + 500,
-    total: 0,
-  })).sort((a, b) => a.price - b.price);
-  const bids: OrderBook["bids"] = Array.from({ length: 8 }, (_, i) => ({
-    price: midPrice - (i + 1) * 0.005 - spread / 2,
-    size: Math.random() * 5000 + 500,
-    total: 0,
-  })).sort((a, b) => b.price - a.price);
-
-  let askTotal = 0;
-  asks.forEach(a => { askTotal += a.size; a.total = askTotal; });
-  let bidTotal = 0;
-  bids.forEach(b => { bidTotal += b.size; b.total = bidTotal; });
-
-  return { market_id: "mock", bids, asks, mid_price: midPrice, spread, timestamp: Date.now() };
-}
+// No hardcoded markets — populated at runtime from Gamma API; the book and
+// history for the selected market come from the CLOB via lib/deskFeed.
 
 interface TradingStore {
   // Market state
@@ -147,8 +116,8 @@ export const useTradingStore = create<TradingStore>()(
 
     selectMarket: (market) => set((state) => ({
       selectedMarket: market,
-      orderbook: state.orderbook ?? generateMockOrderBook(market.yes_price),
-      priceHistory: state.priceHistory.length ? state.priceHistory : generateMockHistory(market.yes_price),
+      orderbook: state.selectedMarket?.condition_id === market.condition_id ? state.orderbook : null,
+      priceHistory: state.selectedMarket?.condition_id === market.condition_id ? state.priceHistory : [],
     })),
 
     toggleWatchlist: (id) => set((state) => {

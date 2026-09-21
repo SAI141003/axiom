@@ -9,6 +9,7 @@ export interface Market {
   linked_asset?: string;
   change_24h?: number;
   end_date?: string;
+  token_id?: string;   // CLOB token id of the YES outcome
 }
 
 export interface OrderBookLevel {
