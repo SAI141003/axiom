@@ -43,16 +43,37 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
     setMsgs((p) => { const n = [...p]; const last = n[n.length - 1]; if (last?.role === "jarvis") fn(last); return n; });
   }, []);
 
-  const speak = useCallback((text: string) => {
-    if (!voiceRef.current || typeof speechSynthesis === "undefined" || !text) { setState("idle"); return; }
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text.replace(/[*_#`]/g, ""));
-    u.rate = 1.02; u.pitch = 0.9;
-    const v = speechSynthesis.getVoices().find((x) => /en-GB|Daniel|Google UK English Male/i.test(`${x.lang} ${x.name}`));
+  // One voice. The server renders AXIOM's neural voice (edge-tts, en-GB Ryan);
+  // the browser's own en-GB voice is only the fallback when that route fails,
+  // so the desk never switches voices mid-conversation.
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const speakingRef = useRef(false);
+  const hush = useCallback(() => { if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; } try { speechSynthesis.cancel(); } catch {} speakingRef.current = false; setState("idle"); }, []);
+  const speak = useCallback(async (text: string) => {
+    const clean = (text || "").replace(/[*_#`]/g, "").trim();
+    if (!voiceRef.current || !clean) { setState("idle"); return; }
+    try { speechSynthesis.cancel(); } catch {}
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
+    try {
+      const r = await fetch("/api/jarvis/tts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: clean }) });
+      if (!r.ok) throw new Error(String(r.status));
+      const url = URL.createObjectURL(await r.blob());
+      const a = new Audio(url); audioRef.current = a;
+      a.onplay = () => { speakingRef.current = true; setState("speaking"); };
+      a.onended = () => { speakingRef.current = false; setState("idle"); URL.revokeObjectURL(url); };
+      a.onerror = () => { speakingRef.current = false; setState("idle"); URL.revokeObjectURL(url); };
+      await a.play();
+      return;
+    } catch { /* fall through to the browser voice */ }
+    if (typeof speechSynthesis === "undefined") { setState("idle"); return; }
+    const u = new SpeechSynthesisUtterance(clean);
+    u.rate = 1.0; u.pitch = 0.95;
+    const vs = speechSynthesis.getVoices();
+    const v = vs.find((x) => /Daniel/i.test(x.name) && /en[-_]GB/i.test(x.lang)) ?? vs.find((x) => /Google UK English Male/i.test(x.name)) ?? vs.find((x) => /en[-_]GB/i.test(x.lang));
     if (v) u.voice = v;
-    u.onstart = () => setState("speaking");
-    u.onend = () => setState("idle");
-    u.onerror = () => setState("idle");
+    u.onstart = () => { speakingRef.current = true; setState("speaking"); };
+    u.onend = () => { speakingRef.current = false; setState("idle"); };
+    u.onerror = () => { speakingRef.current = false; setState("idle"); };
     speechSynthesis.speak(u);
   }, []);
 
@@ -109,11 +130,13 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
     r.onresult = (e: any) => {
       const t = Array.from(e.results).slice(e.resultIndex).map((x: any) => x[0].transcript).join(" ").trim();
       if (!t) return;
+      // "axiom, stop" cuts it off; anything else heard while it speaks is its own voice
+      if (speakingRef.current) { if (/\b(stop|quiet|enough|shut up)\b/i.test(t)) hush(); return; }
       if (continuous) { if (WAKE.test(t)) { const q = t.replace(WAKE, "").replace(/^[,.\s]+/, "").trim(); ask(q.length > 2 ? q : BRIEF); } }
       else ask(t);
     };
     try { r.start(); rec.current = r; } catch { setState("idle"); }
-  }, [ask]);
+  }, [ask, hush]);
 
   const stopListening = useCallback(() => { rec.current?.stop(); }, []);
   const setWake = useCallback((on: boolean) => { wakeRef.current = on; setWakeOn(on); try { localStorage.setItem(WAKE_KEY, on ? "on" : "off"); } catch {} if (on) listen(true); else { rec.current?.stop(); rec.current = null; } }, [listen]);
@@ -134,5 +157,5 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
     return () => { window.removeEventListener("pointerdown", prime); window.removeEventListener("keydown", prime); };
   }, []);
 
-  return { state, msgs, bridge, brainName, micOk, wakeOn, ask, forget, listen, stopListening, setWake, brief: () => ask(BRIEF) };
+  return { state, msgs, bridge, brainName, micOk, wakeOn, ask, forget, listen, stopListening, setWake, hush, brief: () => ask(BRIEF) };
 }

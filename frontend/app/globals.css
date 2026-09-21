@@ -538,3 +538,16 @@ input, textarea, select { cursor: text; }
 .hud-dock-item:hover { color: var(--hud-accent); border-color: var(--hud-line); box-shadow: 0 0 22px -4px var(--hud-glow); transform: translateY(-2px); }
 .hud-dock-item[data-active] { color: var(--hud-accent); border-color: var(--hud-accent); box-shadow: 0 0 26px -4px var(--hud-glow); }
 @media (prefers-reduced-motion: reduce) { .hud-spin, .hud-spin-r, .hud-dock-item::before { animation: none; } }
+
+/* ═══ ONE SCREEN — the home HUD never scrolls on a laptop ═════════════════ */
+.hud-screen { padding: 14px 18px 12px; max-width: 1600px; margin: 0 auto; }
+.hud-screen-grid { display: grid; gap: 14px; grid-template-columns: 1fr; }
+@media (min-width: 1024px) {
+  .hud-screen { height: calc(100vh - 56px); overflow: hidden; }
+  .hud-screen-grid { height: 100%; grid-template-columns: 270px minmax(0, 1fr) 290px; }
+}
+.hud-dock-tight { gap: 8px; padding: 4px 0 0; max-width: 760px; }
+.hud-dock-tight .hud-dock-item { width: 70px; height: 56px; gap: 4px; border-radius: 11px; }
+.hud-dock-tight .hud-dock-item::before { inset: 4px; }
+.hud-dock-tight .hud-dock-label { font-size: 9px; max-width: 64px; }
+.hud-clamp3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }

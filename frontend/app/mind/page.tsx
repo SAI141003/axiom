@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Mic, Send, Volume2, VolumeX, Radio, RotateCcw, Sparkles, MessageSquare, Brain } from "lucide-react";
+import { Mic, Send, Volume2, VolumeX, Radio, RotateCcw, Sparkles, MessageSquare, Brain, Activity } from "lucide-react";
+import AiHealth from "@/components/hud/AiHealth";
 import TopNav from "@/components/TopNav";
 import { useJarvis, BRIEF } from "@/lib/jarvis";
 import { toneFor } from "@/components/jarvis/Reactor";
@@ -27,6 +28,7 @@ export default function JarvisPage() {
   const [voice, setVoice] = useState(true);
   const [input, setInput] = useState("");
   const [panel, setPanel] = useState(true);
+  const [health, setHealth] = useState(false);
   const j = useJarvis({ voice });
   const tone = toneFor(j.state);
 
@@ -39,9 +41,11 @@ export default function JarvisPage() {
           <div className="flex items-center gap-2">
             <span className="hud-chip" style={{ color: tone }}>{j.state}</span>
             <span className="hud-chip" style={{ color: j.bridge === "online" ? "var(--hud-green)" : "var(--hud-amber)" }}>{j.bridge === "online" ? (j.brainName || "platform AI") : j.bridge === "connecting" ? "connecting" : "local"}</span>
+            <button onClick={() => setHealth((h) => !h)} className="hud-icon-btn" aria-label="AI health" aria-pressed={health} title="the health of every AI the desk uses" style={{ background: "rgba(7,10,18,0.7)", color: health ? "var(--hud-accent)" : undefined }}><Activity size={16} /></button>
             <button onClick={() => setPanel((p) => !p)} className="hud-icon-btn" aria-label={panel ? "hide conversation" : "show conversation"} aria-pressed={panel} style={{ background: "rgba(7,10,18,0.7)" }}>{panel ? <Brain size={16} /> : <MessageSquare size={16} />}</button>
           </div>
-          {panel && (
+          {health && <div className="w-full" style={{ maxHeight: "60vh", overflowY: "auto" }}><AiHealth /></div>}
+          {panel && !health && (
             <section aria-label="Conversation" className="hud-glass rounded-2xl w-full flex flex-col" style={{ height: "min(70vh, 640px)" }}>
               <header className="flex items-center gap-3 px-4 h-11 border-b shrink-0" style={{ borderColor: "var(--hud-border)" }}>
                 <Sparkles size={14} style={{ color: tone }} aria-hidden />
