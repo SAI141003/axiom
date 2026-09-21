@@ -146,7 +146,8 @@ function safePath(p) {
 
 // Paper bots AXIOM may start, stop or restart. The dashboard and the live
 // executor are not on the list.
-const CONTROLLABLE = /^com\.polymarket\.(dryrun\.[a-z0-9]+|autotuner|data\.openbb|data\.pumpsmart|newsdesk\.poll|eod\.council|jarvis|worldmonitor)$/;
+// Every service of the desk answers to AXIOM except the live CLOB executor (com.polymarket.bot), which stays behind its two human switches.
+const CONTROLLABLE = /^com\.polymarket\.(?!bot$)[a-z0-9.]+$/;
 
 let uiSend = (m) => {};   // the open socket's sender, set per turn, so navigate can reach the browser
 
@@ -639,12 +640,38 @@ const ACK = { navigate: "Opening it.", morning_brief: "Pulling the briefing.", h
   scenario_forecast: "Running the scenarios — about ten seconds.", propose_strategy: "Judging it on holdout — about twenty seconds.", create_bot: "Building it.", read_code: "Reading the code.", arxiv_search: "Searching the literature." };
 function ack(q, picked) { const hit = picked.find((t) => ACK[t.name] && t.name !== "navigate" && t.name !== "desk_api" && t.name !== "fleet_status" && t.name !== "recall"); if (/open|show|go to|take me/i.test(q)) return ACK.navigate; return hit ? ACK[hit.name] : "On it."; }
 
+// Agent402 matches for a question, as OpenAI-style function tools with real
+// schemas, each running against the local toolbox. Cheap (one /api/find), so
+// every turn gets them; skipped silently if the toolbox is down.
+const BLOCKED_A402 = /^(memory|x402|usdc|transfer|tx-status|gas|wallet|credits|my-usage|seller-payability|route-execute|buy)/;
+async function nativeToolbox(q) {
+  try {
+    const r = await fetch(`${A402}/api/find?q=${encodeURIComponent(q.slice(0, 160))}`, { signal: AbortSignal.timeout(4000) }); const j = await r.json();
+    return (j.results ?? []).filter((x) => x.slug && !BLOCKED_A402.test(x.slug) && (x.score ?? 0) > 25).slice(0, 4).map((x) => {
+      const method = String(x.route ?? "POST").split(" ")[0]; const props = x.inputSchema?.properties ?? {};
+      const def = { type: "function", function: { name: `a402_${x.slug.replace(/-/g, "_")}`, description: `${x.name}: ${String(x.description ?? "").slice(0, 220)} (live, via the toolbox)`, parameters: { type: "object", properties: props, required: x.inputSchema?.required ?? x.required ?? [] } } };
+      const run = async (args) => {
+        const t0 = Date.now();
+        const res = method === "GET" ? await fetch(`${A402}/api/${x.slug}?${new URLSearchParams(Object.fromEntries(Object.entries(args ?? {}).map(([k, v]) => [k, String(v)])))}`, { signal: AbortSignal.timeout(60_000) })
+          : await fetch(`${A402}/api/${x.slug}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(args ?? {}), signal: AbortSignal.timeout(60_000) });
+        const body = (await res.text()).slice(0, 14_000); await audit("toolbox", { slug: x.slug, args }, res.ok ? `ok ${Date.now() - t0}ms` : `HTTP ${res.status}`);
+        return res.ok ? body : `ERROR: ${body.slice(0, 600)}`;
+      };
+      return { def, run };
+    });
+  } catch { return []; }
+}
+
 async function platformTurn(q, send) {
   const chosen = pickTools(q);
   send({ type: "delta", text: ack(q, chosen) + " " });
   const tools = chosen.map((t) => { const p = zodToJsonSchema(t.schema, { target: "openApi3" }); delete p.$schema;
     for (const v of Object.values(p.properties ?? {})) { if (v.enum && v.enum.length > 12) { v.description = `one of ${v.enum.length} known values; the tool corrects near-misses`; delete v.enum; } }
     return { type: "function", function: { name: t.name, description: t.description.split(/(?<=[.!?])\s/)[0].slice(0, 160), parameters: p } }; });
+  // One system: the Agent402 tools that fit this question are not behind a
+  // door — they join AXIOM's own tool list for the turn, callable by name.
+  const native = await nativeToolbox(q);
+  for (const n of native) tools.push(n.def);
   let history = (await loadThread()).slice(-8).map((m) => (m.role === "tool" ? { ...m, content: String(m.content).slice(0, 500) } : m));
   const firstUser = history.findIndex((m) => m.role === "user"); history = firstUser >= 0 ? history.slice(firstUser) : [];   // never start on an orphaned tool result
   const messages = [{ role: "system", content: (await systemPrompt()).slice(0, 8000) }, ...history, { role: "user", content: q }];
@@ -675,6 +702,8 @@ async function platformTurn(q, send) {
       const t = REGISTRY.find((x) => x.name === call.function.name);
       let args = {}; try { args = JSON.parse(call.function.arguments || "{}"); } catch {}
       send({ type: "tool", name: call.function.name });
+      const nat = native.find((n) => n.def.function.name === call.function.name);
+      if (nat) { try { return { id: call.id, out: await nat.run(args) }; } catch (e) { return { id: call.id, out: "tool failed: " + String(e.message).slice(0, 200) }; } }
       if (!t) return { id: call.id, out: "unknown tool" };
       const parsed = t.schema.safeParse(nearest(t, args));
       if (!parsed.success) return { id: call.id, out: `bad arguments: ${parsed.error.issues.map((i) => i.path.join(".") + " " + i.message).join("; ")}` };
