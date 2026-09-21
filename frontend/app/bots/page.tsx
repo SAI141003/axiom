@@ -68,7 +68,7 @@ function Fleet() {
   const pnlBars = accounts.map((a) => ({ name: a.name, pnl: a.pnl ?? 0 }));
   const winBars = accounts.map((a) => ({ name: a.name, win: (a.winRate ?? 0) * 100, trades: a.trades ?? 0 }));
   const equity: any[] = d?.equity ?? [];
-  const goat = (d?.probes ?? []).find((p: any) => /weather/i.test(p.name));
+  const goat = (d?.probes ?? []).find((p: any) => p.name === "weather (late-day)");
   const keys = accounts.map((a) => a.name).filter((k) => equity.some((row) => row[k] != null));
 
   return (

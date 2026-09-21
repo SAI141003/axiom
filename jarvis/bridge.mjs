@@ -333,13 +333,26 @@ const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
   }),
 ]});
 
+// One line per book, fresh from engine_status.json at every turn, so a stale
+// desk_state.md can never put an old P&L in AXIOM's mouth.
+async function liveBooks() {
+  const s = await data("engine_status.json"); const e = s?.engines ?? {};
+  const usd = (v) => (v == null ? "—" : `${v < 0 ? "−" : "+"}$${Math.abs(v).toFixed(2)}`);
+  const rows = Object.entries(e).filter(([k]) => !/retired/.test(k)).map(([k, v]) =>
+    `- ${k}: ${usd(v.pnl)}${v.account != null ? ` (bal $${v.account})` : ""}, ${v.trades}t, ${v.win_rate == null ? "—" : Math.round(v.win_rate * 100) + "%"} win, today ${usd(v.today?.pnl)}`);
+  return rows.length ? rows.join("\n") + `\n(as of ${s?.ts ? new Date(s.ts * 1000).toISOString().slice(0, 16) : "?"} UTC)` : "(engine_status.json missing — run dryrun/brain.py)";
+}
+
 async function systemPrompt() {
   const memory = await readText(MEMORY, await readText(join(HERE, "memory.example.md"), "(empty)"));
   const persona = await readText(PERSONA, "");
   const state = await readText(DESK_STATE, "(no desk state yet — build it with update_desk_state after your first briefing)");
   return `${persona}
 
-DESK STATE (your compact working model — trust it, verify with tools when it matters, and keep it current with update_desk_state)
+LIVE BOOKS (computed from the trade logs just now — these numbers beat anything in the desk state or in earlier turns of this conversation; when you quote a P&L, win rate or trade count, take it from here or from a tool, never from what you said before)
+${await liveBooks()}
+
+DESK STATE (your compact working model — trust it for context and decisions, verify with tools when it matters, and keep it current with update_desk_state)
 ${state.slice(0, 2400)}
 
 You speak for the desk's own data and act only on the user's instruction.
@@ -381,7 +394,7 @@ async function providers() {
   // AXIOM's own NIM key first (no contention with the classifier, no free-tier
   // rate limits), then Groq for speed, then the shared NIM key, then OpenAI.
   const nvKey = env.NVIDIA_API_KEY_JARVIS || env.NVIDIA_API_KEY;
-  const nvModels = [env.NVIDIA_MODEL_JARVIS || env.NVIDIA_MODEL_TOOLS || "nvidia/nemotron-3-super-120b-a12b", "deepseek-ai/deepseek-v4-flash-0731", "mistralai/mistral-large-2-instruct", "nvidia/nemotron-3-ultra-550b-a55b"];   // measured: Super 5-7s, DeepSeek 5-19s, Kimi/GLM 48-90s
+  const nvModels = [env.NVIDIA_MODEL_JARVIS || env.NVIDIA_MODEL_TOOLS || "nvidia/nemotron-3-super-120b-a12b", "openai/gpt-oss-20b", "deepseek-ai/deepseek-v4-flash-0731", "nvidia/nemotron-3-ultra-550b-a55b"];   // measured 2026-09-20: Super 2s, gpt-oss-20b 2s, DeepSeek 19s; mistral-large-2 is gone (404), GLM/Kimi 48-90s
   // Speed first: Groq answers in 0.2-0.5s but allows 8k tokens/min on the free
   // tier, so every turn is kept small (see platformTurn). NIM is the deep bench.
   return [
@@ -416,7 +429,7 @@ function nearest(t, args) {
 }
 const score = (cand, s) => { const c = cand.toLowerCase().replace(/^\/?api\//, "").replace(/[^a-z0-9]/g, ""); if (!c || !s) return 0; if (c === s) return 100; if (c.includes(s) || s.includes(c)) return 50 + Math.min(c.length, s.length); let k = 0; for (const ch of new Set(s)) if (c.includes(ch)) k++; return k; };
 
-async function chat(messages, tools, send) {
+async function chat(messages, tools, send, force) {
   const errs = [];
   for (const p of await providers()) {
     const order = p.name === "groq" ? [...p.models.slice(groqTurn++ % p.models.length), ...p.models.slice(0, groqTurn % p.models.length)] : [picked.get(p.name), ...p.models];
@@ -424,7 +437,9 @@ async function chat(messages, tools, send) {
       try {
         const r = await fetch(`${p.base}/chat/completions`, { method: "POST", signal: AbortSignal.timeout(p.name === "nvidia" ? 120_000 : 60_000),
           headers: { "content-type": "application/json", authorization: `Bearer ${p.key}` },
-          body: JSON.stringify({ model, messages, tools, tool_choice: "auto", max_tokens: 900, temperature: 0.3, stream: true }) });
+          body: JSON.stringify({ model, messages, tools, tool_choice: force ? { type: "function", function: { name: force } } : "auto", max_tokens: 900, temperature: 0.3, stream: true,
+            // reasoning models: think briefly and keep the thinking out of the spoken answer
+            ...(model.includes("gpt-oss") ? { reasoning_effort: "low", ...(p.name === "groq" ? { reasoning_format: "hidden" } : {}) } : {}) }) });
         if (!r.ok) { let j = {}; try { j = await r.json(); } catch {} const e = `${p.name}/${model} ${r.status} ${JSON.stringify(j.error ?? "").slice(0, 160)}`; errs.push(e); console.error("[brain] fallback:", e); if (![400, 404, 410, 429, 503].includes(r.status)) break; continue; }
         // stream: text deltas go to the browser as they arrive; tool calls are assembled
         const msg = { role: "assistant", content: "", tool_calls: [] }; const calls = new Map(); let buf = "";
@@ -483,9 +498,14 @@ async function platformTurn(q, send) {
   let history = (await loadThread()).slice(-8).map((m) => (m.role === "tool" ? { ...m, content: String(m.content).slice(0, 500) } : m));
   const firstUser = history.findIndex((m) => m.role === "user"); history = firstUser >= 0 ? history.slice(firstUser) : [];   // never start on an orphaned tool result
   const messages = [{ role: "system", content: (await systemPrompt()).slice(0, 5200) }, ...history, { role: "user", content: q }];
+  // A question about numbers always starts with a fleet_status call: a small
+  // model will otherwise repeat a figure from an earlier turn instead of the
+  // live one, and nothing on this desk may quote a stale P&L.
+  const NUMBERS = /p&l|pnl|profit|loss|losing|winning|win rate|trades?\b|balance|account|how (is|are) .*(bot|fleet|book|desk|doing)|status|numbers?/i;
+  let force = NUMBERS.test(q) && tools.some((t) => t.function.name === "fleet_status") ? "fleet_status" : undefined;
   let answer = "", brain = "";
   for (let step = 0; step < 24; step++) {
-    const { msg, brain: b } = await chat(messages, tools, send); brain = b;
+    const { msg, brain: b } = await chat(messages, tools, send, force); brain = b; force = undefined;
     messages.push({ role: "assistant", content: msg.content ?? "", ...(msg.tool_calls ? { tool_calls: msg.tool_calls } : {}) });
     if (!msg.tool_calls?.length) { answer = msg.content ?? ""; break; }
     const results = await Promise.all(msg.tool_calls.map(async (call) => {

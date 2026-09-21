@@ -24,7 +24,7 @@ function providers(): Provider[] {
       model: process.env.CEREBRAS_MODEL || "gpt-oss-120b", fallbacks: ["qwen-3-235b-a22b-instruct-2507", "llama-3.3-70b"] },
     { name: "nvidia", key: process.env.NVIDIA_API_KEY,
       base: process.env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1",
-      model: process.env.NVIDIA_MODEL || "z-ai/glm-5.3", fallbacks: ["moonshotai/kimi-k3", "mistralai/mistral-large-2-instruct"] },
+      model: process.env.NVIDIA_MODEL || "nvidia/nemotron-3-super-120b-a12b", fallbacks: ["openai/gpt-oss-20b", "deepseek-ai/deepseek-v4-flash-0731"] },
   ].filter((p) => !!p.key);
 }
 
@@ -65,16 +65,20 @@ export async function askLLM(system: string, user: string, maxTokens = 1000): Pr
         const res = await fetch(`${p.base}/chat/completions`, {
           method: "POST",
           headers: { Authorization: `Bearer ${p.key}`, "content-type": "application/json" },
-          body: JSON.stringify({ model, max_tokens: maxTokens, messages: [{ role: "system", content: system }, { role: "user", content: user }] }),
+          // reasoning models: keep thinking short (Groq gpt-oss) or off (NIM nemotron), or the budget is spent before the answer
+          body: JSON.stringify({ model, max_tokens: maxTokens, ...(model.includes("gpt-oss") ? { reasoning_effort: "low", ...(p.name === "groq" ? { reasoning_format: "hidden" } : {}) } : {}),
+            messages: [{ role: "system", content: (model.includes("nemotron") ? "/no_think\n" : "") + system }, { role: "user", content: user }] }),
           signal: AbortSignal.timeout(timeout),
         });
         if (res.ok) {
           const data = await res.json();
-          const text = data.choices?.[0]?.message?.content;
+          // some NIM reasoning models put their thinking in <think> tags inside content
+          const text = String(data.choices?.[0]?.message?.content ?? "").replace(/<think>[\s\S]*?<\/think>/g, "").trim();
           if (text) { picked.set(p.name, model); return text; }
+          errors.push(`${p.name}/${model} empty`); continue;   // reasoning ate the budget — next model
         }
         errors.push(`${p.name}/${model} ${res.status}`);
-        if (res.status !== 404 && res.status !== 400) break;   // only a missing model justifies trying the next name
+        if (![404, 400, 410, 429].includes(res.status)) break;   // a missing or rate-limited model → next name on the same provider
       } catch (e: any) { errors.push(`${p.name}/${model} ${e?.name ?? e}`); break; }
     }
   }

@@ -13,12 +13,14 @@ interface WTrade {
   obs_source: string; prob_source: string; hours_elapsed: number; ts: number;
   status: "open" | "won" | "lost"; pnl: number | null;
 }
-interface Stats { placed: number; open: number; resolved: number; wins: number; winRate: number; totalPnl: number }
+interface Stats { placed: number; open: number; resolved: number; wins: number; winRate: number; totalPnl: number; since?: string }
+interface Retired { label: string; trades: number; wins: number; totalPnl: number }
 
 export default function WeatherBotPanel() {
   const [trades, setTrades] = useState<WTrade[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [curve, setCurve] = useState<{ ts: number; pnl: number }[]>([]);
+  const [retired, setRetired] = useState<Retired | null>(null);
   const [updated, setUpdated] = useState<Date | null>(null);
   const autoRefresh = useToggle("weatherbot.autoRefresh");
 
@@ -31,6 +33,7 @@ export default function WeatherBotPanel() {
         setTrades(d.trades ?? []);
         setStats(d.stats ?? null);
         setCurve(d.curve ?? []);
+        setRetired(d.retired ?? null);
         setUpdated(new Date());
       } catch {}
     };
@@ -55,7 +58,7 @@ export default function WeatherBotPanel() {
         {stats && (
           <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
             {[
-              { l: "TOTAL P&L", v: `${stats.totalPnl >= 0 ? "+" : ""}$${stats.totalPnl}`,
+              { l: `P&L SINCE ${stats.since ?? "GATE"} · AFTER FEES`, v: `${stats.totalPnl >= 0 ? "+" : ""}$${stats.totalPnl}`,
                 c: stats.totalPnl >= 0 ? "var(--hud-green)" : "var(--hud-red)" },
               { l: "PLACED", v: String(stats.placed), c: "var(--hud-accent)" },
               { l: "OPEN", v: String(stats.open), c: "var(--hud-amber)" },
@@ -69,6 +72,11 @@ export default function WeatherBotPanel() {
                 <div className="text-lg font-bold tabular-nums mt-0.5" style={{ color: s.c }}>{s.v}</div>
               </div>
             ))}
+            {retired && retired.trades > 0 && (
+              <div className="col-span-2 md:col-span-6 text-[11px] font-mono" style={{ color: "var(--hud-muted)" }}>
+                history — {retired.label}: {retired.trades} trades · {retired.wins} won · <span style={{ color: retired.totalPnl >= 0 ? "var(--hud-green)" : "var(--hud-red)" }}>{retired.totalPnl >= 0 ? "+" : ""}${retired.totalPnl}</span>. Not in the numbers above; the live book counts every trade placed since the favorites gate, no retroactive filter.
+              </div>
+            )}
           </div>
         )}
 

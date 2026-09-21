@@ -99,12 +99,12 @@ PERSONAS = [
      "role": "an analyst who first identifies the market regime, then forecasts within it"},
 ]
 # MICRO-AGENTS (your idea): NVIDIA NIM open models let us run the persona votes
-# on a small FAST model (llama-3.1-8b ≈ 0.25s vs the 31B ≈ 2s). Cheap+fast per
+# on a small FAST model (gpt-oss-20b on NIM ≈ 2s; llama-3.1-8b was retired 2026-09). Cheap+fast per
 # agent → we replicate each archetype into a POPULATION (the MiroFish way: many
 # agents per persona type, each with individual temperature variation). Small
 # models are noisier individually, but the swarm AVERAGES the noise out — this
 # is exactly why quantity of diverse cheap agents beats a few expensive ones.
-MICRO_MODEL = os.getenv("MIROFISH_MICRO_MODEL", "meta/llama-3.1-8b-instruct")
+MICRO_MODEL = os.getenv("MIROFISH_MICRO_MODEL", "openai/gpt-oss-20b")
 REPLICAS = int(os.getenv("MIROFISH_REPLICAS", "3"))      # agents per archetype
 MAX_CONCURRENCY = 20                                     # micro-agents are fast
 DELIBERATION_ROUNDS = 2   # round 1 = independent; round 2 = see the swarm & revise
@@ -152,11 +152,18 @@ async def ask_persona(sem: asyncio.Semaphore, persona: dict, seed: str, goal: st
             r = await llm().chat.completions.create(
                 model=MICRO_MODEL,
                 messages=[{"role": "user", "content": prompt}],
-                temperature=persona.get("temp", 0.7), max_tokens=110)
+                temperature=persona.get("temp", 0.7), max_tokens=220,
+                # gpt-oss reasons before it answers; keep that short or the
+                # budget is spent before the JSON
+                extra_body={"reasoning_effort": "low"} if "gpt-oss" in MICRO_MODEL else {})
             txt = r.choices[0].message.content or ""
             m = re.search(r"\{.*\}", txt, re.DOTALL)
-            d = json.loads(m.group(0)) if m else {}
-            p = float(d.get("p", 50))
+            if not m:
+                return None          # no vote is better than a fake 50%
+            d = json.loads(m.group(0))
+            if "p" not in d:
+                return None
+            p = float(d["p"])
             if p > 1:
                 p /= 100.0
             p = max(0.02, min(0.98, p))
