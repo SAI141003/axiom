@@ -49,6 +49,7 @@ const STATE = join(HERE, "state.json");
 const PROPOSALS = join(HERE, "proposals");
 const NOTES = join(HERE, "notes");
 const SKILLS = join(ROOT, ".data", "skills");
+const A402 = process.env.AGENT402_URL || "http://127.0.0.1:3402";   // the self-hosted toolbox
 const ACTIONS = join(ROOT, ".data", "actions.jsonl");
 async function audit(kind, args, result) { try { await mkdir(dirname(ACTIONS), { recursive: true }); await appendFile(ACTIONS, JSON.stringify({ ts: Date.now(), kind, args, result: String(result).slice(0, 300) }) + "\n"); } catch {} }
 async function envFile() { try { return Object.fromEntries((await readFile(join(ROOT, ".env"), "utf-8")).split("\n").filter((l) => l.includes("=") && !l.startsWith("#")).map((l) => { const i = l.indexOf("="); return [l.slice(0, i).trim(), l.slice(i + 1).trim()]; })); } catch { return {}; } }
@@ -386,6 +387,38 @@ const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
   tool("eye", "Drive the Eye (/world, the live globe): focus the camera on a place (lat, lon, alt in globe radii — 0.3 city, 0.8 country, 2 whole earth), switch a layer on or off (flights, mil, sats, quakes, vessels, fires, radio, launches, cables, datacenters, dams, stations, markets), track an entity by name or callsign, release it, or set the sensor (normal, crt, nvg, flir, noir). Opens the Eye first if the user is elsewhere. Use when Sai says 'show me', 'zoom to', 'track', 'night vision', 'what's flying over'.",
     { focus: z.object({ lat: z.number(), lon: z.number(), alt: z.number().min(0.05).max(4).optional() }).optional(), layer: z.object({ id: z.string(), on: z.boolean().optional() }).optional(), track: z.string().max(40).optional(), untrack: z.boolean().optional(), sensor: z.enum(["normal", "crt", "nvg", "flir", "noir"]).optional() },
     async (cmd) => { uiSend({ type: "ui", op: "navigate", href: "/world" }); setTimeout(() => uiSend({ type: "ui", op: "eye", ...cmd }), 900); return text({ ok: true, sent: cmd, note: "the Eye is executing it on screen" }); }),
+  // ── The toolbox: Agent402, self-hosted on :3402 in free mode ───────────────
+  // 591 deterministic and live-data tools + 84 skill packs (MikeyPetrillo/Agent402,
+  // AGPL-3.0, run as its own launchd service, never linked into this code).
+  // Read-only for the desk: nothing here can touch a bot, a book or a key, and
+  // it never pays anyone — FREE_MODE has no wallet.
+  tool("toolbox_find", "Find the right tool in the 591-tool Agent402 toolbox for a task, in plain words ('insider trades for NVDA', 'yield curve', 'perp funding BTC', 'decode this JWT', 'OCR this image', 'Solana token safety'). Returns route, input schema and a ready example. Then call toolbox_call. Also lists matching skill packs.",
+    { q: z.string().min(2).max(120) }, async ({ q }) => {
+      try { const r = await fetch(`${A402}/api/find?q=${encodeURIComponent(q)}`, { signal: AbortSignal.timeout(15_000) }); const j = await r.json();
+        let packs = []; try { packs = JSON.parse(await readFile(join(ROOT, ".data", "a402_packs.json"), "utf-8")).packs.filter((p) => new RegExp(q.split(/\s+/).filter((w) => w.length > 3).join("|") || "$^", "i").test(`${p.slug} ${p.name} ${p.description}`)).slice(0, 4); } catch {}
+        return text({ results: (j.results ?? []).map((x) => ({ slug: x.slug, name: x.name, route: x.route, required: x.required, example: x.example, schema: x.inputSchema?.properties })), packs }); }
+      catch (e) { return text(`toolbox offline (${String(e.message).slice(0, 80)}) — launchctl kickstart -k gui/$UID/com.polymarket.agent402`, true); } }),
+  tool("toolbox_call", "Call one Agent402 tool by slug with its JSON args (get the slug and schema from toolbox_find). Live data comes back as the upstream returned it, with its source; a tool that needs a key the desk lacks returns an error you must relay, never invent. Never use it for desk numbers — those come from fleet_status and desk_api.",
+    { slug: z.string().regex(/^[a-z0-9-]{2,60}$/), args: z.record(z.string(), z.any()).default({}), method: z.enum(["POST", "GET"]).default("POST") },
+    async ({ slug, args, method }) => {
+      if (/^(memory|x402|usdc|transfer|tx-status|gas|wallet|credits|my-usage|seller-payability)/.test(slug)) return text(`'${slug}' is a payment or identity tool — the desk does not use those`, true);
+      try {
+        const t0 = Date.now();
+        const r = method === "GET" ? await fetch(`${A402}/api/${slug}?${new URLSearchParams(Object.fromEntries(Object.entries(args).map(([k, v]) => [k, String(v)])))}`, { signal: AbortSignal.timeout(60_000) })
+          : await fetch(`${A402}/api/${slug}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(args), signal: AbortSignal.timeout(60_000) });
+        const body = (await r.text()).slice(0, 14_000); let j; try { j = JSON.parse(body); } catch { j = body; }
+        await audit("toolbox_call", { slug, args }, r.ok ? `ok ${Date.now() - t0}ms` : `HTTP ${r.status}`);
+        if (!r.ok || j?.error) return text({ tool: slug, error: j?.error ?? `HTTP ${r.status}`, expected: j?.expected, hint: j?.hint }, true);
+        return text({ tool: slug, ms: Date.now() - t0, result: j });
+      } catch (e) { return text(`toolbox_call failed: ${String(e.message).slice(0, 120)}`, true); } }),
+  tool("toolbox_pack", "Get an Agent402 skill pack — an ordered multi-tool workflow with its prompt (earnings-deep-dive, options-analytics, fixed-income-desk, macro-dashboard, crypto-research, sec-filings-deep-dive, insider-alert, defi-dashboard, security-audit, forecasting-bake-off, trend-analysis, weather-brief, price-monitor… 84 in all; list with slug='list'). Then run its steps with toolbox_call, in order, and write the result up. A pack you run well is worth saving as a skill with save_skill.",
+    { slug: z.string().regex(/^[a-z0-9-]{2,60}$/), args: z.record(z.string(), z.any()).default({}) },
+    async ({ slug, args }) => {
+      if (slug === "list") { try { return text(JSON.parse(await readFile(join(ROOT, ".data", "a402_packs.json"), "utf-8"))); } catch { return text("no pack index", true); } }
+      try { const qs = new URLSearchParams(Object.fromEntries(Object.entries(args).map(([k, v]) => [k, String(v)]))); const r = await fetch(`${A402}/api/skill-packs/${slug}/prompt?${qs}`, { signal: AbortSignal.timeout(15_000) }); const j = await r.json();
+        let pack = null; try { pack = JSON.parse(await readFile(join(ROOT, ".data", "a402_packs.json"), "utf-8")).packs.find((p) => p.slug === slug); } catch {}
+        return text({ pack: slug, tools: pack?.tools, prompt: (j.messages ?? []).map((m) => m.content?.text ?? "").join("\n").slice(0, 6000) }); }
+      catch (e) { return text(`pack failed: ${String(e.message).slice(0, 100)}`, true); } }),
   tool("actions_log", "What AXIOM has actually done lately (trades, bot switches, power moves, messages, skills), newest first.", { n: z.number().int().min(1).max(50).default(15) },
     async ({ n }) => { try { const lines = (await readFile(ACTIONS, "utf-8")).trim().split("\n"); return text(lines.slice(-n).reverse().join("\n")); } catch { return text("no actions yet"); } }),
   tool("create_bot", "The Bot OS: create a user-made paper bot from a spec. Translate the user's words into: id (a-z0-9-), name, universe (BASE/QUOTE symbols like ETH/USD), timeframe (1d unless they insist; the edge is daily), weights over the evaluators (momentum, ma_cross, mean_reversion, rsi, bollinger, obv, mfi, volume_profile; 0-1.5), enter (0.05-0.5), exit (below enter), stake ($5-50), max_pos (1-5, stake x max_pos <= 100), note (their request verbatim). It starts on paper from $100 within the hour and appears on /bots. Never creates code; a bad spec is rejected with a reason you should relay.",
@@ -443,6 +476,8 @@ ${await liveBooks()}
 DESK STATE (your compact working model — trust it for context and decisions, verify with tools when it matters, and keep it current with update_desk_state)
 ${state.slice(0, 2400)}
 
+YOUR TOOLBOX (permanent): Agent402, self-hosted on this machine — 591 tools and 84 skill packs for live and deterministic work: SEC EDGAR (insider trades, 13F, filings, XBRL), macro (FRED, yield curve, CPI when keyed), crypto (CoinGecko prices, Hyperliquid perps funding/OI/orderbook, DefiLlama yields, Solana token safety, on-chain reads), network truth (DNS/TLS/whois), documents (PDF, OCR, extract, scrape), stats and forecasting, finance math (Black-Scholes, bonds, IRR), 200+ utilities. toolbox_find → toolbox_call, or toolbox_pack for a workflow. It is read-only for the desk and never pays anyone.
+
 You speak for the desk's own data and act only on the user's instruction. When asked which AI you are or how healthy the models are, read desk_api /api/ai/health — it measures every model the desk uses — and answer with the measured latencies, not a guess.
 
 WHAT YOU CAN REACH
@@ -482,7 +517,7 @@ async function providers() {
   // AXIOM's own NIM key first (no contention with the classifier, no free-tier
   // rate limits), then Groq for speed, then the shared NIM key, then OpenAI.
   const nvKey = env.NVIDIA_API_KEY_JARVIS || env.NVIDIA_API_KEY;
-  const nvModels = [env.NVIDIA_MODEL_JARVIS || env.NVIDIA_MODEL_TOOLS || "nvidia/nemotron-3-super-120b-a12b", "openai/gpt-oss-20b", "deepseek-ai/deepseek-v4-flash-0731", "nvidia/nemotron-3-ultra-550b-a55b"];   // measured 2026-09-20: Super 2s, gpt-oss-20b 2s, DeepSeek 19s; mistral-large-2 is gone (404), GLM/Kimi 48-90s
+  const nvModels = [env.NVIDIA_MODEL_JARVIS || env.NVIDIA_MODEL_TOOLS || "nvidia/nemotron-3-super-120b-a12b", "deepseek-ai/deepseek-v4-flash-0731", "nvidia/nemotron-3-ultra-550b-a55b"];   // measured 2026-09-20: Super 2s, gpt-oss-20b 2s, DeepSeek 19s; mistral-large-2 is gone (404), GLM/Kimi 48-90s
   // Speed first: Groq answers in 0.2-0.5s but allows 8k tokens/min on the free
   // tier, so every turn is kept small (see platformTurn). NIM is the deep bench.
   return [
@@ -536,14 +571,16 @@ async function chat(messages, tools, send, force) {
       try {
         const r = await fetch(`${p.base}/chat/completions`, { method: "POST", signal: AbortSignal.timeout(p.name === "nvidia" ? 120_000 : 60_000),
           headers: { "content-type": "application/json", authorization: `Bearer ${p.key}` },
-          body: JSON.stringify({ model, messages, tools, tool_choice: force ? { type: "function", function: { name: force } } : "auto", max_tokens: 900, temperature: 0.3, stream: true,
+          body: JSON.stringify({ model, messages, ...(tools?.length ? { tools, tool_choice: force ? { type: "function", function: { name: force } } : "auto" } : {}), max_tokens: 900, temperature: 0.3, stream: true,
             ...(["groq", "openai", "cerebras"].includes(p.name) ? { stream_options: { include_usage: true } } : {}),
             // reasoning models: think briefly and keep the thinking out of the spoken answer
             ...(model.includes("gpt-oss") ? { reasoning_effort: "low", ...(p.name === "groq" ? { reasoning_format: "hidden" } : {}) } : {}),
             // nemotron otherwise streams its thinking as reasoning_content and can end a turn with no answer text at all
             ...(model.includes("nemotron") ? { chat_template_kwargs: { enable_thinking: false } } : {}) }) });
         if (!r.ok) { let j = {}; try { j = await r.json(); } catch {} const e = `${p.name}/${model} ${r.status} ${JSON.stringify(j.error ?? "").slice(0, 160)}`; errs.push(e); console.error("[brain] fallback:", e);
-          if (r.status === 429) await recordLimit(p.name, model, j.error?.message ?? JSON.stringify(j)); else await recordUsage(p.name, model, null, `http ${r.status}`, 0);
+          if (r.status === 429) await recordLimit(p.name, model, j.error?.message ?? JSON.stringify(j));
+          else if ([401, 402, 403].includes(r.status)) await recordLimit(p.name, model, `HTTP ${r.status} (key or billing) — try again in 24h0m0s`);
+          else await recordUsage(p.name, model, null, `http ${r.status}`, 0);
           if (![400, 404, 410, 429, 503].includes(r.status)) break; continue; }
         // stream: text deltas go to the browser as they arrive; tool calls are assembled
         const msg = { role: "assistant", content: "", tool_calls: [] }; const calls = new Map(); let buf = ""; let usage = null;
@@ -556,6 +593,7 @@ async function chat(messages, tools, send, force) {
         for (const line of buf.split("\n")) { const l = line.trim(); if (!l.startsWith("data:") || l.slice(5).trim() === "[DONE]") continue; try { const d = JSON.parse(l.slice(5)).choices?.[0]?.delta; if (d?.content) { msg.content += d.content; send?.({ type: "delta", text: d.content }); } } catch {} }
         msg.tool_calls = [...calls.values()]; if (!msg.tool_calls.length) delete msg.tool_calls;
         await recordUsage(p.name, model, usage, "ok", approxTokens + (msg.content.length + JSON.stringify(msg.tool_calls ?? []).length) / 4);
+        if (!msg.content.trim() && !msg.tool_calls) { errs.push(`${p.name}/${model} empty`); console.error("[brain] empty answer from", `${p.name}/${model}`); continue; }
         picked.set(p.name, model); return { msg, brain: `${p.name}/${model}` };
       } catch (e) { errs.push(`${p.name}/${model} ${String(e.message).slice(0, 60)}`); break; }
     }
@@ -566,6 +604,7 @@ async function chat(messages, tools, send, force) {
 // tools always go; the rest are picked by topic. Keeps a turn near 3k tokens.
 const CORE_TOOLS = ["navigate", "fleet_status", "desk_api", "recall"];
 const TOPICS = [
+  [/\b(insider|13f|edgar|filing|sec\b|fred|yield curve|cpi|treasury|funding rate|perp|open interest|defi|tvl|stablecoin|solana token|mint|ens|whois|dns|tls|ocr|pdf|decode|jwt|hash|convert|black.?scholes|bond|ytm|irr|npv|forecast|holt|regression|correlation|toolbox|skill pack|dossier|earnings|geocode|fx rate|exchange rate)\b/i, ["toolbox_find", "toolbox_call", "toolbox_pack"]],
   [/\b(show me|zoom (to|in|out)|track|flying over|satellite|flights?|globe|the eye|night vision|thermal|sensor|crt|nvg|flir)\b/i, ["eye", "navigate"]],
   [/\b(buy|sell|short|close|take profit|get out|position|my book|manual book)\b/i, ["trade"]],
   [/\b(message|text|imessage|email|mail|tell|notify|send)\b/i, ["send_message"]],
@@ -612,16 +651,24 @@ async function platformTurn(q, send) {
   // A question about numbers always starts with a fleet_status call: a small
   // model will otherwise repeat a figure from an earlier turn instead of the
   // live one, and nothing on this desk may quote a stale P&L.
-  const NUMBERS = /p&l|pnl|profit|loss|losing|winning|win rate|trades?\b|balance|account|how (is|are) .*(bot|fleet|book|desk|doing)|status|numbers?/i;
+  const NUMBERS = /p&l|pnl|profit|\b(our|the) (loss|trades|book|books|balance|account)|losing|winning|win rate|how (is|are) .*(bot|fleet|book|desk|doing)|fleet|desk status|the numbers/i;
   // Likewise a command is an action, not a memory: "stop trading crypto" must
   // hit fleet_control this turn, whatever was said before.
   const has = (n) => tools.some((t) => t.function.name === n);
   const CONTROL = /\b(stop|pause|halt|kill|resume|start|restart|turn (on|off)|switch (on|off))\b/i, POWER = /reallocat|all power|divert|focus (the )?(power|compute|brain|ai)|power to/i;
-  const TRADE = /\b(buy|sell|short|close (my|the)? ?position|take profit|get out of)\b/i, MSG = /\b(message|text|imessage|email|mail)\b.*\b(to|him|her|them)\b|\bsend (a |an )?(message|text|email|mail)/i;
+  // a trade order names an action AND a size or a symbol; "the short version" is not an order
+  const TRADE = /\b(buy|sell|short)\b[^.]{0,40}\b(\$?\d+|dollars?|usd|[A-Z]{2,5}(\/USD|-USD)?)\b|\bclose (my|the) [^.]{0,30}position|\btake profit on\b|\bget out of\b/, MSG = /\b(message|text|imessage|email|mail)\b.*\b(to|him|her|them)\b|\bsend (a |an )?(message|text|email|mail)/i;
   let force = TRADE.test(q) && has("trade") ? "trade" : MSG.test(q) && has("send_message") ? "send_message" : POWER.test(q) && has("set_power") ? "set_power" : CONTROL.test(q) && has("fleet_control") ? "fleet_control" : NUMBERS.test(q) && has("fleet_status") ? "fleet_status" : undefined;
   let answer = "", brain = "";
+  let lastSig = "", acts = 0;
   for (let step = 0; step < 24; step++) {
     const { msg, brain: b } = await chat(messages, tools, send, force); brain = b; force = undefined;
+    if (msg.tool_calls?.length) {
+      const sig = JSON.stringify(msg.tool_calls.map((c) => [c.function.name, c.function.arguments]));
+      acts += msg.tool_calls.filter((c) => ["trade", "fleet_control", "send_message", "set_power"].includes(c.function.name)).length;
+      if (sig === lastSig || acts > 3) { messages.push({ role: "user", content: "Stop calling tools. Answer now, in your own voice, from what you already have; say plainly if something could not be done." }); delete msg.tool_calls; const r2 = await chat(messages, [], send); answer = r2.msg.content ?? ""; messages.push({ role: "assistant", content: answer }); break; }
+      lastSig = sig;
+    }
     messages.push({ role: "assistant", content: msg.content ?? "", ...(msg.tool_calls ? { tool_calls: msg.tool_calls } : {}) });
     if (!msg.tool_calls?.length) { answer = msg.content ?? ""; break; }
     const results = await Promise.all(msg.tool_calls.map(async (call) => {
@@ -648,7 +695,7 @@ const BRAIN = (process.env.JARVIS_BRAIN || "platform").toLowerCase();
 async function saveState(s) { await writeFile(STATE, JSON.stringify(s)); }
 
 const TOOLS = ["navigate", "fleet_status", "backtest_results", "safety_proof", "venues", "desk_api", "news", "morning_brief", "read_code", "search_code", "propose_fix",
-  "arxiv_search", "scholar_search", "web_search", "read_url", "write_note", "second_opinion", "update_desk_state", "health_check", "set_power", "power_status", "trade", "send_message", "save_skill", "list_skills", "run_skill", "actions_log", "typed_judgment", "eye", "scenario_forecast", "propose_strategy", "run_backtest", "run_tests", "fleet_control", "create_bot", "list_bots", "set_bot", "remember", "recall"];
+  "arxiv_search", "scholar_search", "web_search", "read_url", "write_note", "second_opinion", "update_desk_state", "health_check", "set_power", "power_status", "trade", "send_message", "save_skill", "list_skills", "run_skill", "actions_log", "typed_judgment", "eye", "toolbox_find", "toolbox_call", "toolbox_pack", "scenario_forecast", "propose_strategy", "run_backtest", "run_tests", "fleet_control", "create_bot", "list_bots", "set_bot", "remember", "recall"];
 const ALLOWED = TOOLS.map((t) => `mcp__axiom__${t}`);
 
 const wss = new WebSocketServer({ port: PORT, host: "127.0.0.1" });
