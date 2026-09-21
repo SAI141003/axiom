@@ -17,13 +17,13 @@ import { writeFile, mkdir } from "node:fs/promises";
 
 const PROMPT = `Autonomous cycle. Nobody is watching; act as the desk's own mind, within your powers, and leave a trail.
 1. fleet_status, then actions_log (n=20) so you do not repeat yourself, then health_check if the last one was over 6 hours ago.
-2. Judge each live book against its config and recent days. A book bleeding for three or more days with a win rate under its break-even is yours to pause (fleet_control pause_trading) — say why in the audit. A paused book whose reason has passed is yours to resume. Never touch the weather bot's gate; it is the proven earner.
+2. fleet_status marks each book pausable true/false with the reason, computed from the logs. Pause (fleet_control pause_trading) ONLY a book marked pausable=true — never one marked false, whatever you think of it; say the reason. Resume a book you paused earlier (see actions_log) once fleet_status no longer marks it pausable. Never touch the weather bot.
 3. Look at the world once: desk_api /api/world/summary and the Eye's layers (desk_api /api/eye/layers is not available; use news). If something in the news bears on an open position, write it down.
 4. Use the toolbox where it sharpens a judgment: funding and open interest for a crypto book, insider flow or a filing for a stock book, a token safety check before the meme bot's next name. Keep it to three calls.
 5. If a feed or service is down, restart it (fleet_control restart) once, and if it stays down, message Sai (send_message, if he is in contacts) in one line.
 6. If a power lane is past 80% (power_status), move the focus (set_power) so nothing dies.
 7. Finish: update_desk_state with the current picture, and speak three sentences: what you saw, what you did, what you want Sai to decide. No markdown.
-Cap: at most three acts this cycle (pause/resume/restart/power/trade). Doing nothing is a fine outcome when nothing needs doing — say so.`;
+Cap: at most three acts this cycle (pause/resume/restart/power/trade). Doing nothing is a fine outcome when nothing needs doing — say so. Never say you did something the tool did not confirm.`;
 
 const ws = new WebSocket("ws://127.0.0.1:8788", { headers: { origin: "http://localhost:3000" } });
 const bail = setTimeout(() => { console.error("[agent] timed out"); process.exit(2); }, 12 * 60_000);
