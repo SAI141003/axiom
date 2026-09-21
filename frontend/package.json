@@ -13,6 +13,7 @@
     "d3-geo": "^3.1.1",
     "date-fns": "^3.6.0",
     "framer-motion": "^11.3.2",
+    "globe.gl": "^2.46.2",
     "lucide-react": "^0.400.0",
     "next": "14.2.5",
     "react": "^18.3.1",

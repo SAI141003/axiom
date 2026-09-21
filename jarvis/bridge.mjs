@@ -383,6 +383,9 @@ const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
   tool("typed_judgment", "Ask Jev (TypeSafe AI's typed-judgment model, ~100 ms) a set of typed questions about a state: noul = probability, choice = pick from options, score = position on a scale. Frozen to logs/jev_judgments.jsonl with a hash, scored later if an outcome is recorded. Use it for a fast calibrated probability, never for a number about the desk's books. Needs TYPESAFE_AI_API_KEY; says so if missing.",
     { state: z.record(z.string(), z.any()), questions: z.record(z.string(), z.object({ type: z.enum(["noul", "choice", "score"]), instructions: z.string().max(600), criteria: z.record(z.string(), z.any()).optional() })), tag: z.string().max(60).optional() },
     async ({ state, questions, tag }) => text(await sh(PY, ["-c", `import json,sys;from signals import jev;print(json.dumps(jev.judge(${JSON.stringify(JSON.stringify(state))} and json.loads(${JSON.stringify(JSON.stringify(state))}), json.loads(${JSON.stringify(JSON.stringify(questions))}), tag=${JSON.stringify(tag ?? "axiom")}) or {"error": "Jev not configured — set TYPESAFE_AI_API_KEY in .env ($0.042 per million input tokens, no free tier)"}))`], 20_000))),
+  tool("eye", "Drive the Eye (/world, the live globe): focus the camera on a place (lat, lon, alt in globe radii — 0.3 city, 0.8 country, 2 whole earth), switch a layer on or off (flights, mil, sats, quakes, vessels, fires, radio, launches, cables, datacenters, dams, stations, markets), track an entity by name or callsign, release it, or set the sensor (normal, crt, nvg, flir, noir). Opens the Eye first if the user is elsewhere. Use when Sai says 'show me', 'zoom to', 'track', 'night vision', 'what's flying over'.",
+    { focus: z.object({ lat: z.number(), lon: z.number(), alt: z.number().min(0.05).max(4).optional() }).optional(), layer: z.object({ id: z.string(), on: z.boolean().optional() }).optional(), track: z.string().max(40).optional(), untrack: z.boolean().optional(), sensor: z.enum(["normal", "crt", "nvg", "flir", "noir"]).optional() },
+    async (cmd) => { uiSend({ type: "ui", op: "navigate", href: "/world" }); setTimeout(() => uiSend({ type: "ui", op: "eye", ...cmd }), 900); return text({ ok: true, sent: cmd, note: "the Eye is executing it on screen" }); }),
   tool("actions_log", "What AXIOM has actually done lately (trades, bot switches, power moves, messages, skills), newest first.", { n: z.number().int().min(1).max(50).default(15) },
     async ({ n }) => { try { const lines = (await readFile(ACTIONS, "utf-8")).trim().split("\n"); return text(lines.slice(-n).reverse().join("\n")); } catch { return text("no actions yet"); } }),
   tool("create_bot", "The Bot OS: create a user-made paper bot from a spec. Translate the user's words into: id (a-z0-9-), name, universe (BASE/QUOTE symbols like ETH/USD), timeframe (1d unless they insist; the edge is daily), weights over the evaluators (momentum, ma_cross, mean_reversion, rsi, bollinger, obv, mfi, volume_profile; 0-1.5), enter (0.05-0.5), exit (below enter), stake ($5-50), max_pos (1-5, stake x max_pos <= 100), note (their request verbatim). It starts on paper from $100 within the hour and appears on /bots. Never creates code; a bad spec is rejected with a reason you should relay.",
@@ -563,6 +566,7 @@ async function chat(messages, tools, send, force) {
 // tools always go; the rest are picked by topic. Keeps a turn near 3k tokens.
 const CORE_TOOLS = ["navigate", "fleet_status", "desk_api", "recall"];
 const TOPICS = [
+  [/\b(show me|zoom (to|in|out)|track|flying over|satellite|flights?|globe|the eye|night vision|thermal|sensor|crt|nvg|flir)\b/i, ["eye", "navigate"]],
   [/\b(buy|sell|short|close|take profit|get out|position|my book|manual book)\b/i, ["trade"]],
   [/\b(message|text|imessage|email|mail|tell|notify|send)\b/i, ["send_message"]],
   [/\bskill|routine|playbook|do the|again like|what (have|did) you do|actions? log|audit/i, ["save_skill", "list_skills", "run_skill", "actions_log"]],
@@ -644,7 +648,7 @@ const BRAIN = (process.env.JARVIS_BRAIN || "platform").toLowerCase();
 async function saveState(s) { await writeFile(STATE, JSON.stringify(s)); }
 
 const TOOLS = ["navigate", "fleet_status", "backtest_results", "safety_proof", "venues", "desk_api", "news", "morning_brief", "read_code", "search_code", "propose_fix",
-  "arxiv_search", "scholar_search", "web_search", "read_url", "write_note", "second_opinion", "update_desk_state", "health_check", "set_power", "power_status", "trade", "send_message", "save_skill", "list_skills", "run_skill", "actions_log", "typed_judgment", "scenario_forecast", "propose_strategy", "run_backtest", "run_tests", "fleet_control", "create_bot", "list_bots", "set_bot", "remember", "recall"];
+  "arxiv_search", "scholar_search", "web_search", "read_url", "write_note", "second_opinion", "update_desk_state", "health_check", "set_power", "power_status", "trade", "send_message", "save_skill", "list_skills", "run_skill", "actions_log", "typed_judgment", "eye", "scenario_forecast", "propose_strategy", "run_backtest", "run_tests", "fleet_control", "create_bot", "list_bots", "set_bot", "remember", "recall"];
 const ALLOWED = TOOLS.map((t) => `mcp__axiom__${t}`);
 
 const wss = new WebSocketServer({ port: PORT, host: "127.0.0.1" });
