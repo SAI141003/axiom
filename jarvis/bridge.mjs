@@ -133,7 +133,7 @@ const DESK_PATHS = ["/api/agents", "/api/ai", "/api/arb", "/api/backtest-lab", "
   "/api/council/tuner", "/api/crypto/trades", "/api/crypto/window", "/api/data-desk", "/api/deepchain", "/api/fleet", "/api/flow-bot", "/api/gamma-pulse",
   "/api/intel", "/api/journal", "/api/kalshi", "/api/learned", "/api/live/balance", "/api/markets", "/api/meme-bot", "/api/newsdesk",
   "/api/options", "/api/oracle", "/api/oracle/track", "/api/premarket", "/api/proving-ground", "/api/quotes", "/api/recall", "/api/scenario",
-  "/api/stocks", "/api/stocks-bot", "/api/tape", "/api/valuation", "/api/venues", "/api/weather", "/api/weather-trades", "/api/weather/picks", "/api/workforce", "/api/world", "/api/world/summary", "/api/botos", "/api/ai/health"];
+  "/api/stocks", "/api/stocks-bot", "/api/tape", "/api/valuation", "/api/venues", "/api/weather", "/api/weather-trades", "/api/weather/picks", "/api/workforce", "/api/world", "/api/world/summary", "/api/botos", "/api/ai/health", "/api/jev"];
 
 // Files AXIOM may read: source only, inside the repo, never secrets.
 const UNREADABLE = /(^|\/)\.env|\.key$|\.pem$|id_rsa|(^|\/)\.claude\/|(^|\/)\.git\/|(^|\/)node_modules\/|(^|\/)\.venv\//;
@@ -380,6 +380,9 @@ const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
       await audit("run_skill", { name }, `${results.length}/${j.steps.length} steps`);
       return text({ skill: name, results });
     }),
+  tool("typed_judgment", "Ask Jev (TypeSafe AI's typed-judgment model, ~100 ms) a set of typed questions about a state: noul = probability, choice = pick from options, score = position on a scale. Frozen to logs/jev_judgments.jsonl with a hash, scored later if an outcome is recorded. Use it for a fast calibrated probability, never for a number about the desk's books. Needs TYPESAFE_AI_API_KEY; says so if missing.",
+    { state: z.record(z.string(), z.any()), questions: z.record(z.string(), z.object({ type: z.enum(["noul", "choice", "score"]), instructions: z.string().max(600), criteria: z.record(z.string(), z.any()).optional() })), tag: z.string().max(60).optional() },
+    async ({ state, questions, tag }) => text(await sh(PY, ["-c", `import json,sys;from signals import jev;print(json.dumps(jev.judge(${JSON.stringify(JSON.stringify(state))} and json.loads(${JSON.stringify(JSON.stringify(state))}), json.loads(${JSON.stringify(JSON.stringify(questions))}), tag=${JSON.stringify(tag ?? "axiom")}) or {"error": "Jev not configured — set TYPESAFE_AI_API_KEY in .env ($0.042 per million input tokens, no free tier)"}))`], 20_000))),
   tool("actions_log", "What AXIOM has actually done lately (trades, bot switches, power moves, messages, skills), newest first.", { n: z.number().int().min(1).max(50).default(15) },
     async ({ n }) => { try { const lines = (await readFile(ACTIONS, "utf-8")).trim().split("\n"); return text(lines.slice(-n).reverse().join("\n")); } catch { return text("no actions yet"); } }),
   tool("create_bot", "The Bot OS: create a user-made paper bot from a spec. Translate the user's words into: id (a-z0-9-), name, universe (BASE/QUOTE symbols like ETH/USD), timeframe (1d unless they insist; the edge is daily), weights over the evaluators (momentum, ma_cross, mean_reversion, rsi, bollinger, obv, mfi, volume_profile; 0-1.5), enter (0.05-0.5), exit (below enter), stake ($5-50), max_pos (1-5, stake x max_pos <= 100), note (their request verbatim). It starts on paper from $100 within the hour and appears on /bots. Never creates code; a bad spec is rejected with a reason you should relay.",
@@ -572,7 +575,7 @@ const TOPICS = [
   [/health|running|down|degraded|working|broken|status|everything ok/i, ["health_check"]],
   [/brief|morning|status|summary|what happened|since yesterday|overnight/i, ["morning_brief"]],
   [/backtest|strategy|sharpe|edge|blend|weights|overfit|holdout|momentum|rsi/i, ["backtest_results", "propose_strategy", "run_backtest"]],
-  [/forecast|predict|scenario|will .* go up|monte/i, ["scenario_forecast"]],
+  [/forecast|predict|scenario|will .* go up|monte|probability|odds|jev|typed/i, ["scenario_forecast", "typed_judgment"]],
   [/safe|safety|assert|invariant|cap|proving/i, ["safety_proof"]],
   [/venue|exchange|where can|trade from|canada|kraken|hyperliquid|polymarket|kalshi/i, ["venues"]],
   [/start|stop|pause|resume|halt|kill|turn (on|off)|switch (on|off)|restart|kick|log of|logs?\b|service|stop trading|trading/i, ["fleet_control"]],
@@ -641,7 +644,7 @@ const BRAIN = (process.env.JARVIS_BRAIN || "platform").toLowerCase();
 async function saveState(s) { await writeFile(STATE, JSON.stringify(s)); }
 
 const TOOLS = ["navigate", "fleet_status", "backtest_results", "safety_proof", "venues", "desk_api", "news", "morning_brief", "read_code", "search_code", "propose_fix",
-  "arxiv_search", "scholar_search", "web_search", "read_url", "write_note", "second_opinion", "update_desk_state", "health_check", "set_power", "power_status", "trade", "send_message", "save_skill", "list_skills", "run_skill", "actions_log", "scenario_forecast", "propose_strategy", "run_backtest", "run_tests", "fleet_control", "create_bot", "list_bots", "set_bot", "remember", "recall"];
+  "arxiv_search", "scholar_search", "web_search", "read_url", "write_note", "second_opinion", "update_desk_state", "health_check", "set_power", "power_status", "trade", "send_message", "save_skill", "list_skills", "run_skill", "actions_log", "typed_judgment", "scenario_forecast", "propose_strategy", "run_backtest", "run_tests", "fleet_control", "create_bot", "list_bots", "set_bot", "remember", "recall"];
 const ALLOWED = TOOLS.map((t) => `mcp__axiom__${t}`);
 
 const wss = new WebSocketServer({ port: PORT, host: "127.0.0.1" });
