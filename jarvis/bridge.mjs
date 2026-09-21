@@ -319,13 +319,19 @@ const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
         return text(r.ok ? `${hit.name}: trading ${on ? "RESUMED" : "PAUSED"} (${hit.key}=${on}); ${on ? "it places trades again from the next cycle (≤5 min)." : "the daemon keeps running and logging, it just places no trades from the next cycle (≤5 min)."}` : `switch failed: HTTP ${r.status}`, !r.ok);
       }
       const names = list.map((l) => l.split(/\s+/).pop()).filter((n) => CONTROLLABLE.test(n));
-      const svc = names.find((n) => n.replace(/^com\.polymarket\.(dryrun\.)?/, "").replace(/[^a-z0-9]/g, "") === key) ?? names.find((n) => n.replace(/[^a-z0-9]/g, "").includes(key));
+      // best match, not first match: exact, then the longest shared run between what Sai said and a service name
+      const norm = (n) => n.replace(/^com\.polymarket\.(dryrun\.)?/, "").replace(/[^a-z0-9]/g, "");
+      const overlap = (a, b) => { let best = 0; for (let i = 0; i < a.length; i++) for (let j = i + 2; j <= a.length; j++) if (b.includes(a.slice(i, j))) best = Math.max(best, j - i); return best; };
+      const svc = names.find((n) => norm(n) === key) ?? names.map((n) => [n, overlap(key, norm(n))]).filter(([, o]) => o >= 4).sort((a, b) => b[1] - a[1])[0]?.[0];
       if (!svc) return text(`no paper-bot service matches '${bot}'; services: ${names.map((n) => n.replace("com.polymarket.", "")).join(", ")}`, true);
       if (action === "log") return text((await sh("bash", ["-c", `tail -40 logs/${svc.replace("com.polymarket.", "").replace("dryrun.", "")}*.log 2>/dev/null`])) || "no log");
       const plist = `${process.env.HOME}/Library/LaunchAgents/${svc}.plist`;
-      if (action === "stop") return text((await sh("launchctl", ["bootout", `gui/${uid}/${svc}`])) || `stopped ${svc}`);
-      if (action === "start") { await sh("launchctl", ["enable", `gui/${uid}/${svc}`]); return text((await sh("launchctl", ["bootstrap", `gui/${uid}`, plist])) || `started ${svc}`); }
-      return text((await sh("launchctl", ["kickstart", "-k", `gui/${uid}/${svc}`])) || `restarted ${svc}`);
+      let out;
+      if (action === "stop") out = (await sh("launchctl", ["bootout", `gui/${uid}/${svc}`])) || `stopped ${svc}`;
+      else if (action === "start") { await sh("launchctl", ["enable", `gui/${uid}/${svc}`]); out = (await sh("launchctl", ["bootstrap", `gui/${uid}`, plist])) || `started ${svc}`; }
+      else out = (await sh("launchctl", ["kickstart", "-k", `gui/${uid}/${svc}`])) || `restarted ${svc}`;
+      await audit("fleet_control", { action, service: svc }, out.slice(0, 120));
+      return text(out);
     }),
   // ── AXIOM's hands ───────────────────────────────────────────────────────────
   // Every act is written to .data/actions.jsonl (who asked, what was done, the
@@ -518,7 +524,7 @@ async function providers() {
   // AXIOM's own NIM key first (no contention with the classifier, no free-tier
   // rate limits), then Groq for speed, then the shared NIM key, then OpenAI.
   const nvKey = env.NVIDIA_API_KEY_JARVIS || env.NVIDIA_API_KEY;
-  const nvModels = [env.NVIDIA_MODEL_JARVIS || env.NVIDIA_MODEL_TOOLS || "nvidia/nemotron-3-super-120b-a12b", "deepseek-ai/deepseek-v4-flash-0731", "nvidia/nemotron-3-ultra-550b-a55b"];   // measured 2026-09-20: Super 2s, gpt-oss-20b 2s, DeepSeek 19s; mistral-large-2 is gone (404), GLM/Kimi 48-90s
+  const nvModels = [env.NVIDIA_MODEL_JARVIS || env.NVIDIA_MODEL_TOOLS || "nvidia/nemotron-3-super-120b-a12b", "nvidia/nemotron-3-ultra-550b-a55b"];   // deepseek-v4-flash retired (410) 2026-09-21   // measured 2026-09-20: Super 2s, gpt-oss-20b 2s, DeepSeek 19s; mistral-large-2 is gone (404), GLM/Kimi 48-90s
   // Speed first: Groq answers in 0.2-0.5s but allows 8k tokens/min on the free
   // tier, so every turn is kept small (see platformTurn). NIM is the deep bench.
   return [
@@ -689,7 +695,14 @@ async function platformTurn(q, send) {
   let answer = "", brain = "";
   let lastSig = "", acts = 0;
   for (let step = 0; step < 24; step++) {
-    const { msg, brain: b } = await chat(messages, tools, send, force); brain = b; force = undefined;
+    let { msg, brain: b } = await chat(messages, tools, send, force); brain = b;
+    if (force && !msg.tool_calls?.length) {
+      // a forced tool that the model talked past is an act it did not do; insist once, then refuse to pretend
+      messages.push({ role: "assistant", content: msg.content ?? "" }, { role: "user", content: `Do it: call ${force} now. Do not describe it, call it.` });
+      ({ msg, brain: b } = await chat(messages, tools, send, force)); brain = b;
+      if (!msg.tool_calls?.length) { answer = `I could not carry that out — the ${force} call did not go through. Nothing was changed.`; messages.push({ role: "assistant", content: answer }); break; }
+    }
+    force = undefined;
     if (msg.tool_calls?.length) {
       const sig = JSON.stringify(msg.tool_calls.map((c) => [c.function.name, c.function.arguments]));
       acts += msg.tool_calls.filter((c) => ["trade", "fleet_control", "send_message", "set_power"].includes(c.function.name)).length;
