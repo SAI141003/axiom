@@ -32,7 +32,7 @@ const tool = (name, description, shape, handler) => {
   REGISTRY.push({ name, description, schema, handler });
   return sdkTool(name, description, shape, handler);
 };
-import { readFile, writeFile, appendFile, mkdir, open } from "node:fs/promises";
+import { readFile, writeFile, appendFile, mkdir, open, readdir } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { dirname, join, resolve, relative, isAbsolute } from "node:path";
@@ -48,6 +48,10 @@ const JOURNAL = join(HERE, "journal.jsonl");
 const STATE = join(HERE, "state.json");
 const PROPOSALS = join(HERE, "proposals");
 const NOTES = join(HERE, "notes");
+const SKILLS = join(ROOT, ".data", "skills");
+const ACTIONS = join(ROOT, ".data", "actions.jsonl");
+async function audit(kind, args, result) { try { await mkdir(dirname(ACTIONS), { recursive: true }); await appendFile(ACTIONS, JSON.stringify({ ts: Date.now(), kind, args, result: String(result).slice(0, 300) }) + "\n"); } catch {} }
+async function envFile() { try { return Object.fromEntries((await readFile(join(ROOT, ".env"), "utf-8")).split("\n").filter((l) => l.includes("=") && !l.startsWith("#")).map((l) => { const i = l.indexOf("="); return [l.slice(0, i).trim(), l.slice(i + 1).trim()]; })); } catch { return {}; } }
 const PERSONA = join(HERE, "persona.md");
 const DESK_STATE = join(HERE, "desk_state.md");
 // Optional second brain. GPT-6 Astra (OpenAI, Sept 2026) or any OpenAI-compatible model:
@@ -255,7 +259,7 @@ const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
   tool("update_desk_state", "Rewrite jarvis/desk_state.md: a DENSE, compact symbolic state of the desk — the facts you would otherwise re-derive every time. One line per item: bot → book, P&L, win rate, status; open problems; standing decisions; what last night's study found; pending proposals. Under 60 lines. Do this at the end of every briefing and every study, and whenever a fact changes. Replace the whole file; do not append.",
     { state: z.string().min(20).max(8000) }, async ({ state }) => { await writeFile(DESK_STATE, `# Desk state — ${new Date().toISOString()}\n\n${state}\n`); return text("desk state updated"); }),
   tool("set_power", "Reallocate the desk's AI power. focus=axiom reserves the fast free lane (Groq) for you and moves the dashboard to NIM; research sends your long unattended work to NIM's big context and leaves Groq to the screens; dashboard gives the screens the fast lane; swarm keeps NIM clear for the 72 MiroFish personas; balanced is the default. Takes effect on the next call, everywhere. Use when Sai says 'reallocate', 'all power to', 'divert', 'focus on'.",
-    { focus: z.enum(["balanced", "axiom", "research", "dashboard", "swarm"]), why: z.string().max(120).optional() }, async ({ focus, why }) => text(await setPowerFocus(focus, why ?? ""))),
+    { focus: z.enum(["balanced", "axiom", "research", "dashboard", "swarm"]), why: z.string().max(120).optional() }, async ({ focus, why }) => { const r = await setPowerFocus(focus, why ?? ""); await audit("set_power", { focus, why }, r.means); return text(r); }),
   tool("power_status", "Where the AI power is allocated right now and what each lane has spent: tokens today per provider/model, learned limits, cooldowns, lanes being skipped.", {}, async () => text({ power: await powerFocus(), ...(await usageLedger()) })),
   tool("health_check", "Probe every external feed and service the desk depends on, right now: exchange data, Polymarket, weather, meme feeds, news, research APIs, the bridge's own services. Returns ok/degraded/down per item with latency and a one-line reason. Run this in the morning brief when asked 'is everything working', and in the weekly freshness study.", {}, async () => {
     const probes = [
@@ -309,6 +313,7 @@ const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
         if (!hit) return text(`no trading switch called '${bot}'; switches: ${bots.map((b) => b.name).join(", ")}. The daemon itself can be stopped with action=stop.`, true);
         const r = await fetch(`${DESK}/api/bots`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ key: hit.key, enabled: action === "resume_trading" }) });
         const on = action === "resume_trading";
+        await audit("fleet_control", { action, bot: hit.name }, r.ok ? "ok" : `HTTP ${r.status}`);
         return text(r.ok ? `${hit.name}: trading ${on ? "RESUMED" : "PAUSED"} (${hit.key}=${on}); ${on ? "it places trades again from the next cycle (≤5 min)." : "the daemon keeps running and logging, it just places no trades from the next cycle (≤5 min)."}` : `switch failed: HTTP ${r.status}`, !r.ok);
       }
       const names = list.map((l) => l.split(/\s+/).pop()).filter((n) => CONTROLLABLE.test(n));
@@ -320,6 +325,63 @@ const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
       if (action === "start") { await sh("launchctl", ["enable", `gui/${uid}/${svc}`]); return text((await sh("launchctl", ["bootstrap", `gui/${uid}`, plist])) || `started ${svc}`); }
       return text((await sh("launchctl", ["kickstart", "-k", `gui/${uid}/${svc}`])) || `restarted ${svc}`);
     }),
+  // ── AXIOM's hands ───────────────────────────────────────────────────────────
+  // Every act is written to .data/actions.jsonl (who asked, what was done, the
+  // result) — the audit trail an agent runtime owes its owner (Agent libOS,
+  // arXiv 2606.03895: capability-controlled, auditable, human-approvable).
+  tool("trade", "Buy, sell (short, crypto only) or close a position on AXIOM's own $100 PAPER book at the real price right now, or show the book. Symbols: crypto as BASE/QUOTE (ETH/USD, BTC/USD, SOL/USD), equities as tickers (NVDA). usd is the stake, max $50. This is paper: there is no route from here to an exchange. When Sai says 'buy', 'sell', 'close', 'take profit', 'get out' — do it, then say the fill price and the book balance. Live money needs the executor's two human switches; say so if asked.",
+    { action: z.enum(["buy", "sell", "close", "status"]), symbol: z.string().max(16).optional(), usd: z.number().min(1).max(50).optional(), why: z.string().max(160).optional() },
+    async ({ action, symbol, usd, why }) => {
+      const args = action === "status" ? ["status"] : action === "close" ? ["close", symbol ?? "", why ?? "Sai said so"] : [action, symbol ?? "", String(usd ?? 10), why ?? "Sai said so"];
+      const out = await sh(PY, [join(ROOT, "dryrun", "manual_book.py"), ...args], 40_000);
+      if (action !== "status") await audit("trade", { action, symbol, usd, why }, out.slice(0, 400));
+      return text(out);
+    }),
+  tool("send_message", "Send a message on Sai's behalf: iMessage/SMS through Messages on this Mac, or email through SMTP if SMTP_HOST/SMTP_USER/SMTP_PASS are set in .env. Only to people in .data/contacts.json (name → handle); if the name is not there, say so and do not send. Keep it short, sign it 'AXIOM for Sai', and read it back to Sai in the reply.",
+    { to: z.string().max(60), body: z.string().min(1).max(1200), channel: z.enum(["imessage", "email"]).default("imessage"), subject: z.string().max(120).optional() },
+    async ({ to, body, channel, subject }) => {
+      let contacts = {}; try { contacts = JSON.parse(await readFile(join(ROOT, ".data", "contacts.json"), "utf-8")); } catch {}
+      const key = Object.keys(contacts).find((k) => k.toLowerCase() === to.toLowerCase() || k.toLowerCase().includes(to.toLowerCase()));
+      if (!key) return text(`'${to}' is not in .data/contacts.json — add {"${to}": "+1... or email"} there first. Known: ${Object.keys(contacts).join(", ") || "none"}`, true);
+      const handle = contacts[key]; const msg = `${body}\n— AXIOM for Sai`;
+      let result;
+      if (channel === "email") {
+        const env = await envFile();
+        if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASS) return text("email is not configured: set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS in .env (Gmail: an app password)", true);
+        const nodemailer = (await import("nodemailer")).default;
+        const t = nodemailer.createTransport({ host: env.SMTP_HOST, port: Number(env.SMTP_PORT || 587), secure: Number(env.SMTP_PORT) === 465, auth: { user: env.SMTP_USER, pass: env.SMTP_PASS } });
+        const r = await t.sendMail({ from: env.SMTP_FROM || env.SMTP_USER, to: handle, subject: subject || "From AXIOM", text: msg });
+        result = `email sent to ${key} <${handle}> (${r.messageId})`;
+      } else {
+        const script = `tell application "Messages"\nset s to 1st account whose service type = iMessage\nset b to participant "${handle}" of s\nsend "${msg.replace(/"/g, '\\"').replace(/\n/g, "\\n")}" to b\nend tell`;
+        const out = await sh("osascript", ["-e", script], 20_000);
+        if (/error|not allowed|can.t get/i.test(out)) return text(`Messages refused: ${out.slice(0, 200)} — allow Automation for Messages in System Settings › Privacy`, true);
+        result = `iMessage sent to ${key} (${handle})`;
+      }
+      await audit("send_message", { to: key, channel, subject }, result);
+      return text({ sent: true, result, message: msg });
+    }),
+  // ── Skills: what AXIOM learns to do, kept and replayed (MUSE-Autoskill, arXiv 2605.27366) ──
+  tool("save_skill", "Save a multi-step procedure you just carried out successfully as a named skill so Sai can ask for it by name next time ('do the morning routine'). steps is the ordered list of tool calls with their arguments, in plain JSON. Save only what worked.",
+    { name: z.string().regex(/^[a-z0-9][a-z0-9-]{1,39}$/), description: z.string().max(200), steps: z.array(z.object({ tool: z.string(), args: z.record(z.string(), z.any()).default({}) })).min(1).max(12) },
+    async ({ name, description, steps }) => { await mkdir(SKILLS, { recursive: true }); await writeFile(join(SKILLS, `${name}.json`), JSON.stringify({ name, description, steps, saved: Date.now(), runs: 0 }, null, 1)); await audit("save_skill", { name }, `${steps.length} steps`); return text(`saved skill '${name}' (${steps.length} steps)`); }),
+  tool("list_skills", "The skills AXIOM has saved: name, what it does, steps, how often it has run.", {}, async () => {
+    try { const fs_ = (await readdir(SKILLS)).filter((f) => f.endsWith(".json")); return text(await Promise.all(fs_.map(async (f) => { const j = JSON.parse(await readFile(join(SKILLS, f), "utf-8")); return { name: j.name, description: j.description, steps: j.steps.map((s) => s.tool), runs: j.runs }; }))); } catch { return text("no skills saved yet"); } }),
+  tool("run_skill", "Run a saved skill by name: executes its tool steps in order and returns every result. Stops at the first error.", { name: z.string().regex(/^[a-z0-9][a-z0-9-]{1,39}$/) },
+    async ({ name }) => {
+      let j; try { j = JSON.parse(await readFile(join(SKILLS, `${name}.json`), "utf-8")); } catch { return text(`no skill '${name}'`, true); }
+      const results = [];
+      for (const st of j.steps) {
+        const t = REGISTRY.find((x) => x.name === st.tool); if (!t) { results.push({ tool: st.tool, error: "unknown tool" }); break; }
+        const parsed = t.schema.safeParse(nearest(t, st.args ?? {})); if (!parsed.success) { results.push({ tool: st.tool, error: "bad args" }); break; }
+        const r = await t.handler(parsed.data); const out = (r.content ?? []).map((c) => c.text ?? "").join("\n").slice(0, 1500); results.push({ tool: st.tool, out }); if (r.isError) break;
+      }
+      j.runs = (j.runs ?? 0) + 1; j.last_run = Date.now(); await writeFile(join(SKILLS, `${name}.json`), JSON.stringify(j, null, 1));
+      await audit("run_skill", { name }, `${results.length}/${j.steps.length} steps`);
+      return text({ skill: name, results });
+    }),
+  tool("actions_log", "What AXIOM has actually done lately (trades, bot switches, power moves, messages, skills), newest first.", { n: z.number().int().min(1).max(50).default(15) },
+    async ({ n }) => { try { const lines = (await readFile(ACTIONS, "utf-8")).trim().split("\n"); return text(lines.slice(-n).reverse().join("\n")); } catch { return text("no actions yet"); } }),
   tool("create_bot", "The Bot OS: create a user-made paper bot from a spec. Translate the user's words into: id (a-z0-9-), name, universe (BASE/QUOTE symbols like ETH/USD), timeframe (1d unless they insist; the edge is daily), weights over the evaluators (momentum, ma_cross, mean_reversion, rsi, bollinger, obv, mfi, volume_profile; 0-1.5), enter (0.05-0.5), exit (below enter), stake ($5-50), max_pos (1-5, stake x max_pos <= 100), note (their request verbatim). It starts on paper from $100 within the hour and appears on /bots. Never creates code; a bad spec is rejected with a reason you should relay.",
     { id: z.string().regex(/^[a-z0-9][a-z0-9-]{1,39}$/), name: z.string().min(2).max(60), universe: z.array(z.string()).min(1).max(8), timeframe: z.enum(["1h", "4h", "1d"]).default("1d"),
       weights: z.record(z.string(), z.number().min(0).max(1.5)), enter: z.number().min(0.05).max(0.5).default(0.15), exit: z.number().min(0).max(0.49).default(0.05),
@@ -498,6 +560,9 @@ async function chat(messages, tools, send, force) {
 // tools always go; the rest are picked by topic. Keeps a turn near 3k tokens.
 const CORE_TOOLS = ["navigate", "fleet_status", "desk_api", "recall"];
 const TOPICS = [
+  [/\b(buy|sell|short|close|take profit|get out|position|my book|manual book)\b/i, ["trade"]],
+  [/\b(message|text|imessage|email|mail|tell|notify|send)\b/i, ["send_message"]],
+  [/\bskill|routine|playbook|do the|again like|what (have|did) you do|actions? log|audit/i, ["save_skill", "list_skills", "run_skill", "actions_log"]],
   [/reallocat|all power|divert|focus (the )?(power|compute|brain|ai)|power (to|on|status)|tokens? (spent|used|left)|budget|quota/i, ["set_power", "power_status"]],
   [/which (ai|model|brain)|ai health|health of (the |your )?(ai|brain|models?)|latency|how fast|which model/i, ["desk_api"]],
   [/news|headline|world|happening|market.?s?\b|wire|crypto|geopolit|oil|war/i, ["news"]],
@@ -545,7 +610,8 @@ async function platformTurn(q, send) {
   // hit fleet_control this turn, whatever was said before.
   const has = (n) => tools.some((t) => t.function.name === n);
   const CONTROL = /\b(stop|pause|halt|kill|resume|start|restart|turn (on|off)|switch (on|off))\b/i, POWER = /reallocat|all power|divert|focus (the )?(power|compute|brain|ai)|power to/i;
-  let force = POWER.test(q) && has("set_power") ? "set_power" : CONTROL.test(q) && has("fleet_control") ? "fleet_control" : NUMBERS.test(q) && has("fleet_status") ? "fleet_status" : undefined;
+  const TRADE = /\b(buy|sell|short|close (my|the)? ?position|take profit|get out of)\b/i, MSG = /\b(message|text|imessage|email|mail)\b.*\b(to|him|her|them)\b|\bsend (a |an )?(message|text|email|mail)/i;
+  let force = TRADE.test(q) && has("trade") ? "trade" : MSG.test(q) && has("send_message") ? "send_message" : POWER.test(q) && has("set_power") ? "set_power" : CONTROL.test(q) && has("fleet_control") ? "fleet_control" : NUMBERS.test(q) && has("fleet_status") ? "fleet_status" : undefined;
   let answer = "", brain = "";
   for (let step = 0; step < 24; step++) {
     const { msg, brain: b } = await chat(messages, tools, send, force); brain = b; force = undefined;
@@ -575,7 +641,7 @@ const BRAIN = (process.env.JARVIS_BRAIN || "platform").toLowerCase();
 async function saveState(s) { await writeFile(STATE, JSON.stringify(s)); }
 
 const TOOLS = ["navigate", "fleet_status", "backtest_results", "safety_proof", "venues", "desk_api", "news", "morning_brief", "read_code", "search_code", "propose_fix",
-  "arxiv_search", "scholar_search", "web_search", "read_url", "write_note", "second_opinion", "update_desk_state", "health_check", "set_power", "power_status", "scenario_forecast", "propose_strategy", "run_backtest", "run_tests", "fleet_control", "create_bot", "list_bots", "set_bot", "remember", "recall"];
+  "arxiv_search", "scholar_search", "web_search", "read_url", "write_note", "second_opinion", "update_desk_state", "health_check", "set_power", "power_status", "trade", "send_message", "save_skill", "list_skills", "run_skill", "actions_log", "scenario_forecast", "propose_strategy", "run_backtest", "run_tests", "fleet_control", "create_bot", "list_bots", "set_bot", "remember", "recall"];
 const ALLOWED = TOOLS.map((t) => `mcp__axiom__${t}`);
 
 const wss = new WebSocketServer({ port: PORT, host: "127.0.0.1" });
