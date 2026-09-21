@@ -551,3 +551,43 @@ input, textarea, select { cursor: text; }
 .hud-dock-tight .hud-dock-item::before { inset: 4px; }
 .hud-dock-tight .hud-dock-label { font-size: 9px; max-width: 64px; }
 .hud-clamp3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* ═══ THE EYE — full-bleed globe with a tactical HUD (after gods-eye-view) ═ */
+.eye { position: relative; height: calc(100vh - 56px); width: 100%; overflow: hidden; background: #000; }
+.eye-globe { position: absolute; inset: 0; }
+.eye-globe canvas { outline: none; }
+.eye-panel { position: absolute; z-index: 5; background: rgba(5,7,13,0.72); border: 1px solid var(--hud-line-dim); border-radius: 10px; padding: 8px 10px; backdrop-filter: blur(10px); font: 500 10.5px/1.5 "JetBrains Mono", ui-monospace, monospace; color: var(--hud-text); box-shadow: 0 0 0 1px rgba(76,201,255,0.06), 0 10px 40px -20px #000; }
+.eye-panel::before { content: ""; position: absolute; inset: 4px; border: 1px solid transparent; border-top-color: var(--hud-line); border-left-color: var(--hud-line); width: 10px; height: 10px; pointer-events: none; }
+.eye-tl { top: 12px; left: 12px; min-width: 300px; }
+.eye-l { top: 176px; left: 12px; width: 232px; display: flex; flex-direction: column; gap: 1px; max-height: calc(100% - 200px); overflow-y: auto; scrollbar-width: none; }
+.eye-r { top: 12px; right: 12px; width: 300px; max-height: calc(100% - 70px); overflow-y: auto; scrollbar-width: none; }
+.eye-bl { bottom: 12px; left: 12px; display: flex; align-items: center; gap: 8px; max-width: 360px; }
+.eye-title { display: flex; align-items: center; gap: 6px; font-size: 9px; letter-spacing: 0.24em; font-weight: 700; color: var(--hud-accent); margin-bottom: 4px; text-shadow: 0 0 10px var(--hud-glow); }
+.eye-row { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--hud-border); padding: 2px 0; }
+.eye-row span { color: var(--hud-muted); letter-spacing: 0.12em; font-size: 9px; }
+.eye-row b { font-weight: 600; text-align: right; min-width: 0; display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
+.eye-layer { display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 6px; border-radius: 6px; background: transparent; border: 0; color: var(--hud-muted); text-align: left; cursor: pointer; font: inherit; }
+.eye-layer[data-on] { color: var(--hud-text); background: rgba(76,201,255,0.06); }
+.eye-layer:hover { background: rgba(255,255,255,0.05); }
+.eye-layer-name { flex: 1; }
+.eye-layer-n { font-size: 9px; }
+.eye-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--hud-line-dim); background: rgba(5,7,13,0.7); color: var(--hud-muted); font: 600 9px/1.4 "JetBrains Mono", monospace; letter-spacing: 0.08em; cursor: pointer; }
+.eye-chip[data-on] { color: var(--hud-accent); border-color: var(--hud-accent); box-shadow: 0 0 12px -2px var(--hud-glow); }
+.eye-chip-accent { color: var(--hud-accent); border-color: var(--hud-line); }
+.eye-chips { position: absolute; right: 12px; bottom: 12px; z-index: 6; display: flex; gap: 6px; }
+.eye-track-name { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; margin-bottom: 2px; text-shadow: 0 0 12px currentColor; }
+.eye-contact { display: flex; align-items: center; gap: 8px; width: 100%; padding: 3px 4px; border: 0; border-bottom: 1px solid var(--hud-border); background: transparent; color: var(--hud-text); text-align: left; cursor: pointer; font: inherit; }
+.eye-contact:hover { background: rgba(255,255,255,0.05); }
+.eye-contact .truncate { flex: 1; }
+.eye-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 6px currentColor; }
+.eye-muted { color: var(--hud-muted); font-size: 10px; padding: 4px 0; }
+.eye-tip { background: rgba(5,7,13,0.9); border: 1px solid var(--hud-line-dim); border-radius: 6px; padding: 6px 8px; font: 500 10.5px/1.4 "JetBrains Mono", monospace; color: var(--hud-text); }
+
+/* ═══ SENSOR MODES — the whole desk through a different eyepiece ═════════ */
+html[data-sensor="crt"] body { filter: contrast(1.15) saturate(0.7) sepia(0.35) hue-rotate(35deg); }
+html[data-sensor="crt"] body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 9999; background: repeating-linear-gradient(0deg, rgba(0,0,0,0.22) 0 1px, transparent 1px 3px); mix-blend-mode: multiply; }
+html[data-sensor="nvg"] body { filter: grayscale(1) brightness(1.15) contrast(1.2) sepia(1) hue-rotate(60deg) saturate(3); }
+html[data-sensor="nvg"] body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 9999; background: radial-gradient(circle at 50% 50%, transparent 55%, rgba(0,0,0,0.8) 100%); }
+html[data-sensor="flir"] body { filter: grayscale(1) invert(1) contrast(1.3) brightness(0.9); }
+html[data-sensor="noir"] body { filter: grayscale(1) contrast(1.25); }
+@media (max-width: 900px) { .eye-l, .eye-r { display: none; } .eye-tl { min-width: 0; right: 12px; } }

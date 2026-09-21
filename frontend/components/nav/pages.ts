@@ -36,7 +36,7 @@ export const GROUPS: Group[] = [
     { href: "/oracle",    label: "Oracle",    hint: "the oracle-lag probe, Brier-scored",       icon: Eye },
     { href: "/intel",     label: "Intel",     hint: "news read by the classifier",             icon: Radio, keywords: "sentiment materiality" },
     { href: "/news",      label: "News",      hint: "live wall, live summary, the world wire",  icon: Newspaper, keywords: "tv video headlines wire" },
-    { href: "/world",     label: "World",     hint: "World Monitor, whole: the live map, chokepoints, cables, exchanges, missions", icon: Globe, keywords: "map monitor geopolitics situation room" },
+    { href: "/world",     label: "The Eye",   hint: "the globe: live aircraft, military, satellites, quakes, launches, radio, cables, the weather book, the exchanges", icon: Globe, keywords: "map globe world monitor geopolitics situation room flights satellites eye" },
     { href: "/journal",   label: "Journal",   hint: "every trade, every lesson",               icon: BookOpen },
   ]},
   { label: "Account", pages: [

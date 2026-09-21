@@ -27,6 +27,8 @@ export default function TopNav() {
     return () => { document.removeEventListener("mousedown", onDoc); document.removeEventListener("keydown", onKey); window.removeEventListener("axiom:palette-open", close); window.removeEventListener("axiom:jarvis-open", close); };
   }, []);
   useEffect(() => { setOpenGroup(null); }, [pathname]);
+  // the Eye's sensor mode (CRT / NVG / FLIR / noir) is a desk-wide setting
+  useEffect(() => { try { const s = localStorage.getItem("axiom.sensor"); if (s && s !== "normal") document.documentElement.dataset.sensor = s; else delete document.documentElement.dataset.sensor; } catch {} }, [pathname]);
 
   return (
     <>

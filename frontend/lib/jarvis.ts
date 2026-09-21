@@ -94,6 +94,7 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
           else if (m.type === "done") { patchLast((l) => { l.text = m.text || l.text; l.brain = "bridge"; }); speak(m.text); }
           else if (m.type === "error") setMsgs((p) => [...p, { role: "jarvis", text: m.text, brain: "bridge" }]);
           else if (m.type === "ui" && m.op === "navigate" && typeof m.href === "string" && m.href.startsWith("/")) { routerRef.current.push(m.href); window.dispatchEvent(new Event("axiom:jarvis-open")); }
+          else if (m.type === "ui" && m.op === "eye") { const fire = () => window.dispatchEvent(new CustomEvent("axiom:eye", { detail: m })); fire(); setTimeout(fire, 2500); }
         };
         ws.current = s;
       } catch { setBridge("offline"); }
