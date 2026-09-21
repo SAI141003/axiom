@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
 import net from "net";
+import { ledger } from "@/lib/aiUsage";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,7 @@ async function chat(base: string, key: string, model: string, extra: Record<stri
 
 export async function GET(request: Request) {
   const force = new URL(request.url).searchParams.get("refresh") === "1";
-  if (!force && cache && Date.now() - cache.at < 10 * 60_000) return NextResponse.json(cache.payload);
+  if (!force && cache && Date.now() - cache.at < 10 * 60_000) return NextResponse.json({ ...cache.payload, usage: await ledger() });
   const env = await readEnv();
   const G = "https://api.groq.com/openai/v1", N = env.NVIDIA_BASE_URL || "https://integrate.api.nvidia.com/v1", C = "https://api.cerebras.ai/v1";
   const oss = { reasoning_effort: "low", reasoning_format: "hidden" };
@@ -75,7 +76,8 @@ export async function GET(request: Request) {
 
   const ok = models.filter((m) => m.status === "ok").length, keyed = models.filter((m) => m.status !== "no key").length;
   const fastest = models.filter((m) => m.status === "ok").sort((a, b) => (a.ms ?? 1e9) - (b.ms ?? 1e9))[0];
-  const payload = { generated: Date.now(), models, services, summary: { ok, keyed, fastest: fastest ? `${fastest.model} ${fastest.ms}ms` : null, brainReady: models.some((m) => /AXIOM brain/.test(m.job) && m.status === "ok") } };
+  const usage = await ledger();
+  const payload = { generated: Date.now(), models, services, usage, summary: { ok, keyed, fastest: fastest ? `${fastest.model} ${fastest.ms}ms` : null, brainReady: models.some((m) => /AXIOM brain/.test(m.job) && m.status === "ok") } };
   cache = { at: Date.now(), payload };
   return NextResponse.json(payload);
 }

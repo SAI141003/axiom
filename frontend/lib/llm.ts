@@ -7,6 +7,8 @@
  * First provider with a key wins; failures fall through to the next.
  */
 
+import { record, recordLimit, avoid } from "./aiUsage";
+
 interface Provider { name: string; key?: string; base: string; model: string; fallbacks?: string[] }
 // Hosted model catalogs change under us (Groq retired llama-3.3-70b in Sept 2026 and
 // broke every LLM feature for a day). Each provider lists alternates; a 404
@@ -32,6 +34,7 @@ export async function askLLM(system: string, user: string, maxTokens = 1000): Pr
   const errors: string[] = [];
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   const chain = providers();
+  const skip = await avoid();   // lanes past 80% of a learned budget or in a 429 cooldown
   const nvidiaIdx = chain.findIndex((p) => p.name === "nvidia");
   const anthropicSlot = nvidiaIdx === -1 ? chain.length : nvidiaIdx;
 
@@ -61,6 +64,7 @@ export async function askLLM(system: string, user: string, maxTokens = 1000): Pr
     const timeout = p.name === "nvidia" ? 90_000 : 45_000;
     const candidates = [picked.get(p.name) ?? p.model, ...(p.fallbacks ?? [])].filter((v, k, a) => a.indexOf(v) === k);
     for (const model of candidates) {
+      if (skip.has(`${p.name}:${model}`)) { errors.push(`${p.name}/${model} skipped (budget)`); continue; }
       try {
         const res = await fetch(`${p.base}/chat/completions`, {
           method: "POST",
@@ -74,9 +78,11 @@ export async function askLLM(system: string, user: string, maxTokens = 1000): Pr
           const data = await res.json();
           // some NIM reasoning models put their thinking in <think> tags inside content
           const text = String(data.choices?.[0]?.message?.content ?? "").replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+          await record(p.name, model, data.usage, "ok", (system.length + user.length + text.length) / 4);
           if (text) { picked.set(p.name, model); return text; }
           errors.push(`${p.name}/${model} empty`); continue;   // reasoning ate the budget — next model
         }
+        if (res.status === 429) { let j: any = {}; try { j = await res.json(); } catch {} await recordLimit(p.name, model, j?.error?.message ?? ""); }
         errors.push(`${p.name}/${model} ${res.status}`);
         if (![404, 400, 410, 429].includes(res.status)) break;   // a missing or rate-limited model → next name on the same provider
       } catch (e: any) { errors.push(`${p.name}/${model} ${e?.name ?? e}`); break; }

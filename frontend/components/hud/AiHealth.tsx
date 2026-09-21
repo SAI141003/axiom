@@ -13,6 +13,8 @@ export default function AiHealth({ compact = false }: { compact?: boolean }) {
   const load = (refresh = false) => { setBusy(true); fetch(`/api/ai/health${refresh ? "?refresh=1" : ""}`).then((r) => r.json()).then(setD).catch(() => {}).finally(() => setBusy(false)); };
   useEffect(() => { load(); const t = setInterval(() => load(), 10 * 60_000); return () => clearInterval(t); }, []);
   const models: any[] = d?.models ?? [], services: any[] = d?.services ?? [];
+  const lanes: any[] = (d?.usage?.lanes ?? []).filter((l: any) => l.day > 0 || l.skip).sort((a: any, b: any) => b.day - a.day);
+  const k = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n));
   const shown = compact ? models.filter((m) => m.status !== "no key").slice(0, 6) : models;
   const svc = compact ? services.slice(0, 3) : services;
   return (
@@ -31,6 +33,14 @@ export default function AiHealth({ compact = false }: { compact?: boolean }) {
           {!compact && <span className="truncate hidden lg:inline" style={{ color: "var(--hud-muted)" }}>{m.provider} · {m.model}</span>}
           <span className="flex-1" />
           <span className="shrink-0" style={{ color: TONE[m.status] }}>{m.status}{m.ms != null && m.status !== "no key" ? ` ${m.ms >= 1000 ? (m.ms / 1000).toFixed(1) + "s" : m.ms + "ms"}` : ""}</span>
+        </div>
+      ))}
+      {(compact ? lanes.slice(0, 3) : lanes).map((l, i) => (
+        <div key={`u${i}`} className="flex items-center gap-2 py-[3px] text-[10.5px] font-mono min-w-0" style={{ borderBottom: "1px solid var(--hud-border)" }} title={`${l.provider} ${l.model}: ${l.day} tokens in 24h${l.limits.day ? ` of ${l.limits.day}/day` : ""}${l.estimated ? ` (${l.estimated} estimated)` : ""}${l.skip ? ` — skipped: ${l.skip}` : ""}`}>
+          <span className="hud-led shrink-0" style={{ background: l.skip ? "var(--hud-amber)" : "var(--hud-accent)", color: l.skip ? "var(--hud-amber)" : "var(--hud-accent)" }} aria-hidden />
+          <span className="truncate" style={{ color: "var(--hud-text)" }}>{l.model.split("/").pop()} <span style={{ color: "var(--hud-muted)" }}>· {l.provider}</span></span>
+          <span className="flex-1" />
+          <span className="shrink-0" style={{ color: l.skip ? "var(--hud-amber)" : "var(--hud-muted)" }}>{k(l.day)} tok{l.dayPct != null ? ` · ${Math.round(l.dayPct * 100)}%` : ""}{l.skip ? ` · ${l.skip}` : ""}</span>
         </div>
       ))}
       {svc.map((s, i) => (
