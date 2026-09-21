@@ -160,7 +160,12 @@ const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
     }),
   tool("fleet_status", "Every paper account: balance, P&L, trades, win rate, today, config; fleet totals; days of forward test.", {}, async () => {
     const s = await data("engine_status.json"); const f = await data("forward_perf.json"); const e = s?.engines ?? {};
-    return text({ as_of: s?.ts, days_tracked: f?.days_tracked, accounts: Object.entries(e).map(([k, v]) => ({ name: k, account: v.account, pnl: v.pnl, trades: v.trades, win_rate: v.win_rate, today: v.today, config: v.config })) });
+    // The pause rule is computed here, not judged by the model: a book is
+    // pausable only with 30+ trades, its last three trading days all losing,
+    // and a win rate under 50%. Fresh v2 books and retired books are never pausable.
+    const verdict = (k, v) => { const d = (v.daily ?? []).slice(-3); const fresh = (v.trades ?? 0) < 30, retired = /retired/.test(k), bleeding = d.length === 3 && d.every((x) => x.pnl < 0), weak = (v.win_rate ?? 1) < 0.5, weather = /weather/.test(k);
+      return { pausable: !fresh && !retired && !weather && bleeding && weak, why: retired ? "retired, history only" : weather ? "the proven earner, never paused" : fresh ? `only ${v.trades} trades — too young to judge` : !bleeding ? `last 3 days not all losing (${d.map((x) => x.pnl).join(", ")})` : !weak ? `win rate ${v.win_rate} is not under 0.5` : `bleeding 3 days at ${v.win_rate} win rate` }; };
+    return text({ as_of: s?.ts, days_tracked: f?.days_tracked, accounts: Object.entries(e).map(([k, v]) => ({ name: k, account: v.account, pnl: v.pnl, trades: v.trades, win_rate: v.win_rate, today: v.today, last_days: (v.daily ?? []).slice(-3), config: v.config, ...verdict(k, v) })) });
   }),
   tool("backtest_results", "Walk-forward backtest, the 9-cell grid, the anti-overfit search, the strategy-variant bake-off, with verdicts.", {}, async () => {
     const [r, b, o, x, ps] = await Promise.all(["backtest_report.json", "backtest_batch.json", "optimize_report.json", "experiments_report.json", "per_symbol_report.json"].map(data));
@@ -312,7 +317,18 @@ const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
       if (action === "pause_trading" || action === "resume_trading") {
         const bots = await switches();
         const hit = bots.find((b) => b.key.toLowerCase().replace(/[^a-z0-9]/g, "").includes(key) || b.name.toLowerCase().replace(/[^a-z0-9]/g, "").includes(key));
-        if (!hit) return text(`no trading switch called '${bot}'; switches: ${bots.map((b) => b.name).join(", ")}. The daemon itself can be stopped with action=stop.`, true);
+        if (!hit) {
+          // no trading switch for this bot (flow, meme, stocks, gamma, ccxt…): pausing means stopping its service, resuming means starting it. Same audit, said plainly.
+          const norm0 = (n) => n.replace(/^com\.polymarket\.(dryrun\.)?/, "").replace(/[^a-z0-9]/g, "");
+          const names0 = list.map((l) => l.split(/\s+/).pop()).filter((n) => CONTROLLABLE.test(n));
+          const allNames = [...names0, ...(await sh("bash", ["-c", `ls ${process.env.HOME}/Library/LaunchAgents | sed 's/.plist$//'`])).split("\n").filter((n) => CONTROLLABLE.test(n))].filter((v, i, a) => a.indexOf(v) === i);
+          const svc0 = allNames.find((n) => norm0(n) === key) ?? allNames.find((n) => norm0(n).includes(key) || key.includes(norm0(n)));
+          if (!svc0) return text(`no bot called '${bot}'. Switches: ${bots.map((b) => b.name).join(", ")}; services: ${allNames.map((n) => n.replace("com.polymarket.", "")).join(", ")}`, true);
+          const plist0 = `${process.env.HOME}/Library/LaunchAgents/${svc0}.plist`;
+          const out0 = action === "pause_trading" ? ((await sh("launchctl", ["bootout", `gui/${uid}/${svc0}`])) || `stopped ${svc0}`) : ((await sh("launchctl", ["enable", `gui/${uid}/${svc0}`])), (await sh("launchctl", ["bootstrap", `gui/${uid}`, plist0])) || `started ${svc0}`);
+          await audit("fleet_control", { action, service: svc0, via: "service" }, out0.slice(0, 120));
+          return text(`${svc0.replace("com.polymarket.", "")}: ${action === "pause_trading" ? "STOPPED (this bot has no trading switch, so its service is stopped; its book and log are kept)" : "STARTED"} — ${out0}`);
+        }
         const r = await fetch(`${DESK}/api/bots`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ key: hit.key, enabled: action === "resume_trading" }) });
         const on = action === "resume_trading";
         await audit("fleet_control", { action, bot: hit.name }, r.ok ? "ok" : `HTTP ${r.status}`);
@@ -724,6 +740,11 @@ async function platformTurn(q, send) {
       catch (e) { return { id: call.id, out: "tool failed: " + String(e.message).slice(0, 200) }; }
     }));
     for (const r of results) messages.push({ role: "tool", tool_call_id: r.id, content: String(r.out).slice(0, 12_000) });
+  }
+  if (acts === 0 && /\bI\s+(stopped|paused|resumed|restarted|started|bought|sold|closed|moved|reallocated|sent|messaged)\b/i.test(answer)) {
+    // it described an act it never performed this turn: no tool call, no act. Make it say so.
+    messages.push({ role: "user", content: "Check yourself: you called no acting tool this turn (no pause, resume, stop, restart, trade, power move or message went through). Restate your answer without claiming any act; say what you would have done and that it was not done." });
+    try { const { msg: m2 } = await chat(messages, [], send); if (m2.content?.trim()) { answer = m2.content; messages.push({ role: "assistant", content: answer }); } } catch {}
   }
   if (!answer.trim()) {
     // a long tool run can end on an empty assistant turn; ask once for the words
