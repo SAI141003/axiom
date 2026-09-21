@@ -34,7 +34,10 @@ SCORE_THRESHOLD = 0.25
 MAX_SIDE_PX = 0.62
 ENTRY_AT_S = 45          # snapshot+entry this many seconds into the window
 PARAMS = Path(__file__).resolve().parent.parent / ".data" / "params_crypto.json"
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from bot_switch import bot_enabled
+from signals import jev   # typed shadow judge, only when TYPESAFE_AI_API_KEY is set
 
 
 def learned_params(asset: str) -> dict:
@@ -185,6 +188,17 @@ async def main() -> None:
                     }
                     log_write(rec)
                     pending[rec["id"]] = rec
+                    # Jev shadow judge (signals/jev.py): a typed "up in 5 min?"
+                    # probability frozen before the outcome, scored at resolve.
+                    # Only when TYPESAFE_AI_API_KEY is set; never a fake number.
+                    if jev.configured():
+                        try:
+                            jev.judge({"asset": a, "spot": sig["spot"], "momentum_bp": sig["momentum_bp"], "persist": sig["persist"], "rv_bp": sig.get("rv_bp"),
+                                       "recent_directions": dirs[a], "market_up_price": mkt["up"], "market_down_price": mkt["down"]},
+                                      {"up": {"type": "noul", "instructions": "Will `asset` close ABOVE its price at the start of this 5-minute window, given `spot`, `momentum_bp`, `persist`, `rv_bp` and `recent_directions`? The market prices UP at `market_up_price`."}},
+                                      tag=rec["id"])
+                        except Exception as exc:
+                            print(f"[crypto-daemon] jev error {rec['id']}: {exc}", flush=True)
                 except Exception as exc:
                     print(f"[crypto-daemon] entry error {a}-{win}: {exc}", flush=True)
 
@@ -212,6 +226,8 @@ async def main() -> None:
                         pnl = round(gross - STAKE * clob_fee(entry), 2)
                     log_write({"type": "resolve", "id": rid, "up_won": up_won,
                                "won": won, "pnl": pnl})
+                    if jev.configured():
+                        jev.score(rid, {"up": 1.0 if up_won else 0.0})
                     del pending[rid]
                 except Exception as exc:
                     print(f"[crypto-daemon] resolve error {rid}: {exc}", flush=True)
