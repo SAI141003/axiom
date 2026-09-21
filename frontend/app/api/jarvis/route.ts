@@ -13,7 +13,7 @@ const pct = (v: number) => `${(v * 100).toFixed(1)} percent`;
 
 // The fallback brain: answers the common questions straight from the desk's
 // data files, with no model at all. The bridge (jarvis/bridge.mjs) is the real
-// JARVIS; this keeps the page useful when it is not running.
+// AXIOM; this keeps the page useful when it is not running.
 export async function POST(request: Request) {
   let q = "";
   try { q = String((await request.json()).text ?? "").toLowerCase(); } catch { return NextResponse.json({ error: "bad json" }, { status: 400 }); }

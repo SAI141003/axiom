@@ -4,6 +4,8 @@ import { promisify } from "util";
 import path from "path";
 import { promises as fs } from "fs";
 
+export const dynamic = "force-dynamic";
+
 const execFileP = promisify(execFile);
 const ROOT = path.join(process.cwd(), "..");
 

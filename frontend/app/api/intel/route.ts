@@ -5,6 +5,8 @@ import { promises as fs } from "fs";
 import path from "path";
 import { askLLM } from "@/lib/llm";
 
+export const dynamic = "force-dynamic";
+
 const run = promisify(exec);
 const ROOT = path.join(process.cwd(), "..");
 const JOURNAL = path.join(ROOT, "logs", "journal.jsonl");

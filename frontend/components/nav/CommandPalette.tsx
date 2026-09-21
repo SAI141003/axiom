@@ -7,7 +7,7 @@ import { Search, Sparkles, CornerDownLeft } from "lucide-react";
 import { PAGES } from "./pages";
 
 // ⌘K. Type a page name to jump, or type a question and press enter to ask
-// JARVIS — the palette hands it to the dock, which opens with the answer.
+// AXIOM — the palette hands it to the dock, which opens with the answer.
 export default function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -52,8 +52,8 @@ export default function CommandPalette() {
                       transition={{ type: "spring", damping: 26, stiffness: 300 }} className="hud-glass w-full max-w-xl rounded-2xl overflow-hidden">
             <div className="flex items-center gap-3 px-4 h-14 border-b" style={{ borderColor: "var(--hud-border)" }}>
               <Search size={16} style={{ color: "var(--hud-muted)" }} aria-hidden />
-              <label htmlFor="palette-input" className="sr-only">Go to a page or ask JARVIS</label>
-              <input id="palette-input" ref={input} value={q} onChange={(e) => { setQ(e.target.value); setI(0); }} placeholder="go to a page, or ask JARVIS anything…" autoComplete="off"
+              <label htmlFor="palette-input" className="sr-only">Go to a page or ask AXIOM</label>
+              <input id="palette-input" ref={input} value={q} onChange={(e) => { setQ(e.target.value); setI(0); }} placeholder="go to a page, or ask AXIOM anything…" autoComplete="off"
                      onKeyDown={(e) => { if (e.key === "ArrowDown") { e.preventDefault(); setI((x) => Math.min(rows - 1, x + 1)); } if (e.key === "ArrowUp") { e.preventDefault(); setI((x) => Math.max(0, x - 1)); } if (e.key === "Enter") { e.preventDefault(); go(i); } }}
                      className="flex-1 bg-transparent outline-none text-[14px] prose-sans" style={{ color: "var(--hud-text)" }} />
               <kbd className="hud-kbd">esc</kbd>
@@ -76,7 +76,7 @@ export default function CommandPalette() {
                 <li role="option" aria-selected={i === hits.length} onMouseEnter={() => setI(hits.length)} onClick={() => go(hits.length)}
                     className="flex items-center gap-3 px-4 min-h-[48px] cursor-pointer border-t mt-1" style={{ background: i === hits.length ? "var(--hud-accent-soft)" : "transparent", borderColor: "var(--hud-border)" }}>
                   <Sparkles size={16} style={{ color: "var(--hud-accent)" }} aria-hidden />
-                  <span className="text-[13px] prose-sans" style={{ color: "var(--hud-text)" }}>Ask JARVIS: <em style={{ color: "var(--hud-accent-2)" }}>{q.trim()}</em></span>
+                  <span className="text-[13px] prose-sans" style={{ color: "var(--hud-text)" }}>Ask AXIOM: <em style={{ color: "var(--hud-accent-2)" }}>{q.trim()}</em></span>
                   <span className="flex-1" />
                   <CornerDownLeft size={14} style={{ color: "var(--hud-muted)" }} aria-hidden />
                 </li>
@@ -84,7 +84,7 @@ export default function CommandPalette() {
               {!hits.length && !askable && <li className="px-4 py-6 text-[12px] text-center prose-sans" style={{ color: "var(--hud-muted)" }}>nothing matches</li>}
             </ul>
             <div className="flex items-center gap-4 px-4 h-9 border-t text-[10px] font-mono" style={{ borderColor: "var(--hud-border)", color: "var(--hud-muted)" }}>
-              <span><kbd className="hud-kbd">↑↓</kbd> move</span><span><kbd className="hud-kbd">↵</kbd> open</span><span><kbd className="hud-kbd">⌘J</kbd> JARVIS</span>
+              <span><kbd className="hud-kbd">↑↓</kbd> move</span><span><kbd className="hud-kbd">↵</kbd> open</span><span><kbd className="hud-kbd">⌘J</kbd> AXIOM</span>
             </div>
           </motion.div>
         </motion.div>

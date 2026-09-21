@@ -148,7 +148,7 @@ export default function FaceCore({
       // background head glow (behind everything)
       const bc = T(BRAIN_CX, BRAIN_CY);
       const halo = ctx.createRadialGradient(bc.sx, bc.sy, 4, bc.sx, bc.sy, S * 0.9);
-      halo.addColorStop(0, `rgba(56,189,248,${0.16 * breathe + act * 0.06})`);
+      halo.addColorStop(0, `rgba(76,201,255,${0.16 * breathe + act * 0.06})`);
       halo.addColorStop(0.5, `rgba(37,99,235,${0.05})`);
       halo.addColorStop(1, "rgba(37,99,235,0)");
       ctx.fillStyle = halo; ctx.fillRect(0, 0, size, size);
@@ -225,8 +225,8 @@ export default function FaceCore({
       // ── brain bloom ──
       const bloom = ctx.createRadialGradient(bc.sx, bc.sy, 2, bc.sx, bc.sy, S * 0.42);
       bloom.addColorStop(0, `rgba(200,240,255,${0.28 * breathe})`);
-      bloom.addColorStop(0.5, `rgba(56,189,248,${0.10})`);
-      bloom.addColorStop(1, "rgba(56,189,248,0)");
+      bloom.addColorStop(0.5, `rgba(76,201,255,${0.10})`);
+      bloom.addColorStop(1, "rgba(76,201,255,0)");
       ctx.fillStyle = bloom; ctx.beginPath(); ctx.arc(bc.sx, bc.sy, S * 0.42, 0, 7); ctx.fill();
 
       // ── gaze + blink ──
@@ -270,8 +270,8 @@ export default function FaceCore({
         const ix = ep.sx + gaze.x * ew * 0.5, iy = ep.sy + gaze.y * eh * 0.6;
         const ir = ctx.createRadialGradient(ix, iy, 0, ix, iy, ew * 0.6);
         ir.addColorStop(0, "rgba(255,255,255,0.95)");
-        ir.addColorStop(0.4, "rgba(56,189,248,0.9)");
-        ir.addColorStop(1, "rgba(56,189,248,0)");
+        ir.addColorStop(0.4, "rgba(76,201,255,0.9)");
+        ir.addColorStop(1, "rgba(76,201,255,0)");
         ctx.fillStyle = ir; ctx.beginPath(); ctx.arc(ix, iy, ew * 0.6, 0, 7); ctx.fill();
         ctx.fillStyle = "rgba(6,12,24,0.95)"; ctx.beginPath(); ctx.arc(ix, iy, ew * 0.2, 0, 7); ctx.fill();
       }

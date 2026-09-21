@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { askLLM } from "@/lib/llm";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(request: Request) {
   let body: { stats?: Record<string, unknown>; signals?: unknown[] };
   try {

@@ -1,4 +1,4 @@
-# JARVIS memory — standing notes
+# AXIOM memory — standing notes
 
 - 2026-09-19: The owner's name and city go here. Answers are spoken; keep them short and lead with what changed.
 - 2026-09-19: Every bot is a $100 paper account. Live trading stays off; never enable it.

@@ -4,6 +4,8 @@ import path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
 
+export const dynamic = "force-dynamic";
+
 const execFileP = promisify(execFile);
 const ENV = path.join(process.cwd(), "..", ".env");
 

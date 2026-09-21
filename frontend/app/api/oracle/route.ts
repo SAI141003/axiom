@@ -5,6 +5,8 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import { askLLM } from "../../../lib/llm";
 
+export const dynamic = "force-dynamic";
+
 const execFileP = promisify(execFile);
 
 /**

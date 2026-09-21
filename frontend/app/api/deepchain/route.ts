@@ -3,6 +3,8 @@ import { promises as fs } from "fs";
 import path from "path";
 import { askLLM } from "@/lib/llm";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Deep Chain Research — quant-grade supply-chain intelligence for ANY ticker.
  *

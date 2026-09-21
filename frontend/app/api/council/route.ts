@@ -3,6 +3,8 @@ import { promises as fs } from "fs";
 import path from "path";
 import { askLLM } from "../../../lib/llm";
 
+export const dynamic = "force-dynamic";
+
 const ROOT = path.join(process.cwd(), "..");
 
 // OUTSIDE VIEW (Tetlock): anchor the aggregate on the reference-class base rate,

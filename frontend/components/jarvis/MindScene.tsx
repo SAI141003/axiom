@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import TopNav from "@/components/TopNav";
 import BrainCore, { type DataMote } from "@/components/BrainCore";
 
 /**
@@ -22,7 +21,7 @@ interface Agent { id: string; label: string; group: string; alive: boolean }
 const LEFT_POS = [{ top: "12%" }, { top: "42%" }, { top: "72%" }];
 const RIGHT_POS = [{ top: "12%" }, { top: "42%" }, { top: "72%" }];
 
-export default function BrainPage() {
+export default function MindScene({ compact = false }: { compact?: boolean }) {
   const [feeds, setFeeds] = useState<Feed[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [events, setEvents] = useState<any[]>([]);
@@ -128,7 +127,6 @@ export default function BrainPage() {
 
   return (
     <div className="hud-bg overflow-hidden">
-      <TopNav />
 
       {/* ═══ THE STAGE — full viewport ═══ */}
       <div className="relative w-full" style={{ height: stage.h }}>
@@ -143,16 +141,16 @@ export default function BrainPage() {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1 }}
                     className="absolute top-3 left-1/2 -translate-x-1/2 text-center pointer-events-none"
                     style={{ zIndex: 4 }}>
-          <h1 className="text-lg font-bold tracking-[0.5em] glow-cyan font-mono">THE BRAIN</h1>
+          <h2 className="text-lg font-bold tracking-[0.5em] glow-cyan font-mono">AXIOM · THE MIND</h2>
           <div className="text-[10px] font-mono" style={{ color: "var(--hud-muted)" }}>
             perception → attribution → memory → bounded action
           </div>
         </motion.div>
 
-        {/* live AGENT CENSUS — top-right corner */}
+        {/* live AGENT CENSUS — top-left corner (the conversation panel owns the right) */}
         <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.3 }}
                     className="hud-panel hud-panel-static px-3 py-2 font-mono backdrop-blur-sm"
-                    style={{ position: "absolute", top: 12, right: 16, zIndex: 5, background: "rgba(18,21,28,0.8)" }}>
+                    style={{ position: "absolute", top: 12, left: 16, zIndex: 5, background: "rgba(18,21,28,0.8)" }}>
           <div className="flex items-center gap-2">
             <span className="inline-block w-2 h-2 rounded-full" style={{
               background: census && census.running === census.total ? "var(--hud-green)" : "var(--hud-amber)",

@@ -24,7 +24,7 @@ interface BrainEvent {
 }
 
 const COLOR: Record<string, string> = {
-  data: "#5fb8c9", signal: "#38bdf8", execution: "#3ecf8e",
+  data: "#5fb8c9", signal: "#4cc9ff", execution: "#3ecf8e",
   risk: "#f47174", strategy: "#e2b158", core: "#e8ecf4",
   win: "#3ecf8e", loss: "#f47174", suggest: "#e2b158",
 };

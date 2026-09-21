@@ -58,13 +58,13 @@ export default function ConnectomePage() {
                 const a = layout.pos[e.from], b = layout.pos[e.to]; if (!a || !b) return null;
                 const hot = pick ? (e.from === pick.id || e.to === pick.id) : false;
                 const mx = (a[0] + b[0]) / 2;
-                return <path key={i} d={`M${a[0]},${a[1]} C${mx},${a[1]} ${mx},${b[1]} ${b[0]},${b[1]}`} fill="none" stroke={hot ? "#7dd3fc" : e.lit ? "#f5b942" : "#1e2f48"} strokeWidth={hot ? 1.6 : e.lit ? 1.1 : 0.6} opacity={pick && !hot ? 0.25 : e.lit ? 0.9 : 0.7} />;
+                return <path key={i} d={`M${a[0]},${a[1]} C${mx},${a[1]} ${mx},${b[1]} ${b[0]},${b[1]}`} fill="none" stroke={hot ? "#9be1ff" : e.lit ? "#f5b942" : "#1e2f48"} strokeWidth={hot ? 1.6 : e.lit ? 1.1 : 0.6} opacity={pick && !hot ? 0.25 : e.lit ? 0.9 : 0.7} />;
               })}
               {layout && nodes.filter(visible).map((n) => {
                 const p = layout.pos[n.id]; if (!p) return null;
                 const isPick = pick?.id === n.id, near = neigh.has(n.id);
                 const r = n.layer === "book" ? 7 : n.layer === "mind" ? 9 : n.layer === "sensor" ? 5 : 3.5;
-                const fill = n.layer === "book" ? (n.pnl > 0 ? "#22c55e" : n.pnl < 0 ? "#ef4444" : "#93a0b8") : n.lit ? "#f5b942" : n.layer === "sensor" ? "#38bdf8" : "#2c3a4f";
+                const fill = n.layer === "book" ? (n.pnl > 0 ? "#22c55e" : n.pnl < 0 ? "#ef4444" : "#93a0b8") : n.lit ? "#f5b942" : n.layer === "sensor" ? "#4cc9ff" : "#2c3a4f";
                 return (
                   <g key={n.id} transform={`translate(${p[0]},${p[1]})`} onClick={() => setPick(isPick ? null : n)} style={{ cursor: "pointer" }} opacity={pick && !isPick && !near ? 0.3 : 1}>
                     <circle r={r + (isPick ? 3 : 0)} fill={fill} stroke={isPick ? "#ffffff" : "#05070c"} strokeWidth={isPick ? 1.5 : 0.8} style={n.lit || isPick ? { filter: `drop-shadow(0 0 4px ${fill})` } : undefined} />
@@ -84,7 +84,7 @@ export default function ConnectomePage() {
                 {pick.layer === "book" && pick.account != null && <div className="text-[12px] tabular-nums" style={{ color: "var(--hud-text)" }}>book {usd(pick.account)} · P&L <b style={{ color: pick.pnl >= 0 ? "var(--hud-green)" : "var(--hud-red)" }}>{pick.pnl >= 0 ? "+" : ""}{usd(pick.pnl)}</b>{pick.win_rate != null ? ` · win ${(pick.win_rate * 100).toFixed(0)}%` : ""}{pick.events_24h != null ? ` · ${pick.events_24h} events today` : ""}</div>}
                 <div className="text-[10px] tracking-widest mt-1" style={{ color: "var(--hud-muted)" }}>WIRED TO · {neigh.size}</div>
                 <ul className="flex flex-col gap-1 max-h-[40vh] overflow-y-auto">{[...neigh].map((id) => { const n = nodes.find((x) => x.id === id); return n ? <li key={id} className="text-[11px] cursor-pointer hover:underline" style={{ color: n.lit ? "var(--hud-gold)" : "var(--hud-text)" }} onClick={() => setPick(n)}>{n.label} <span style={{ color: "var(--hud-muted)" }}>· {LAYER_LABEL[n.layer]?.toLowerCase()}</span></li> : null; })}</ul>
-                <button onClick={() => window.dispatchEvent(new CustomEvent("axiom:jarvis-ask", { detail: `On the connectome I picked "${pick.label}" (${pick.id}). What does it do, what feeds it, and is it earning its keep? Three sentences.` }))} className="hud-btn hud-btn-accent self-start mt-1"><Sparkles size={12} aria-hidden /> Ask JARVIS</button>
+                <button onClick={() => window.dispatchEvent(new CustomEvent("axiom:jarvis-ask", { detail: `On the connectome I picked "${pick.label}" (${pick.id}). What does it do, what feeds it, and is it earning its keep? Three sentences.` }))} className="hud-btn hud-btn-accent self-start mt-1"><Sparkles size={12} aria-hidden /> Ask AXIOM</button>
               </>
             )}
           </aside>

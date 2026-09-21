@@ -4,6 +4,8 @@ import { promisify } from "util";
 import path from "path";
 import { askLLM } from "../../../lib/llm";
 
+export const dynamic = "force-dynamic";
+
 const execFileP = promisify(execFile);
 const ROOT = path.join(process.cwd(), "..");
 

@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ChevronDown, Command, Sparkles } from "lucide-react";
 import { GROUPS, pageFor } from "./nav/pages";
+import Rail from "./os/Rail";
 
 // Four groups, each a menu. The bar never overflows: at any width it is the
 // wordmark, four labels, the palette shortcut and the mode chip. The current
@@ -28,6 +29,8 @@ export default function TopNav() {
   useEffect(() => { setOpenGroup(null); }, [pathname]);
 
   return (
+    <>
+    <Rail />
     <nav ref={bar} aria-label="Primary" className="sticky top-0 z-50 hud-glass-bar flex items-center gap-2 px-4 h-14">
       <Link href="/" className="flex items-center gap-2 mr-2 shrink-0 rounded-md focus-visible:ring-2" style={{ ["--tw-ring-color" as any]: "var(--hud-accent)" }} aria-label="AXIOM home">
         <svg viewBox="0 0 64 64" className="w-[22px] h-[22px]" aria-hidden="true">
@@ -38,7 +41,11 @@ export default function TopNav() {
         <span className="hud-gradient-text text-[14px] font-extrabold tracking-[0.22em] font-mono">AXIOM</span>
       </Link>
 
-      <div className="flex items-center gap-1 min-w-0">
+      {/* breadcrumb on md+ (the rail holds the menus); the menus themselves below md */}
+      <div className="hidden md:flex items-center gap-2 min-w-0 text-[11px] font-mono" style={{ color: "var(--hud-muted)" }}>
+        {current && <><span className="tracking-[0.14em] uppercase">{GROUPS.find((g) => g.pages.some((p) => p.href === current.href))?.label}</span><span>·</span><span className="prose-sans text-[12px] font-medium" style={{ color: "var(--hud-text)" }}>{current.label}</span><span className="prose-sans text-[11px] truncate hidden lg:inline">— {current.hint}</span></>}
+      </div>
+      <div className="flex md:hidden items-center gap-1 min-w-0">
         {GROUPS.map((g) => {
           const here = g.pages.some((p) => p.href === current?.href);
           const open = openGroup === g.label;
@@ -85,12 +92,13 @@ export default function TopNav() {
         <Command size={13} aria-hidden /><span className="font-mono text-[11px]">K</span>
         <span className="prose-sans text-[11px]" style={{ color: "var(--hud-muted)" }}>jump or ask</span>
       </button>
-      {pathname !== "/jarvis" && (
-        <button onClick={() => window.dispatchEvent(new Event("axiom:jarvis-open"))} className="hud-navbtn" aria-label="open JARVIS">
-          <Sparkles size={13} aria-hidden style={{ color: "var(--hud-accent)" }} /><span className="font-mono text-[11px] tracking-widest">JARVIS</span>
+      {pathname !== "/mind" && (
+        <button onClick={() => window.dispatchEvent(new Event("axiom:jarvis-open"))} className="hud-navbtn" aria-label="open AXIOM">
+          <Sparkles size={13} aria-hidden style={{ color: "var(--hud-accent)" }} /><span className="font-mono text-[11px] tracking-widest">AXIOM</span>
         </button>
       )}
       <span className="hud-chip ml-1" style={{ color: "var(--hud-amber)" }}>Dry-run</span>
     </nav>
+    </>
   );
 }

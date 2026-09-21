@@ -46,7 +46,7 @@ export default function LiveSummary() {
         <span>{d ? `${d.headlines} headlines · ${d.brain === "llm" ? "condensed by the desk's LLM" : "top headline per category"}` : ""}</span>
         <span>{d ? ago(d.generated) : ""}</span>
       </div>
-      <button onClick={() => window.dispatchEvent(new CustomEvent("axiom:jarvis-ask", { detail: "Given the live world summary on the news desk, what should I watch on our positions today? Three sentences." }))} className="hud-btn hud-btn-accent self-start"><Sparkles size={12} aria-hidden /> Ask JARVIS what it means</button>
+      <button onClick={() => window.dispatchEvent(new CustomEvent("axiom:jarvis-ask", { detail: "Given the live world summary on the news desk, what should I watch on our positions today? Three sentences." }))} className="hud-btn hud-btn-accent self-start"><Sparkles size={12} aria-hidden /> Ask AXIOM what it means</button>
     </aside>
   );
 }

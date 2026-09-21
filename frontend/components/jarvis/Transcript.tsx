@@ -9,7 +9,7 @@ export function Transcript({ msgs, state, suggestions, onPick, className = "" }:
   const reduced = useReducedMotion();
   useEffect(() => { bottom.current?.scrollIntoView({ behavior: reduced ? "auto" : "smooth" }); }, [msgs, state, reduced]);
   return (
-    <div className={`flex flex-col gap-3 overflow-y-auto min-w-0 ${className}`} role="log" aria-live="polite" aria-label="JARVIS transcript">
+    <div className={`flex flex-col gap-3 overflow-y-auto min-w-0 ${className}`} role="log" aria-live="polite" aria-label="AXIOM transcript">
       {msgs.length === 0 && suggestions && (
         <div className="flex flex-wrap gap-2">
           {suggestions.map((s) => (
@@ -21,10 +21,10 @@ export function Transcript({ msgs, state, suggestions, onPick, className = "" }:
         <motion.div key={i} initial={reduced ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }}
                     className={`max-w-[92%] ${m.role === "you" ? "self-end" : "self-start"}`}>
           <div className="text-[9px] tracking-widest mb-1 font-mono" style={{ color: m.role === "you" ? "var(--hud-muted)" : "var(--hud-accent)" }}>
-            {m.role === "you" ? "YOU" : "JARVIS"}{m.brain === "local" ? " · LOCAL" : ""}{m.tools?.length ? ` · ${m.tools.join(" → ")}` : ""}
+            {m.role === "you" ? "YOU" : "AXIOM"}{m.brain === "local" ? " · LOCAL" : ""}{m.tools?.length ? ` · ${m.tools.join(" → ")}` : ""}
           </div>
           <div className="prose-sans text-[13px] leading-relaxed break-words whitespace-pre-wrap rounded-xl px-3.5 py-2.5"
-               style={{ background: m.role === "you" ? "var(--hud-accent-soft)" : "rgba(255,255,255,0.035)", color: "var(--hud-text)", border: "1px solid " + (m.role === "you" ? "rgba(56,189,248,0.22)" : "var(--hud-border)") }}>
+               style={{ background: m.role === "you" ? "var(--hud-accent-soft)" : "rgba(255,255,255,0.035)", color: "var(--hud-text)", border: "1px solid " + (m.role === "you" ? "rgba(76,201,255,0.22)" : "var(--hud-border)") }}>
             {m.text || (state === "thinking" ? <span className="inline-flex gap-1" aria-label="thinking"><Dot /><Dot d={0.15} /><Dot d={0.3} /></span> : "")}
           </div>
         </motion.div>

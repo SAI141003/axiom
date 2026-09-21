@@ -8,18 +8,25 @@ export type JarvisState = "idle" | "listening" | "thinking" | "speaking";
 export type BridgeState = "connecting" | "online" | "offline";
 
 const BRIDGE = "ws://127.0.0.1:8788";
-export const WAKE = /\b(hey|ok|okay)\s+jarvis\b/i;
-export const BRIEF = "Good morning, Jarvis. Give me the status briefing.";
+export const WAKE = /\b(hey|ok|okay)\s+axiom\b/i;
+export const BRIEF = "Good morning, Axiom. Give me the status briefing.";
 
-// One JARVIS for the whole desk. The page at /jarvis and the dock on every
+// One AXIOM for the whole desk. The page at /jarvis and the dock on every
 // other page share this hook, so a conversation started in one continues in
 // the other (the bridge holds the thread; this hook holds the transcript).
-export function useJarvis(opts: { voice?: boolean; context?: () => string } = {}) {
+const WAKE_KEY = "axiom.wake";
+export const wakeArmed = () => { try { return localStorage.getItem(WAKE_KEY) !== "off"; } catch { return true; } };
+
+// The wake word is on by default and stays on: AXIOM listens on every page
+// ("hey Axiom" alone gives the briefing). Browsers only let a page speak
+// after the first click or key, so the first spoken reply waits for that.
+export function useJarvis(opts: { voice?: boolean; context?: () => string; listen?: boolean } = {}) {
   const [state, setState] = useState<JarvisState>("idle");
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [bridge, setBridge] = useState<BridgeState>("connecting");
   const [micOk, setMicOk] = useState<boolean | null>(null);
   const [brainName, setBrainName] = useState<string>("");
+  const [wakeOn, setWakeOn] = useState<boolean>(false);
   const voiceRef = useRef(opts.voice ?? true);
   voiceRef.current = opts.voice ?? true;
   const ctxRef = useRef(opts.context);
@@ -29,6 +36,8 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string } = {}
   const wakeRef = useRef(false);
   const router = useRouter();
   const routerRef = useRef(router); routerRef.current = router;
+
+  useEffect(() => { try { window.dispatchEvent(new CustomEvent("axiom:jarvis-state", { detail: state })); } catch {} }, [state]);
 
   const patchLast = useCallback((fn: (m: Msg) => void) => {
     setMsgs((p) => { const n = [...p]; const last = n[n.length - 1]; if (last?.role === "jarvis") fn(last); return n; });
@@ -107,7 +116,23 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string } = {}
   }, [ask]);
 
   const stopListening = useCallback(() => { rec.current?.stop(); }, []);
-  const setWake = useCallback((on: boolean) => { wakeRef.current = on; if (on) listen(true); else { rec.current?.stop(); rec.current = null; } }, [listen]);
+  const setWake = useCallback((on: boolean) => { wakeRef.current = on; setWakeOn(on); try { localStorage.setItem(WAKE_KEY, on ? "on" : "off"); } catch {} if (on) listen(true); else { rec.current?.stop(); rec.current = null; } }, [listen]);
 
-  return { state, msgs, bridge, brainName, micOk, ask, forget, listen, stopListening, setWake, brief: () => ask(BRIEF) };
+  // Always on: arm the wake word on mount when this instance owns the mic.
+  useEffect(() => {
+    if (opts.listen === false) return;
+    if (!wakeArmed()) return;
+    const t = setTimeout(() => { wakeRef.current = true; setWakeOn(true); listen(true); }, 800);
+    return () => { clearTimeout(t); rec.current?.stop(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opts.listen]);
+
+  // Unlock speech on the first gesture so the next reply is heard.
+  useEffect(() => {
+    const prime = () => { try { speechSynthesis.resume(); const u = new SpeechSynthesisUtterance(""); u.volume = 0; speechSynthesis.speak(u); } catch {} window.removeEventListener("pointerdown", prime); window.removeEventListener("keydown", prime); };
+    window.addEventListener("pointerdown", prime); window.addEventListener("keydown", prime);
+    return () => { window.removeEventListener("pointerdown", prime); window.removeEventListener("keydown", prime); };
+  }, []);
+
+  return { state, msgs, bridge, brainName, micOk, wakeOn, ask, forget, listen, stopListening, setWake, brief: () => ask(BRIEF) };
 }

@@ -7,13 +7,13 @@ import {
 
 // One palette for every chart on the desk. Indigo is the brand; the rest are
 // chosen to stay distinguishable on the dark ground and to a colour-blind eye.
-export const PALETTE = ["#38bdf8", "#f5b942", "#22c55e", "#ef4444", "#c084fc", "#7dd3fc", "#a3e635", "#fb923c"];
+export const PALETTE = ["#4cc9ff", "#f5b942", "#22c55e", "#ef4444", "#c084fc", "#9be1ff", "#a3e635", "#fb923c"];
 export const GREEN = "#22c55e";
 export const RED = "#ef4444";
 
 const tip = {
   contentStyle: { background: "#0e131d", border: "1px solid #2c3a4f", borderRadius: 6, fontSize: 11, fontFamily: "inherit" },
-  labelStyle: { color: "#7dd3fc" },
+  labelStyle: { color: "#9be1ff" },
   itemStyle: { color: "#eef2f8" },
 };
 const axis = { stroke: "#7d8aa3", fontSize: 10, fontFamily: "inherit" };
