@@ -14,6 +14,7 @@
  *
  *   cd jarvis && npm install && npm start        →  ws://127.0.0.1:8788
  */
+import { record as recordUsage, recordLimit, avoid as avoidLanes, ledger as usageLedger, focus as powerFocus, setFocus as setPowerFocus, orderLanes, FOCI } from "./usage.mjs";
 import { WebSocketServer } from "ws";
 import { query, createSdkMcpServer, tool as sdkTool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
@@ -247,11 +248,15 @@ const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
           headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
           body: JSON.stringify({ model, messages: [{ role: "system", content: "You are a careful quantitative-finance reviewer. Be concrete and brief. Do not invent numbers." }, { role: "user", content: question }] }) });
         const j = await r.json();
-        if (!r.ok) return text(`second brain error (${model}): ${JSON.stringify(j.error ?? j).slice(0, 300)}`, true);
+        if (!r.ok) { if (r.status === 429) await recordLimit(deep.name ?? "nvidia", model, j.error?.message ?? ""); return text(`second brain error (${model}): ${JSON.stringify(j.error ?? j).slice(0, 300)}`, true); }
+        await recordUsage(deep.name ?? "nvidia", model, j.usage, "ok", question.length / 4);
         return text({ model, answer: j.choices?.[0]?.message?.content ?? "" });
       } catch (e) { return text(`second brain unreachable: ${String(e.message).slice(0, 120)}`, true); } }),
   tool("update_desk_state", "Rewrite jarvis/desk_state.md: a DENSE, compact symbolic state of the desk — the facts you would otherwise re-derive every time. One line per item: bot → book, P&L, win rate, status; open problems; standing decisions; what last night's study found; pending proposals. Under 60 lines. Do this at the end of every briefing and every study, and whenever a fact changes. Replace the whole file; do not append.",
     { state: z.string().min(20).max(8000) }, async ({ state }) => { await writeFile(DESK_STATE, `# Desk state — ${new Date().toISOString()}\n\n${state}\n`); return text("desk state updated"); }),
+  tool("set_power", "Reallocate the desk's AI power. focus=axiom reserves the fast free lane (Groq) for you and moves the dashboard to NIM; research sends your long unattended work to NIM's big context and leaves Groq to the screens; dashboard gives the screens the fast lane; swarm keeps NIM clear for the 72 MiroFish personas; balanced is the default. Takes effect on the next call, everywhere. Use when Sai says 'reallocate', 'all power to', 'divert', 'focus on'.",
+    { focus: z.enum(["balanced", "axiom", "research", "dashboard", "swarm"]), why: z.string().max(120).optional() }, async ({ focus, why }) => text(await setPowerFocus(focus, why ?? ""))),
+  tool("power_status", "Where the AI power is allocated right now and what each lane has spent: tokens today per provider/model, learned limits, cooldowns, lanes being skipped.", {}, async () => text({ power: await powerFocus(), ...(await usageLedger()) })),
   tool("health_check", "Probe every external feed and service the desk depends on, right now: exchange data, Polymarket, weather, meme feeds, news, research APIs, the bridge's own services. Returns ok/degraded/down per item with latency and a one-line reason. Run this in the morning brief when asked 'is everything working', and in the weekly freshness study.", {}, async () => {
     const probes = [
       ["Kraken OHLCV (CCXT)", "https://api.kraken.com/0/public/OHLC?pair=XBTUSD&interval=1440", (t) => t.includes('"error":[]')],
@@ -287,14 +292,28 @@ const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
   tool("run_backtest", "Re-run the walk-forward backtest on live candles (~30s). Only when explicitly asked.", {}, async () => { await sh(PY, ["-m", "backtest.octobot_engine"], 180_000); const r = await data("backtest_report.json"); return text({ symbol: r?.symbol, metrics: r?.metrics, as_of: r?.ts }); }),
   tool("run_tests", "Run the unit tests and a 1-round safety simulation.", {}, async () =>
     text({ pytest: (await sh(PY, ["-m", "pytest", "tests/", "-q"], 240_000)).split("\n").slice(-3).join("\n"), scenario: (await sh(PY, ["execution/scenario_sim.py", "1"], 120_000)).split("\n").filter((l) => /PERFECT|FAIL|✗/.test(l)).join("\n") })),
-  tool("fleet_control", "List the paper bots, or start / stop / restart one, or read its log. Only paper bots are controllable — not the dashboard, not the live executor. Act only when the user told you to, and say what you did.",
-    { action: z.enum(["list", "start", "stop", "restart", "log"]), service: z.string().regex(/^[a-z0-9.]{0,40}$/).optional() },
-    async ({ action, service }) => {
+  // Plain names → the things Sai actually says. "crypto" is both a launchd
+  // service (dryrun.crypto) and a trading switch (BOT_CRYPTO_ENABLED).
+  tool("fleet_control", "Do what Sai says to a paper bot, by its plain name (crypto, weather, options, oracle-lag, kronos, premarket, vwap, newslag, memebot, flowbot, stocksbot, gammapulse, ccxtbot, botos, autotuner, mirofish, worldmonitor...). Actions: pause_trading / resume_trading flip the bot's trading switch (it keeps logging, places no trades) — use these for 'stop trading X'; stop / start / restart control the service itself; log reads its tail; list shows everything. Only paper bots — never the dashboard or the live executor. Act ONLY on the bot Sai named, once; if it is not found, say so and stop — never touch a different bot to compensate, and never claim something is stopped unless this tool said so.",
+    { action: z.enum(["list", "pause_trading", "resume_trading", "start", "stop", "restart", "log"]), bot: z.string().max(40).optional() },
+    async ({ action, bot }) => {
       const uid = (await sh("id", ["-u"])).trim();
-      if (action === "list") return text((await sh("launchctl", ["list"])).split("\n").filter((l) => l.includes("com.polymarket")).join("\n"));
-      if (!service) return text("service required", true);
-      const svc = service.startsWith("com.polymarket.") ? service : `com.polymarket.${service}`;
-      if (!CONTROLLABLE.test(svc)) return text(`${svc} is not a paper bot; a human must handle it`, true);
+      const list = (await sh("launchctl", ["list"])).split("\n").filter((l) => l.includes("com.polymarket"));
+      const switches = async () => { try { return JSON.parse(await deskGet("/api/bots")).bots ?? []; } catch { return []; } };
+      if (action === "list") return text({ services: list.join("\n"), switches: await switches() });
+      if (!bot) return text("which bot?", true);
+      const key = bot.toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (action === "pause_trading" || action === "resume_trading") {
+        const bots = await switches();
+        const hit = bots.find((b) => b.key.toLowerCase().replace(/[^a-z0-9]/g, "").includes(key) || b.name.toLowerCase().replace(/[^a-z0-9]/g, "").includes(key));
+        if (!hit) return text(`no trading switch called '${bot}'; switches: ${bots.map((b) => b.name).join(", ")}. The daemon itself can be stopped with action=stop.`, true);
+        const r = await fetch(`${DESK}/api/bots`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ key: hit.key, enabled: action === "resume_trading" }) });
+        const on = action === "resume_trading";
+        return text(r.ok ? `${hit.name}: trading ${on ? "RESUMED" : "PAUSED"} (${hit.key}=${on}); ${on ? "it places trades again from the next cycle (≤5 min)." : "the daemon keeps running and logging, it just places no trades from the next cycle (≤5 min)."}` : `switch failed: HTTP ${r.status}`, !r.ok);
+      }
+      const names = list.map((l) => l.split(/\s+/).pop()).filter((n) => CONTROLLABLE.test(n));
+      const svc = names.find((n) => n.replace(/^com\.polymarket\.(dryrun\.)?/, "").replace(/[^a-z0-9]/g, "") === key) ?? names.find((n) => n.replace(/[^a-z0-9]/g, "").includes(key));
+      if (!svc) return text(`no paper-bot service matches '${bot}'; services: ${names.map((n) => n.replace("com.polymarket.", "")).join(", ")}`, true);
       if (action === "log") return text((await sh("bash", ["-c", `tail -40 logs/${svc.replace("com.polymarket.", "").replace("dryrun.", "")}*.log 2>/dev/null`])) || "no log");
       const plist = `${process.env.HOME}/Library/LaunchAgents/${svc}.plist`;
       if (action === "stop") return text((await sh("launchctl", ["bootout", `gui/${uid}/${svc}`])) || `stopped ${svc}`);
@@ -438,28 +457,37 @@ async function chat(messages, tools, send, force) {
   // burning a minute failing through the fast lanes first.
   const approxTokens = (JSON.stringify(messages).length + JSON.stringify(tools).length) / 4;
   const lanes = (await providers()).filter((p) => approxTokens < 6000 || !["groq", "cerebras"].includes(p.name));
-  for (const p of lanes) {
+  // Resource reallocation: lanes past 80% of a learned budget or inside a 429
+  // cooldown are skipped up front, so the turn moves on before the lane dies.
+  const skip = await avoidLanes();
+  const { focus: f } = await powerFocus();
+  for (const p of orderLanes("bridge", lanes, f)) {
     const order = p.name === "groq" ? [...p.models.slice(groqTurn++ % p.models.length), ...p.models.slice(0, groqTurn % p.models.length)] : [picked.get(p.name), ...p.models];
     for (const model of order.filter((v, i, a) => v && a.indexOf(v) === i)) {
+      if (skip.has(`${p.name}:${model}`)) { errs.push(`${p.name}/${model} skipped (budget)`); continue; }
       try {
         const r = await fetch(`${p.base}/chat/completions`, { method: "POST", signal: AbortSignal.timeout(p.name === "nvidia" ? 120_000 : 60_000),
           headers: { "content-type": "application/json", authorization: `Bearer ${p.key}` },
           body: JSON.stringify({ model, messages, tools, tool_choice: force ? { type: "function", function: { name: force } } : "auto", max_tokens: 900, temperature: 0.3, stream: true,
+            ...(["groq", "openai", "cerebras"].includes(p.name) ? { stream_options: { include_usage: true } } : {}),
             // reasoning models: think briefly and keep the thinking out of the spoken answer
             ...(model.includes("gpt-oss") ? { reasoning_effort: "low", ...(p.name === "groq" ? { reasoning_format: "hidden" } : {}) } : {}),
             // nemotron otherwise streams its thinking as reasoning_content and can end a turn with no answer text at all
             ...(model.includes("nemotron") ? { chat_template_kwargs: { enable_thinking: false } } : {}) }) });
-        if (!r.ok) { let j = {}; try { j = await r.json(); } catch {} const e = `${p.name}/${model} ${r.status} ${JSON.stringify(j.error ?? "").slice(0, 160)}`; errs.push(e); console.error("[brain] fallback:", e); if (![400, 404, 410, 429, 503].includes(r.status)) break; continue; }
+        if (!r.ok) { let j = {}; try { j = await r.json(); } catch {} const e = `${p.name}/${model} ${r.status} ${JSON.stringify(j.error ?? "").slice(0, 160)}`; errs.push(e); console.error("[brain] fallback:", e);
+          if (r.status === 429) await recordLimit(p.name, model, j.error?.message ?? JSON.stringify(j)); else await recordUsage(p.name, model, null, `http ${r.status}`, 0);
+          if (![400, 404, 410, 429, 503].includes(r.status)) break; continue; }
         // stream: text deltas go to the browser as they arrive; tool calls are assembled
-        const msg = { role: "assistant", content: "", tool_calls: [] }; const calls = new Map(); let buf = "";
+        const msg = { role: "assistant", content: "", tool_calls: [] }; const calls = new Map(); let buf = ""; let usage = null;
         const reader = r.body.getReader(); const dec = new TextDecoder();
         while (true) { const { value, done } = await reader.read(); if (done) break; buf += dec.decode(value, { stream: true });
           let i; while ((i = buf.indexOf("\n")) >= 0) { const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1); if (!line.startsWith("data:")) continue; const data = line.slice(5).trim(); if (data === "[DONE]") continue;
-            let ev; try { ev = JSON.parse(data); } catch { continue; } const d = ev.choices?.[0]?.delta; if (!d) continue;
+            let ev; try { ev = JSON.parse(data); } catch { continue; } if (ev.usage) usage = ev.usage; const d = ev.choices?.[0]?.delta; if (!d) continue;
             if (d.content) { msg.content += d.content; send?.({ type: "delta", text: d.content }); }
             for (const tc of d.tool_calls ?? []) { const c = calls.get(tc.index) ?? { id: tc.id, type: "function", function: { name: "", arguments: "" } }; if (tc.id) c.id = tc.id; if (tc.function?.name) c.function.name += tc.function.name; if (tc.function?.arguments) c.function.arguments += tc.function.arguments; calls.set(tc.index, c); } } }
         for (const line of buf.split("\n")) { const l = line.trim(); if (!l.startsWith("data:") || l.slice(5).trim() === "[DONE]") continue; try { const d = JSON.parse(l.slice(5)).choices?.[0]?.delta; if (d?.content) { msg.content += d.content; send?.({ type: "delta", text: d.content }); } } catch {} }
         msg.tool_calls = [...calls.values()]; if (!msg.tool_calls.length) delete msg.tool_calls;
+        await recordUsage(p.name, model, usage, "ok", approxTokens + (msg.content.length + JSON.stringify(msg.tool_calls ?? []).length) / 4);
         picked.set(p.name, model); return { msg, brain: `${p.name}/${model}` };
       } catch (e) { errs.push(`${p.name}/${model} ${String(e.message).slice(0, 60)}`); break; }
     }
@@ -470,6 +498,7 @@ async function chat(messages, tools, send, force) {
 // tools always go; the rest are picked by topic. Keeps a turn near 3k tokens.
 const CORE_TOOLS = ["navigate", "fleet_status", "desk_api", "recall"];
 const TOPICS = [
+  [/reallocat|all power|divert|focus (the )?(power|compute|brain|ai)|power (to|on|status)|tokens? (spent|used|left)|budget|quota/i, ["set_power", "power_status"]],
   [/which (ai|model|brain)|ai health|health of (the |your )?(ai|brain|models?)|latency|how fast|which model/i, ["desk_api"]],
   [/news|headline|world|happening|market.?s?\b|wire|crypto|geopolit|oil|war/i, ["news"]],
   [/research|paper|arxiv|scholar|study|read\b|literature|search the web|look up|google/i, ["arxiv_search", "scholar_search", "web_search", "read_url", "write_note"]],
@@ -481,7 +510,7 @@ const TOPICS = [
   [/forecast|predict|scenario|will .* go up|monte/i, ["scenario_forecast"]],
   [/safe|safety|assert|invariant|cap|proving/i, ["safety_proof"]],
   [/venue|exchange|where can|trade from|canada|kraken|hyperliquid|polymarket|kalshi/i, ["venues"]],
-  [/start|stop|restart|kick|log of|logs?\b|service/i, ["fleet_control"]],
+  [/start|stop|pause|resume|halt|kill|turn (on|off)|switch (on|off)|restart|kick|log of|logs?\b|service|stop trading|trading/i, ["fleet_control"]],
   [/remember|note this|keep in mind|memory|desk state|forget/i, ["remember", "update_desk_state"]],
   [/second opinion|cross.?check|ask astra|ask the 550|deep think/i, ["second_opinion"]],
   [/test|pytest/i, ["run_tests"]],
@@ -512,7 +541,11 @@ async function platformTurn(q, send) {
   // model will otherwise repeat a figure from an earlier turn instead of the
   // live one, and nothing on this desk may quote a stale P&L.
   const NUMBERS = /p&l|pnl|profit|loss|losing|winning|win rate|trades?\b|balance|account|how (is|are) .*(bot|fleet|book|desk|doing)|status|numbers?/i;
-  let force = NUMBERS.test(q) && tools.some((t) => t.function.name === "fleet_status") ? "fleet_status" : undefined;
+  // Likewise a command is an action, not a memory: "stop trading crypto" must
+  // hit fleet_control this turn, whatever was said before.
+  const has = (n) => tools.some((t) => t.function.name === n);
+  const CONTROL = /\b(stop|pause|halt|kill|resume|start|restart|turn (on|off)|switch (on|off))\b/i, POWER = /reallocat|all power|divert|focus (the )?(power|compute|brain|ai)|power to/i;
+  let force = POWER.test(q) && has("set_power") ? "set_power" : CONTROL.test(q) && has("fleet_control") ? "fleet_control" : NUMBERS.test(q) && has("fleet_status") ? "fleet_status" : undefined;
   let answer = "", brain = "";
   for (let step = 0; step < 24; step++) {
     const { msg, brain: b } = await chat(messages, tools, send, force); brain = b; force = undefined;
@@ -542,7 +575,7 @@ const BRAIN = (process.env.JARVIS_BRAIN || "platform").toLowerCase();
 async function saveState(s) { await writeFile(STATE, JSON.stringify(s)); }
 
 const TOOLS = ["navigate", "fleet_status", "backtest_results", "safety_proof", "venues", "desk_api", "news", "morning_brief", "read_code", "search_code", "propose_fix",
-  "arxiv_search", "scholar_search", "web_search", "read_url", "write_note", "second_opinion", "update_desk_state", "health_check", "scenario_forecast", "propose_strategy", "run_backtest", "run_tests", "fleet_control", "create_bot", "list_bots", "set_bot", "remember", "recall"];
+  "arxiv_search", "scholar_search", "web_search", "read_url", "write_note", "second_opinion", "update_desk_state", "health_check", "set_power", "power_status", "scenario_forecast", "propose_strategy", "run_backtest", "run_tests", "fleet_control", "create_bot", "list_bots", "set_bot", "remember", "recall"];
 const ALLOWED = TOOLS.map((t) => `mcp__axiom__${t}`);
 
 const wss = new WebSocketServer({ port: PORT, host: "127.0.0.1" });
