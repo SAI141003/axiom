@@ -128,7 +128,7 @@ const DESK_PATHS = ["/api/agents", "/api/ai", "/api/arb", "/api/backtest-lab", "
   "/api/council/tuner", "/api/crypto/trades", "/api/crypto/window", "/api/data-desk", "/api/deepchain", "/api/fleet", "/api/flow-bot", "/api/gamma-pulse",
   "/api/intel", "/api/journal", "/api/kalshi", "/api/learned", "/api/live/balance", "/api/markets", "/api/meme-bot", "/api/newsdesk",
   "/api/options", "/api/oracle", "/api/oracle/track", "/api/premarket", "/api/proving-ground", "/api/quotes", "/api/recall", "/api/scenario",
-  "/api/stocks", "/api/stocks-bot", "/api/tape", "/api/valuation", "/api/venues", "/api/weather", "/api/weather-trades", "/api/weather/picks", "/api/workforce", "/api/world", "/api/world/summary", "/api/botos"];
+  "/api/stocks", "/api/stocks-bot", "/api/tape", "/api/valuation", "/api/venues", "/api/weather", "/api/weather-trades", "/api/weather/picks", "/api/workforce", "/api/world", "/api/world/summary", "/api/botos", "/api/ai/health"];
 
 // Files AXIOM may read: source only, inside the repo, never secrets.
 const UNREADABLE = /(^|\/)\.env|\.key$|\.pem$|id_rsa|(^|\/)\.claude\/|(^|\/)\.git\/|(^|\/)node_modules\/|(^|\/)\.venv\//;
@@ -270,6 +270,7 @@ const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
       ["DuckDuckGo search", "https://html.duckduckgo.com/html/?q=arc+agi", (t) => t.includes("result__a")],
       ["YouTube live embed", "https://www.youtube.com/embed/live_stream?channel=UCIALMKvObZNtJ6AmdCLP7Lg", (t) => t.includes("<html")],
       ["Dashboard", `${DESK}/api/fleet`, (t) => t.includes('"accounts"')],
+      ["AI health (every model, cached 10 min)", `${DESK}/api/ai/health`, (t) => /"brainReady":true/.test(t)],
     ];
     const out = await Promise.all(probes.map(async ([name, url, ok]) => { const t0 = Date.now(); try { const r = await fetch(url, { signal: AbortSignal.timeout(15_000), headers: { "User-Agent": "Mozilla/5.0 (AXIOM health)" } }); const t = await r.text(); return { name, status: r.ok && ok(t) ? "ok" : "degraded", http: r.status, ms: Date.now() - t0 }; } catch (e) { return { name, status: "down", ms: Date.now() - t0, reason: String(e.message).slice(0, 80) }; } }));
     let pump = "unknown"; try { const WSc = (await import("ws")).default; pump = await new Promise((res) => { const w = new WSc("wss://pumpportal.fun/api/data"); const t = setTimeout(() => { w.terminate(); res("down"); }, 8000); w.on("open", () => { clearTimeout(t); w.close(); res("ok"); }); w.on("error", () => { clearTimeout(t); res("down"); }); }); } catch { pump = "down"; }
@@ -355,7 +356,7 @@ ${await liveBooks()}
 DESK STATE (your compact working model — trust it for context and decisions, verify with tools when it matters, and keep it current with update_desk_state)
 ${state.slice(0, 2400)}
 
-You speak for the desk's own data and act only on the user's instruction.
+You speak for the desk's own data and act only on the user's instruction. When asked which AI you are or how healthy the models are, read desk_api /api/ai/health — it measures every model the desk uses — and answer with the measured latencies, not a guess.
 
 WHAT YOU CAN REACH
 - Every page's data (desk_api), every news outlet the desk reads (news), the fleet (fleet_status, morning_brief, fleet_control), the Bot OS (create_bot, list_bots, set_bot — the user can say "create a bot that…" and you build it from a spec, on paper), research (backtest_results, safety_proof, propose_strategy, scenario_forecast, run_backtest, venues), the tests (run_tests), and the source code to read (read_code, search_code).
@@ -431,7 +432,13 @@ const score = (cand, s) => { const c = cand.toLowerCase().replace(/^\/?api\//, "
 
 async function chat(messages, tools, send, force) {
   const errs = [];
-  for (const p of await providers()) {
+  // Groq's free tier rejects anything over ~8k tokens per minute per model
+  // (413) and Cerebras is unpaid; a long unattended turn (night study, weekly
+  // freshness, a deep read) goes straight to NIM's 128k+ context instead of
+  // burning a minute failing through the fast lanes first.
+  const approxTokens = (JSON.stringify(messages).length + JSON.stringify(tools).length) / 4;
+  const lanes = (await providers()).filter((p) => approxTokens < 6000 || !["groq", "cerebras"].includes(p.name));
+  for (const p of lanes) {
     const order = p.name === "groq" ? [...p.models.slice(groqTurn++ % p.models.length), ...p.models.slice(0, groqTurn % p.models.length)] : [picked.get(p.name), ...p.models];
     for (const model of order.filter((v, i, a) => v && a.indexOf(v) === i)) {
       try {
@@ -439,7 +446,9 @@ async function chat(messages, tools, send, force) {
           headers: { "content-type": "application/json", authorization: `Bearer ${p.key}` },
           body: JSON.stringify({ model, messages, tools, tool_choice: force ? { type: "function", function: { name: force } } : "auto", max_tokens: 900, temperature: 0.3, stream: true,
             // reasoning models: think briefly and keep the thinking out of the spoken answer
-            ...(model.includes("gpt-oss") ? { reasoning_effort: "low", ...(p.name === "groq" ? { reasoning_format: "hidden" } : {}) } : {}) }) });
+            ...(model.includes("gpt-oss") ? { reasoning_effort: "low", ...(p.name === "groq" ? { reasoning_format: "hidden" } : {}) } : {}),
+            // nemotron otherwise streams its thinking as reasoning_content and can end a turn with no answer text at all
+            ...(model.includes("nemotron") ? { chat_template_kwargs: { enable_thinking: false } } : {}) }) });
         if (!r.ok) { let j = {}; try { j = await r.json(); } catch {} const e = `${p.name}/${model} ${r.status} ${JSON.stringify(j.error ?? "").slice(0, 160)}`; errs.push(e); console.error("[brain] fallback:", e); if (![400, 404, 410, 429, 503].includes(r.status)) break; continue; }
         // stream: text deltas go to the browser as they arrive; tool calls are assembled
         const msg = { role: "assistant", content: "", tool_calls: [] }; const calls = new Map(); let buf = "";
@@ -461,6 +470,7 @@ async function chat(messages, tools, send, force) {
 // tools always go; the rest are picked by topic. Keeps a turn near 3k tokens.
 const CORE_TOOLS = ["navigate", "fleet_status", "desk_api", "recall"];
 const TOPICS = [
+  [/which (ai|model|brain)|ai health|health of (the |your )?(ai|brain|models?)|latency|how fast|which model/i, ["desk_api"]],
   [/news|headline|world|happening|market.?s?\b|wire|crypto|geopolit|oil|war/i, ["news"]],
   [/research|paper|arxiv|scholar|study|read\b|literature|search the web|look up|google/i, ["arxiv_search", "scholar_search", "web_search", "read_url", "write_note"]],
   [/create|new bot|make a bot|build a bot|my bots|spec bot|pause|resume|retire/i, ["create_bot", "list_bots", "set_bot"]],
@@ -497,7 +507,7 @@ async function platformTurn(q, send) {
     return { type: "function", function: { name: t.name, description: t.description.split(/(?<=[.!?])\s/)[0].slice(0, 160), parameters: p } }; });
   let history = (await loadThread()).slice(-8).map((m) => (m.role === "tool" ? { ...m, content: String(m.content).slice(0, 500) } : m));
   const firstUser = history.findIndex((m) => m.role === "user"); history = firstUser >= 0 ? history.slice(firstUser) : [];   // never start on an orphaned tool result
-  const messages = [{ role: "system", content: (await systemPrompt()).slice(0, 5200) }, ...history, { role: "user", content: q }];
+  const messages = [{ role: "system", content: (await systemPrompt()).slice(0, 8000) }, ...history, { role: "user", content: q }];
   // A question about numbers always starts with a fleet_status call: a small
   // model will otherwise repeat a figure from an earlier turn instead of the
   // live one, and nothing on this desk may quote a stale P&L.
@@ -519,6 +529,11 @@ async function platformTurn(q, send) {
       catch (e) { return { id: call.id, out: "tool failed: " + String(e.message).slice(0, 200) }; }
     }));
     for (const r of results) messages.push({ role: "tool", tool_call_id: r.id, content: String(r.out).slice(0, 12_000) });
+  }
+  if (!answer.trim()) {
+    // a long tool run can end on an empty assistant turn; ask once for the words
+    messages.push({ role: "user", content: "You finished the work. Now say the spoken summary, in your own voice, four sentences at most, no markdown." });
+    try { const { msg } = await chat(messages, [], send); answer = msg.content ?? ""; messages.push({ role: "assistant", content: answer }); } catch {}
   }
   await saveThread(messages.slice(1));   // everything but the system prompt
   return { answer: answer || "I could not complete that.", brain };
