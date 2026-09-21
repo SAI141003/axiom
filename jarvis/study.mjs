@@ -1,5 +1,5 @@
 /**
- * JARVIS night study. Once a day, unattended: look at the fleet, pick the
+ * AXIOM night study. Once a day, unattended: look at the fleet, pick the
  * weakest book, go read what the literature says about that failure, write a
  * note with citations, and leave one concrete proposal for the morning.
  *

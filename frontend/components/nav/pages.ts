@@ -13,9 +13,8 @@ export type Group = { label: string; pages: Page[] };
 export const GROUPS: Group[] = [
   { label: "Desk", pages: [
     { href: "/",          label: "Home",      hint: "the desk at a glance",                    icon: Home },
-    { href: "/jarvis",    label: "Jarvis",    hint: "the desk's voice — ask anything",         icon: Sparkles, keywords: "assistant voice ai brief" },
+    { href: "/mind",    label: "Axiom",    hint: "the mind of the desk — the brain, the feeds, the swarm, and the voice", icon: Brain, keywords: "assistant voice ai brief brain mind reflection" },
     { href: "/terminal",  label: "Terminal",  hint: "order book, signal feed, kill switch",    icon: Terminal, keywords: "bloomberg kill switch" },
-    { href: "/brain",     label: "Brain",     hint: "the reflection loop and daily scoreboard", icon: Brain, keywords: "lessons thompson allocation" },
     { href: "/council",   label: "Council",   hint: "eight role agents debate and rule",       icon: Users, keywords: "agents debate risk manager" },
     { href: "/workforce", label: "Workforce", hint: "the agent roster",                        icon: Briefcase },
     { href: "/connectome", label: "Connectome", hint: "the desk's nervous system, read from the code, lit by today's activity", icon: Network, keywords: "wiring graph brain map modules" },

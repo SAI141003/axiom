@@ -36,7 +36,7 @@ export default function WorldWire() {
             {cat === "all" && <span className="hud-chip shrink-0 hidden md:inline-flex" style={{ padding: "1px 8px" }}>{labels[it.cat] ?? it.cat}</span>}
             <a href={it.link} target="_blank" rel="noreferrer" className="prose-sans text-[13px] flex-1 min-w-0 truncate hover:underline" style={{ color: "var(--hud-text)" }}>{it.title}</a>
             <span className="text-[10px] font-mono shrink-0 truncate max-w-[9rem]" style={{ color: "var(--hud-muted)" }}>{it.source}</span>
-            <button onClick={() => window.dispatchEvent(new CustomEvent("axiom:jarvis-ask", { detail: `What does this headline mean for our positions, in two sentences: "${it.title}" (${it.source})` }))} className="hud-icon-btn shrink-0" aria-label="ask JARVIS about this" title="ask JARVIS"><Sparkles size={13} /></button>
+            <button onClick={() => window.dispatchEvent(new CustomEvent("axiom:jarvis-ask", { detail: `What does this headline mean for our positions, in two sentences: "${it.title}" (${it.source})` }))} className="hud-icon-btn shrink-0" aria-label="ask AXIOM about this" title="ask AXIOM"><Sparkles size={13} /></button>
           </li>
         ))}
         {!items.length && <li className="px-4 py-6 text-center prose-sans text-[12px]" style={{ color: "var(--hud-muted)" }}>{busy ? "reading feeds…" : "nothing fresh in this category right now"}</li>}

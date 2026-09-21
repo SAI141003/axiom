@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { askLLM as askClaude } from "@/lib/llm";
 
+export const dynamic = "force-dynamic";
+
 /**
  * AI Desk — 5 working tools. Each fetches LIVE market data server-side,
  * then asks Claude to analyze it. No demo data.

@@ -22,7 +22,7 @@ const PAGE_API: Record<string, string> = {
   "/live-account": "/api/live/balance", "/venues": "/api/venues", "/premarket": "/api/premarket",
 };
 
-// JARVIS on every page. A reactor in the corner; click it and the desk's voice
+// AXIOM on every page. A reactor in the corner; click it and the desk's voice
 // slides in already knowing which page you are looking at and which endpoint
 // feeds it, so "what am I looking at?" and "why is this red?" just work.
 export default function JarvisDock() {
@@ -31,6 +31,7 @@ export default function JarvisDock() {
   const reduced = useReducedMotion();
   const j = useJarvis({
     voice: true,
+    listen: pathname !== "/mind",   // the AXIOM page owns the mic there; the dock owns it everywhere else
     context: () => `[Context: the user is looking at ${PAGE_NAMES[pathname] ?? pathname}${PAGE_API[pathname] ? `; its data comes from desk_api ${PAGE_API[pathname]}` : ""}. Answer about what they can see when it is relevant.]`,
   });
   const [input, setInput] = useState("");
@@ -43,9 +44,20 @@ export default function JarvisDock() {
     window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey);
   }, []);
   useEffect(() => { const h = () => setOpen(true); window.addEventListener("axiom:jarvis-open", h); return () => window.removeEventListener("axiom:jarvis-open", h); }, []);
+  // Arrival briefing: coming back to the desk after six hours away, AXIOM
+  // opens and briefs without being asked -- the OS greets you.
+  useEffect(() => {
+    if (pathname !== "/" || j.bridge !== "online") return;
+    try {
+      const last = Number(localStorage.getItem("axiom.lastBrief") || 0);
+      if (Date.now() - last > 6 * 3600_000) { localStorage.setItem("axiom.lastBrief", String(Date.now())); setOpen(true); const t = setTimeout(() => j.ask("Good to have you back. Give me the status briefing."), 1200); return () => clearTimeout(t); }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, j.bridge]);
   useEffect(() => { const h = (e: Event) => { setOpen(true); j.ask((e as CustomEvent).detail); }; window.addEventListener("axiom:jarvis-ask", h); return () => window.removeEventListener("axiom:jarvis-ask", h); }, [j]);
 
-  if (pathname === "/jarvis") return null;
+  useEffect(() => { if (j.state === "thinking" || j.state === "speaking") setOpen(true); }, [j.state]);
+  if (pathname === "/mind") return null;
   const tone = toneFor(j.state);
 
   return (
@@ -57,20 +69,20 @@ export default function JarvisDock() {
           )}
         </AnimatePresence>
         <motion.div whileTap={reduced ? {} : { scale: 0.96 }}>
-          <Reactor state={j.state} size={64} onClick={() => setOpen((o) => !o)} label={open ? "close JARVIS" : "open JARVIS (⌘J)"} />
+          <Reactor state={j.state} size={64} onClick={() => setOpen((o) => !o)} label={open ? "close AXIOM" : "open AXIOM (⌘J)"} />
         </motion.div>
       </div>
 
       <AnimatePresence>
         {open && (
-          <motion.aside key="dock" role="dialog" aria-label="JARVIS" aria-modal="false"
+          <motion.aside key="dock" role="dialog" aria-label="AXIOM" aria-modal="false"
                         initial={reduced ? { opacity: 0 } : { opacity: 0, x: 40, scale: 0.98 }} animate={{ opacity: 1, x: 0, scale: 1 }} exit={reduced ? { opacity: 0 } : { opacity: 0, x: 40, scale: 0.98 }}
                         transition={{ type: "spring", damping: 24, stiffness: 220 }}
                         className="fixed z-[89] right-5 bottom-24 w-[min(420px,calc(100vw-2.5rem))] h-[min(620px,calc(100vh-8rem))] flex flex-col rounded-2xl overflow-hidden hud-glass">
             <header className="flex items-center gap-3 px-4 h-12 border-b shrink-0" style={{ borderColor: "var(--hud-border)" }}>
               <Sparkles size={15} style={{ color: tone }} aria-hidden />
               <div className="min-w-0">
-                <div className="text-[11px] font-bold tracking-[0.22em] font-mono" style={{ color: "var(--hud-text)" }}>JARVIS</div>
+                <div className="text-[11px] font-bold tracking-[0.22em] font-mono" style={{ color: "var(--hud-text)" }}>AXIOM</div>
                 <div className="text-[9px] truncate font-mono" style={{ color: "var(--hud-muted)" }}>{j.bridge === "online" ? `${j.brainName || "platform AI"} · on ${PAGE_NAMES[pathname] ?? pathname}` : j.bridge === "connecting" ? "connecting…" : "local fallback — start the bridge for full power"}</div>
               </div>
               <div className="flex-1" />
@@ -82,7 +94,7 @@ export default function JarvisDock() {
             <form onSubmit={(e) => { e.preventDefault(); j.ask(input); setInput(""); }} className="flex items-center gap-2 p-3 border-t shrink-0" style={{ borderColor: "var(--hud-border)" }}>
               <button type="button" onClick={() => (j.state === "listening" ? j.stopListening() : j.listen(false))} aria-label={j.state === "listening" ? "stop listening" : "talk"} aria-pressed={j.state === "listening"}
                       className="hud-icon-btn" style={{ color: j.state === "listening" ? "var(--hud-green)" : undefined }}><Mic size={16} /></button>
-              <label className="sr-only" htmlFor="jarvis-dock-input">Ask JARVIS</label>
+              <label className="sr-only" htmlFor="jarvis-dock-input">Ask AXIOM</label>
               <input id="jarvis-dock-input" value={input} onChange={(e) => setInput(e.target.value)} placeholder="ask about this page…" autoComplete="off"
                      className="hud-input flex-1 min-w-0" />
               <button type="submit" disabled={j.state === "thinking" || !input.trim()} aria-label="send" className="hud-icon-btn hud-icon-btn-accent"><Send size={16} /></button>

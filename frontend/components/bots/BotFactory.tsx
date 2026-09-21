@@ -7,7 +7,7 @@ import { Card, usd } from "@/components/charts";
 const EVALUATORS = ["momentum", "ma_cross", "mean_reversion", "rsi", "bollinger", "obv", "mfi", "volume_profile"];
 const DEFAULT = { name: "", universe: "ETH/USD", timeframe: "1d", stake: 20, max_pos: 2, enter: 0.15, exit: 0.05, weights: { momentum: 1.0, rsi: 0.5 } as Record<string, number>, note: "" };
 
-// The Bot OS. Describe a bot in words and JARVIS writes the spec, or set the
+// The Bot OS. Describe a bot in words and AXIOM writes the spec, or set the
 // dials yourself. Either way it is a JSON file the runner picks up within the
 // hour, trades on paper from $100, and shows here with its own book.
 export default function BotFactory() {
@@ -36,12 +36,12 @@ export default function BotFactory() {
   return (
     <div className="flex flex-col gap-4">
       <div className="grid lg:grid-cols-[1fr_1.2fr] gap-4">
-        <Card title="DESCRIBE A BOT" sub="say what you want; JARVIS writes the spec and starts it on paper">
+        <Card title="DESCRIBE A BOT" sub="say what you want; AXIOM writes the spec and starts it on paper">
           <form onSubmit={(e) => { e.preventDefault(); describe(); }} className="flex flex-col gap-2">
             <label htmlFor="bot-desc" className="sr-only">Describe the bot</label>
             <textarea id="bot-desc" value={desc} onChange={(e) => setDesc(e.target.value)} rows={4} placeholder="e.g. a daily SOL and ETH bot that buys momentum with RSI confirmation, $15 a position, two positions max"
                       className="hud-input prose-sans w-full resize-none py-3" />
-            <button type="submit" disabled={!desc.trim()} className="hud-btn hud-btn-accent self-start" style={{ minHeight: 40 }}><Sparkles size={13} aria-hidden /> Ask JARVIS to build it</button>
+            <button type="submit" disabled={!desc.trim()} className="hud-btn hud-btn-accent self-start" style={{ minHeight: 40 }}><Sparkles size={13} aria-hidden /> Ask AXIOM to build it</button>
           </form>
         </Card>
 
@@ -87,7 +87,7 @@ export default function BotFactory() {
       </div>
 
       <Card title="YOUR BOTS" sub={`${bots.length} spec bot${bots.length === 1 ? "" : "s"} · each on its own $100 paper book · runner cycles hourly`}>
-        {bots.length === 0 && <div className="text-[12px] py-6 text-center prose-sans" style={{ color: "var(--hud-muted)" }}>none yet — describe one above, or ask JARVIS anywhere: “create a bot that…”</div>}
+        {bots.length === 0 && <div className="text-[12px] py-6 text-center prose-sans" style={{ color: "var(--hud-muted)" }}>none yet — describe one above, or ask AXIOM anywhere: “create a bot that…”</div>}
         <div className="flex flex-col gap-2">
           {bots.map((b) => {
             const k = b.book;

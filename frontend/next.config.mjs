@@ -12,6 +12,8 @@ const nextConfig = {
       ...Object.entries(bots).map(([from, tab]) => ({ source: `/${from}`, destination: `/bots?tab=${tab}`, permanent: true })),
       { source: "/gravia", destination: "/", permanent: true },
       { source: "/mirofish", destination: "/terminal", permanent: true },
+      { source: "/brain", destination: "/mind", permanent: true },
+      { source: "/jarvis", destination: "/mind", permanent: true },
     ];
   },
 };

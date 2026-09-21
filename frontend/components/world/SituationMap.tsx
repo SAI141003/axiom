@@ -10,7 +10,7 @@ type Layer = "exchanges" | "chokepoints" | "quakes" | "news";
 // AXIOM's own situation map. Built from free data and fixed knowledge, not a
 // third-party dashboard: exchanges with live open/closed state, the eight
 // chokepoints a trading desk watches, USGS earthquakes from the last day, and
-// the World Wire's headline pressure by region. Click anything; ask JARVIS.
+// the World Wire's headline pressure by region. Click anything; ask AXIOM.
 export default function SituationMap() {
   const [d, setD] = useState<any>(null);
   const [layers, setLayers] = useState<Record<Layer, boolean>>({ exchanges: true, chokepoints: true, quakes: true, news: true });
@@ -40,8 +40,8 @@ export default function SituationMap() {
               </Geographies>
               {layers.news && (d?.regions ?? []).map((r: any) => (
                 <Marker key={r.id} coordinates={[r.lon, r.lat]} onClick={() => setPick({ kind: "region", ...r })} style={{ default: { cursor: "pointer" } }}>
-                  <circle r={6 + Math.min(18, Math.sqrt(r.fresh ?? 0) * 3)} fill="rgba(56,189,248,0.10)" stroke="rgba(56,189,248,0.45)" strokeWidth={0.8} />
-                  <text textAnchor="middle" y={-4} style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 7, fill: "#7dd3fc" }}>{r.fresh}</text>
+                  <circle r={6 + Math.min(18, Math.sqrt(r.fresh ?? 0) * 3)} fill="rgba(76,201,255,0.10)" stroke="rgba(76,201,255,0.45)" strokeWidth={0.8} />
+                  <text textAnchor="middle" y={-4} style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 7, fill: "#9be1ff" }}>{r.fresh}</text>
                 </Marker>
               ))}
               {layers.quakes && (d?.quakes ?? []).map((q: any, i: number) => (
@@ -62,7 +62,7 @@ export default function SituationMap() {
             </ZoomableGroup>
           </ComposableMap>
           <div className="flex flex-wrap gap-4 px-4 py-2 text-[10px] font-mono border-t" style={{ color: "var(--hud-muted)", borderColor: "var(--hud-border)" }}>
-            <span><span style={{ color: "#22c55e" }}>●</span> exchange open</span><span><span style={{ color: "#4a5a75" }}>●</span> closed</span><span><span style={{ color: "#f59e0b" }}>◆</span> chokepoint</span><span><span style={{ color: "#ef4444" }}>●</span> quake M4.5+</span><span><span style={{ color: "#7dd3fc" }}>◯</span> fresh headlines by region</span><span className="flex-1" /><span>scroll to zoom · drag to pan</span>
+            <span><span style={{ color: "#22c55e" }}>●</span> exchange open</span><span><span style={{ color: "#4a5a75" }}>●</span> closed</span><span><span style={{ color: "#f59e0b" }}>◆</span> chokepoint</span><span><span style={{ color: "#ef4444" }}>●</span> quake M4.5+</span><span><span style={{ color: "#9be1ff" }}>◯</span> fresh headlines by region</span><span className="flex-1" /><span>scroll to zoom · drag to pan</span>
           </div>
         </div>
         <aside className="border-l p-4 min-w-0 flex flex-col gap-3" style={{ borderColor: "var(--hud-border)" }} aria-live="polite">
@@ -91,7 +91,7 @@ export default function SituationMap() {
                   {(pick.items ?? []).map((it: any, i: number) => <li key={i}><a href={it.link} target="_blank" rel="noreferrer" className="prose-sans text-[12px] hover:underline" style={{ color: "var(--hud-text)" }}>{it.title}</a> <span className="text-[10px] font-mono" style={{ color: "var(--hud-muted)" }}>— {it.source}</span></li>)}
                 </ul>
               )}
-              <button onClick={() => window.dispatchEvent(new CustomEvent("axiom:jarvis-ask", { detail: `On the situation map I picked ${pick.kind} "${pick.name ?? pick.place ?? pick.id}". What matters about it for our positions right now? Three sentences.` }))} className="hud-btn hud-btn-accent self-start"><Sparkles size={12} aria-hidden /> Ask JARVIS</button>
+              <button onClick={() => window.dispatchEvent(new CustomEvent("axiom:jarvis-ask", { detail: `On the situation map I picked ${pick.kind} "${pick.name ?? pick.place ?? pick.id}". What matters about it for our positions right now? Three sentences.` }))} className="hud-btn hud-btn-accent self-start"><Sparkles size={12} aria-hidden /> Ask AXIOM</button>
             </>
           )}
         </aside>

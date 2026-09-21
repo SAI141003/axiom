@@ -1,5 +1,5 @@
 /**
- * JARVIS weekly freshness study. Every Sunday: probe every feed, then go and
+ * AXIOM weekly freshness study. Every Sunday: probe every feed, then go and
  * check whether anything the desk depends on has changed -- API deprecations,
  * new model releases, new benchmark results, new papers on the desk's methods.
  * Writes a note and updates the desk state, so nothing quietly rots.

@@ -38,7 +38,7 @@ export default function VenuesPage() {
 
         {/* Breaking: MetaMask Agent Wallet */}
         {featured && (
-          <div className="hud-panel hud-panel-static p-4 mb-5" style={{ borderColor: "rgba(56,189,248,0.55)" }}>
+          <div className="hud-panel hud-panel-static p-4 mb-5" style={{ borderColor: "rgba(76,201,255,0.55)" }}>
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="text-[9px] font-bold px-2 py-0.5 rounded" style={{ color: "#0a0e17", background: "var(--hud-cyan)" }}>NEW · AUG 6 2026</span>
               <span className="text-[15px] font-bold" style={{ color: "var(--hud-text)" }}>{featured.name}</span>

@@ -1,5 +1,5 @@
 /**
- * AXIOM · JARVIS bridge (v2).
+ * AXIOM · AXIOM bridge (v2).
  *
  * Runs the Claude Agent SDK -- Claude Code as a library -- on your existing
  * login and gives it the desk: every page's data, every news outlet the desk
@@ -56,7 +56,7 @@ async function dotenv() { const out = {}; for (const l of (await readText(join(R
 
 // ── Research: the free corners of the internet, read directly ────────────────
 const strip = (html) => html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, "").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, " ").trim();
-async function get(url, ms = 20_000) { const r = await fetch(url, { signal: AbortSignal.timeout(ms), headers: { "User-Agent": "Mozilla/5.0 (AXIOM JARVIS research)" } }); return r.text(); }
+async function get(url, ms = 20_000) { const r = await fetch(url, { signal: AbortSignal.timeout(ms), headers: { "User-Agent": "Mozilla/5.0 (AXIOM AXIOM research)" } }); return r.text(); }
 async function arxiv(q, max) {
   const xml = await get(`https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(q)}&start=0&max_results=${max}&sortBy=relevance`);
   return [...xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)].map((m) => { const e = m[1]; const f = (t) => (e.match(new RegExp(`<${t}[^>]*>([\\s\\S]*?)<\\/${t}>`)) || [])[1]?.replace(/\s+/g, " ").trim();
@@ -103,10 +103,10 @@ async function deskGet(path) {
   return (await r.text()).slice(0, 14_000);
 }
 
-// ── The pages JARVIS can open by voice, each with the endpoint that feeds it ──
+// ── The pages AXIOM can open by voice, each with the endpoint that feeds it ──
 const PAGES = [
-  ["/", "home", "the desk at a glance", "/api/fleet"], ["/jarvis", "jarvis", "the assistant", null], ["/terminal", "terminal", "order book, signal feed, kill switch", "/api/markets"],
-  ["/brain", "brain", "the reflection loop and daily scoreboard", "/api/brain"], ["/council", "council", "eight role agents debate and rule", "/api/council/review/latest"],
+  ["/", "home", "the desk at a glance", "/api/fleet"], ["/mind", "jarvis", "the assistant", null], ["/terminal", "terminal", "order book, signal feed, kill switch", "/api/markets"],
+  ["/mind", "brain mind reflection", "the mind: reflection loop, feeds, swarm", "/api/brain"], ["/council", "council", "eight role agents debate and rule", "/api/council/review/latest"],
   ["/workforce", "workforce", "the agent roster", "/api/workforce"], ["/connectome", "connectome wiring", "the desk's nervous system read from the code", "/api/connectome"], ["/bots", "bots fleet", "every paper account on one screen", "/api/fleet"],
   ["/bots?tab=create", "create a bot", "the Bot OS", "/api/botos"], ["/crypto", "crypto auto-bot", "5-minute crypto engine", "/api/crypto/trades"],
   ["/weather", "weather", "station observations vs market buckets", "/api/weather/picks"], ["/premarket", "pre-market", "first-20-minute stock picks", "/api/premarket"],
@@ -130,7 +130,7 @@ const DESK_PATHS = ["/api/agents", "/api/ai", "/api/arb", "/api/backtest-lab", "
   "/api/options", "/api/oracle", "/api/oracle/track", "/api/premarket", "/api/proving-ground", "/api/quotes", "/api/recall", "/api/scenario",
   "/api/stocks", "/api/stocks-bot", "/api/tape", "/api/valuation", "/api/venues", "/api/weather", "/api/weather-trades", "/api/weather/picks", "/api/workforce", "/api/world", "/api/world/summary", "/api/botos"];
 
-// Files JARVIS may read: source only, inside the repo, never secrets.
+// Files AXIOM may read: source only, inside the repo, never secrets.
 const UNREADABLE = /(^|\/)\.env|\.key$|\.pem$|id_rsa|(^|\/)\.claude\/|(^|\/)\.git\/|(^|\/)node_modules\/|(^|\/)\.venv\//;
 function safePath(p) {
   const abs = isAbsolute(p) ? p : join(ROOT, p);
@@ -138,7 +138,7 @@ function safePath(p) {
   return abs;
 }
 
-// Paper bots JARVIS may start, stop or restart. The dashboard and the live
+// Paper bots AXIOM may start, stop or restart. The dashboard and the live
 // executor are not on the list.
 const CONTROLLABLE = /^com\.polymarket\.(dryrun\.[a-z0-9]+|autotuner|data\.openbb|data\.pumpsmart|newsdesk\.poll|eod\.council|jarvis|worldmonitor)$/;
 
@@ -179,7 +179,7 @@ const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
       }
       return text(compact(out).slice(0, 16_000));
     }),
-  tool("morning_brief", "Everything that happened on the desk since yesterday, in one call: fleet P&L today and overall, which bots traded, weather resolutions, service health, disk, errors in logs, top headlines, standing notes. Call this when asked for status or a briefing, or when greeted with just 'hey Jarvis'.", {}, async () => {
+  tool("morning_brief", "Everything that happened on the desk since yesterday, in one call: fleet P&L today and overall, which bots traded, weather resolutions, service health, disk, errors in logs, top headlines, standing notes. Call this when asked for status or a briefing, or when greeted with just 'hey Axiom'.", {}, async () => {
     const since = Date.now() / 1000 - 24 * 3600;
     const s = await data("engine_status.json"); const e = s?.engines ?? {};
     const accounts = Object.entries(e).map(([k, v]) => ({ name: k, account: v.account, pnl: v.pnl, today: v.today, trades: v.trades, win_rate: v.win_rate }));
@@ -210,7 +210,7 @@ const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
     async ({ title, file, diagnosis, before, after, verify }) => {
       await mkdir(PROPOSALS, { recursive: true });
       const name = `${new Date().toISOString().replace(/[:.]/g, "-")}-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40)}.md`;
-      const body = `# ${title}\n\n**File:** \`${file}\`\n\n## Diagnosis\n${diagnosis}\n\n## Change\n\n### Before\n\`\`\`\n${before}\n\`\`\`\n\n### After\n\`\`\`\n${after}\n\`\`\`\n\n## Verify\n${verify}\n\n_Proposed by JARVIS. Apply in a Claude Code session: "apply jarvis/proposals/${name}"._\n`;
+      const body = `# ${title}\n\n**File:** \`${file}\`\n\n## Diagnosis\n${diagnosis}\n\n## Change\n\n### Before\n\`\`\`\n${before}\n\`\`\`\n\n### After\n\`\`\`\n${after}\n\`\`\`\n\n## Verify\n${verify}\n\n_Proposed by AXIOM. Apply in a Claude Code session: "apply jarvis/proposals/${name}"._\n`;
       await writeFile(join(PROPOSALS, name), body);
       return text(`proposal saved: jarvis/proposals/${name}`);
     }),
@@ -358,7 +358,7 @@ HOW TO ANSWER
 - Be honest about losses. The desk's edge is daily-only and the forward test has not proven profitable; never imply otherwise.
 
 THE MORNING BRIEF
-- If greeted with only "hey Jarvis", "good morning", or asked for status: call morning_brief and deliver it like a chief of staff — fleet P&L today and overall, who traded, anything broken (a stopped service, an error, low disk), then the two or three headlines that matter to the positions. Lead with what changed.
+- If greeted with only "hey Axiom", "good morning", or asked for status: call morning_brief and deliver it like a chief of staff — fleet P&L today and overall, who traded, anything broken (a stopped service, an error, low disk), then the two or three headlines that matter to the positions. Lead with what changed.
 
 FIXING THINGS
 - When asked to fix or change code: read it first (read_code, search_code), diagnose, then write a proposal with propose_fix — the exact before and after. You do not edit files yourself; a human applies the proposal in a Claude Code session. Say where you saved it. Paper bots you may restart with fleet_control when told.
@@ -378,7 +378,7 @@ async function saveThread(msgs) { await writeFile(THREAD, JSON.stringify(msgs.sl
 
 async function providers() {
   const env = { ...(await dotenv()), ...(await (async () => { const o = {}; for (const l of (await readText(join(ROOT, "frontend", ".env.local"))).split("\n")) { const m = l.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/); if (m && m[2]) o[m[1]] = m[2].replace(/^["']|["']$/g, ""); } return o; })()) };
-  // JARVIS's own NIM key first (no contention with the classifier, no free-tier
+  // AXIOM's own NIM key first (no contention with the classifier, no free-tier
   // rate limits), then Groq for speed, then the shared NIM key, then OpenAI.
   const nvKey = env.NVIDIA_API_KEY_JARVIS || env.NVIDIA_API_KEY;
   const nvModels = [env.NVIDIA_MODEL_JARVIS || env.NVIDIA_MODEL_TOOLS || "nvidia/nemotron-3-super-120b-a12b", "deepseek-ai/deepseek-v4-flash-0731", "mistralai/mistral-large-2-instruct", "nvidia/nemotron-3-ultra-550b-a55b"];   // measured: Super 5-7s, DeepSeek 5-19s, Kimi/GLM 48-90s

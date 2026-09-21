@@ -3,6 +3,8 @@ import { promises as fs } from "fs";
 import path from "path";
 import { askLLM } from "../../../lib/llm";
 
+export const dynamic = "force-dynamic";
+
 /**
  * QUANT NEWS DESK — live headlines classified the way a desk quant reads them:
  *   headline → event type → affected symbols (direct + chain) → direction,
