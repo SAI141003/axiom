@@ -603,6 +603,32 @@ def engines_status() -> dict:
             "pnl": round(acct - 100, 2), "account": round(acct, 2),
             "today": today_f, "daily": daily_f,
             "config": "live order-flow (CVD+big trades+DOM), intraday BTC/ETH/SOL, $30/pos — forward test, NOT backtestable"}
+    # manual book: what Sai tells AXIOM to buy or sell, by voice — $100 paper
+    rows = load("manual_book.jsonl")
+    mcl = [r for r in rows if r["type"] == "mclose"]
+    if rows:
+        ml = [{"won": r["won"], "pnl": r["pnl"], "ts": r.get("ts", 0)} for r in mcl]
+        acct, ml = walk_account(ml)
+        w = sum(1 for t in ml if t["won"])
+        today_m, daily_m = day_split(ml)
+        out["manual ($100 acct)"] = {
+            "trades": len(ml), "wins": w, "win_rate": round(w / len(ml), 3) if ml else None,
+            "pnl": round(acct - 100, 2), "account": round(acct, 2),
+            "today": today_m, "daily": daily_m,
+            "config": "AXIOM's hands: orders Sai gives by voice, real prices, paper only, $50 max per order"}
+
+    # manual book: what Sai tells AXIOM to buy or sell, by voice — $100 paper
+    rows = load("manual_book.jsonl")
+    if rows:
+        ml = [{"won": r["won"], "pnl": r["pnl"], "ts": r.get("ts", 0)} for r in rows if r["type"] == "mclose"]
+        acct, ml = walk_account(ml)
+        w = sum(1 for t in ml if t["won"])
+        today_m, daily_m = day_split(ml)
+        out["manual ($100 acct)"] = {
+            "trades": len(ml), "wins": w, "win_rate": round(w / len(ml), 3) if ml else None,
+            "pnl": round(acct - 100, 2), "account": round(acct, 2),
+            "today": today_m, "daily": daily_m,
+            "config": "AXIOM's hands: orders Sai gives by voice, real prices, paper only, $50 max per order"}
     return out
 
 
