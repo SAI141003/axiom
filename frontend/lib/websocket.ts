@@ -3,6 +3,7 @@ import { useTradingStore } from "./store";
 import type { WSMessage, Market, Signal, Order, Position, ArbOpportunity } from "./types";
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8765";
+let liveFunded = false;   // true once the live CLOB bot reports a real bankroll
 const PING_INTERVAL_MS = 15_000;
 const RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 15000, 30000];
 
@@ -54,11 +55,19 @@ function dispatch(msg: WSMessage) {
       break;
     }
     case "risk_update": {
-      store.setRisk(msg as any);
+      // The bridge mirrors the live CLOB bot's Redis. While that bot is unfunded
+      // (bankroll 0) the paper fleet is the desk's real book, so only the kill
+      // switch is taken from here; the desk feed owns the rest.
+      const r = msg as any;
+      liveFunded = r.bankroll > 0;
+      if (liveFunded) store.setRisk(r);
+      else store.setRisk({ kill_switch_active: !!r.kill_switch_active });
       break;
     }
     case "heartbeat": {
-      store.setWorkerHealth((msg as any).workers ?? {});
+      // only workers that have actually reported; silent ones don't overwrite the launchd view
+      const w = Object.fromEntries(Object.entries((msg as any).workers ?? {}).filter(([, v]) => Number(v) > 0));
+      if (Object.keys(w).length) store.setWorkerHealth(w as any);
       break;
     }
     case "stats_update": {
@@ -89,7 +98,7 @@ function dispatch(msg: WSMessage) {
       break;
     }
     case "positions_update": {
-      store.setPositions((msg as any).positions ?? []);
+      if (liveFunded) store.setPositions((msg as any).positions ?? []);   // otherwise the paper books own the panel
       break;
     }
     case "kill_switch": {
