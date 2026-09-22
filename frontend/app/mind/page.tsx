@@ -57,7 +57,7 @@ export default function JarvisPage() {
               </header>
               <Transcript msgs={j.msgs} state={j.state} suggestions={SUGGESTIONS} onPick={j.ask} className="flex-1 p-4" />
               <form onSubmit={(e) => { e.preventDefault(); j.ask(input); setInput(""); }} className="flex items-center gap-2 p-3 border-t shrink-0" style={{ borderColor: "var(--hud-border)" }}>
-                <button type="button" onClick={() => (j.state === "listening" ? j.stopListening() : j.listen(false))} aria-label={j.state === "listening" ? "stop listening" : "talk"} aria-pressed={j.state === "listening"} className="hud-icon-btn" style={{ color: j.state === "listening" ? "var(--hud-green)" : undefined }}><Mic size={16} /></button>
+                <button type="button" onClick={() => (j.state === "listening" ? j.stopListening() : j.listen(true))} aria-label={j.state === "listening" ? "stop listening" : "talk"} aria-pressed={j.state === "listening"} className="hud-icon-btn" style={{ color: j.state === "listening" ? "var(--hud-green)" : undefined }}><Mic size={16} /></button>
                 <label htmlFor="jarvis-input" className="sr-only">Ask AXIOM</label>
                 <input id="jarvis-input" value={input} onChange={(e) => setInput(e.target.value)} placeholder="ask the desk anything…" autoComplete="off" className="hud-input flex-1 min-w-0 prose-sans" style={{ minHeight: 40 }} />
                 <button type="submit" disabled={j.state === "thinking" || !input.trim()} className="hud-icon-btn hud-icon-btn-accent" aria-label="send"><Send size={16} /></button>

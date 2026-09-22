@@ -122,7 +122,7 @@ const PAGES = [
   ["/lab?tab=proving", "proving ground safety", "the fault-injection proof", "/api/proving-ground"], ["/lab?tab=scenario", "scenario", "scenario forecasts", "/api/scenario"],
   ["/ai", "ai desk", "stock analyst, market intel, risk engine, macro, alpha hunter", null], ["/oracle", "oracle", "the oracle-lag probe", "/api/oracle"],
   ["/intel", "intel", "news read by the classifier", "/api/intel"], ["/news", "news", "live wall, live summary, the world wire", "/api/world/summary"],
-  ["/world", "world monitor map", "World Monitor: the live map, chokepoints, cables, missions", null], ["/journal", "journal", "every trade, every lesson", "/api/journal"],
+  ["/world", "the eye, globe, world map", "The Eye: the live globe — flights, military, satellites, quakes, launches, radio, cables, the weather book, the exchanges", "/api/eye/layers"], ["/journal", "journal", "every trade, every lesson", "/api/journal"],
   ["/live-account", "account", "balance, caps, the go-live gate", "/api/live/balance"], ["/venues", "venues", "where a bot can trade from here", "/api/venues"],
   ["/settings", "keys settings", "API keys and bot switches", null], ["/about", "about sources", "every source, paper, repo and feed", null],
 ];
@@ -409,7 +409,13 @@ const axiom = createSdkMcpServer({ name: "axiom", version: "2.0.0", tools: [
     async ({ state, questions, tag }) => text(await sh(PY, ["-c", `import json,sys;from signals import jev;print(json.dumps(jev.judge(${JSON.stringify(JSON.stringify(state))} and json.loads(${JSON.stringify(JSON.stringify(state))}), json.loads(${JSON.stringify(JSON.stringify(questions))}), tag=${JSON.stringify(tag ?? "axiom")}) or {"error": "Jev not configured — set TYPESAFE_AI_API_KEY in .env ($0.042 per million input tokens, no free tier)"}))`], 20_000))),
   tool("eye", "Drive the Eye (/world, the live globe): focus the camera on a place (lat, lon, alt in globe radii — 0.3 city, 0.8 country, 2 whole earth), switch a layer on or off (flights, mil, sats, quakes, vessels, fires, radio, launches, cables, datacenters, dams, stations, markets), track an entity by name or callsign, release it, or set the sensor (normal, crt, nvg, flir, noir). Opens the Eye first if the user is elsewhere. Use when Sai says 'show me', 'zoom to', 'track', 'night vision', 'what's flying over'.",
     { focus: z.object({ lat: z.number(), lon: z.number(), alt: z.number().min(0.05).max(4).optional() }).optional(), layer: z.object({ id: z.string(), on: z.boolean().optional() }).optional(), track: z.string().max(40).optional(), untrack: z.boolean().optional(), sensor: z.enum(["normal", "crt", "nvg", "flir", "noir"]).optional() },
-    async (cmd) => { uiSend({ type: "ui", op: "navigate", href: "/world" }); setTimeout(() => uiSend({ type: "ui", op: "eye", ...cmd }), 900); return text({ ok: true, sent: cmd, note: "the Eye is executing it on screen" }); }),
+    async (cmd) => {
+      uiSend({ type: "ui", op: "navigate", href: "/world" });
+      if (Object.keys(cmd).length) setTimeout(() => uiSend({ type: "ui", op: "eye", ...cmd }), 900);
+      let layers = null; try { layers = JSON.parse(await deskGet("/api/eye/layers")); } catch {}
+      return text({ opened: "/world", sent: cmd, on_screen: layers ? { stations_with_open_positions: (layers.stations ?? []).filter((s) => s.open?.length).map((s) => `${s.city}: ${s.open.length}`), exchanges_open: (layers.exchanges ?? []).filter((e) => e.open).map((e) => e.name) } : "layers unavailable",
+        next: "The Eye is on screen: flights, military ADS-B, satellites, quakes, launches, the weather book's stations and the exchanges are live layers. Say what you actually see from these facts; never invent what is on the globe." });
+    }),
   // ── The toolbox: Agent402, self-hosted on :3402 in free mode ───────────────
   // 591 deterministic and live-data tools + 84 skill packs (MikeyPetrillo/Agent402,
   // AGPL-3.0, run as its own launchd service, never linked into this code).
@@ -501,7 +507,7 @@ ${state.slice(0, 2400)}
 
 YOUR TOOLBOX (permanent): Agent402, self-hosted on this machine — 591 tools and 84 skill packs for live and deterministic work: SEC EDGAR (insider trades, 13F, filings, XBRL), macro (FRED, yield curve, CPI when keyed), crypto (CoinGecko prices, Hyperliquid perps funding/OI/orderbook, DefiLlama yields, Solana token safety, on-chain reads), network truth (DNS/TLS/whois), documents (PDF, OCR, extract, scrape), stats and forecasting, finance math (Black-Scholes, bonds, IRR), 200+ utilities. toolbox_find → toolbox_call, or toolbox_pack for a workflow. It is read-only for the desk and never pays anyone.
 
-You speak for the desk's own data and act only on the user's instruction. When asked which AI you are or how healthy the models are, read desk_api /api/ai/health — it measures every model the desk uses — and answer with the measured latencies, not a guess.
+You speak for the desk's own data and act only on the user's instruction. After navigate or eye, describe the page ONLY from the endpoint you just read; if you did not read it, say you opened it and ask what they want from it. When asked which AI you are or how healthy the models are, read desk_api /api/ai/health — it measures every model the desk uses — and answer with the measured latencies, not a guess.
 
 WHAT YOU CAN REACH
 - Every page's data (desk_api), every news outlet the desk reads (news), the fleet (fleet_status, morning_brief, fleet_control), the Bot OS (create_bot, list_bots, set_bot — the user can say "create a bot that…" and you build it from a spec, on paper), research (backtest_results, safety_proof, propose_strategy, scenario_forecast, run_backtest, venues), the tests (run_tests), and the source code to read (read_code, search_code).
@@ -707,7 +713,10 @@ async function platformTurn(q, send) {
   const CONTROL = /\b(stop|pause|halt|kill|resume|start|restart|turn (on|off)|switch (on|off))\b/i, POWER = /reallocat|all power|divert|focus (the )?(power|compute|brain|ai)|power to/i;
   // a trade order names an action AND a size or a symbol; "the short version" is not an order
   const TRADE = /\b(buy|sell|short)\b[^.]{0,40}\b(\$?\d+|dollars?|usd|[A-Z]{2,5}(\/USD|-USD)?)\b|\bclose (my|the) [^.]{0,30}position|\btake profit on\b|\bget out of\b/, MSG = /\b(message|text|imessage|email|mail)\b.*\b(to|him|her|them)\b|\bsend (a |an )?(message|text|email|mail)/i;
-  let force = TRADE.test(q) && has("trade") ? "trade" : MSG.test(q) && has("send_message") ? "send_message" : POWER.test(q) && has("set_power") ? "set_power" : CONTROL.test(q) && has("fleet_control") ? "fleet_control" : NUMBERS.test(q) && has("fleet_status") ? "fleet_status" : undefined;
+  const OPEN = /\b(open|show me|go to|take me to|bring up|pull up|switch to)\b/i;
+  let force = OPEN.test(q) && has("eye") && /\b(eye|globe|world|map|satellite|flight)\b/i.test(q) ? "eye"
+    : OPEN.test(q) && has("navigate") ? "navigate"
+    : TRADE.test(q) && has("trade") ? "trade" : MSG.test(q) && has("send_message") ? "send_message" : POWER.test(q) && has("set_power") ? "set_power" : CONTROL.test(q) && has("fleet_control") ? "fleet_control" : NUMBERS.test(q) && has("fleet_status") ? "fleet_status" : undefined;
   let answer = "", brain = "";
   let lastSig = "", acts = 0;
   for (let step = 0; step < 24; step++) {

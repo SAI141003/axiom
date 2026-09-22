@@ -64,7 +64,8 @@ export default function JarvisDock() {
     <>
       <div className="fixed z-[90] right-5 bottom-5 flex items-center gap-3">
         <AnimatePresence>
-          {j.micOk === false && <motion.button key="mic" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => j.listen(true)} className="hud-chip" style={{ color: "var(--hud-red)" }} title="Chrome blocked the microphone — click the lock icon in the address bar, allow Microphone, then click here">mic blocked — allow it</motion.button>}
+          {j.micOk === false && <motion.button key="mic" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => j.listen()} className="hud-chip" style={{ color: "var(--hud-red)" }} title="Chrome blocked the microphone — click the lock icon in the address bar, allow Microphone, then click here">mic blocked — allow it</motion.button>}
+          {j.heard && !open && <motion.span key="heard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="hud-chip" style={{ color: "var(--hud-muted)" }}>heard: “{j.heard.slice(0, 40)}”</motion.span>}
           {j.voiceLocked && <motion.span key="voice" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="hud-chip" style={{ color: "var(--hud-amber)" }}>tap anywhere once to unlock voice</motion.span>}
           {!open && j.state !== "idle" && (
             <motion.span key="state" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} className="hud-chip" style={{ color: tone }}>{j.state === "listening" ? "listening for “hey Axiom”" : j.state}</motion.span>
@@ -88,13 +89,14 @@ export default function JarvisDock() {
                 <div className="text-[9px] truncate font-mono" style={{ color: "var(--hud-muted)" }}>{j.bridge === "online" ? `${j.brainName || "platform AI"} · on ${PAGE_NAMES[pathname] ?? pathname}` : j.bridge === "connecting" ? "connecting…" : "local fallback — start the bridge for full power"}</div>
               </div>
               <div className="flex-1" />
+              <button onClick={() => j.speak("I'm here, Sai. The mic is on and I'm listening for my name.")} className="hud-btn" title="hear AXIOM (also unlocks audio in the browser)">VOICE</button>
               <button onClick={j.brief} className="hud-btn hud-btn-accent" title="status briefing">BRIEF</button>
               <button onClick={() => setOpen(false)} aria-label="close" className="hud-icon-btn"><X size={16} /></button>
             </header>
             <Transcript msgs={j.msgs} state={j.state} className="flex-1 p-4"
                         suggestions={["What am I looking at?", "Anything broken right now?", "What changed since yesterday?", "Which bot should I watch today?"]} onPick={j.ask} />
             <form onSubmit={(e) => { e.preventDefault(); j.ask(input); setInput(""); }} className="flex items-center gap-2 p-3 border-t shrink-0" style={{ borderColor: "var(--hud-border)" }}>
-              <button type="button" onClick={() => (j.state === "listening" ? j.stopListening() : j.listen(false))} aria-label={j.state === "listening" ? "stop listening" : "talk"} aria-pressed={j.state === "listening"}
+              <button type="button" onClick={() => (j.state === "listening" ? j.stopListening() : j.listen(true))} aria-label={j.state === "listening" ? "stop listening" : "talk"} aria-pressed={j.state === "listening"}
                       className="hud-icon-btn" style={{ color: j.state === "listening" ? "var(--hud-green)" : undefined }}><Mic size={16} /></button>
               <label className="sr-only" htmlFor="jarvis-dock-input">Ask AXIOM</label>
               <input id="jarvis-dock-input" value={input} onChange={(e) => setInput(e.target.value)} placeholder="ask about this page…" autoComplete="off"
