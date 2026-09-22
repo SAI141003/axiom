@@ -22,6 +22,10 @@ export const wakeArmed = () => { try { return localStorage.getItem(WAKE_KEY) !==
 // The wake word is on by default and stays on: AXIOM listens on every page
 // ("hey Axiom" alone gives the briefing). Browsers only let a page speak
 // after the first click or key, so the first spoken reply waits for that.
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
+const lev = (a: string, b: string) => { const m = a.length, n = b.length; let prev = Array.from({ length: n + 1 }, (_, j) => j); for (let i = 1; i <= m; i++) { const cur = [i]; for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = cur; } return prev[n]; };
+const like = (a: string, b: string) => a === b || (a[0] === b[0] && lev(a, b) <= Math.max(1, Math.floor(Math.max(a.length, b.length) / 2)));
+
 export function useJarvis(opts: { voice?: boolean; context?: () => string; listen?: boolean } = {}) {
   const [state, setState] = useState<JarvisState>("idle");
   const [msgs, setMsgs] = useState<Msg[]>([]);
@@ -54,7 +58,11 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
   const [voiceLocked, setVoiceLocked] = useState(false);
   const [heard, setHeard] = useState<string>("");   // the last thing the recogniser transcribed, shown for a few seconds
   const speakingRef = useRef(false);
+  const armed = useRef(false);          // the wake word should be running
+  const spinRef = useRef<null | (() => void)>(null);
   const queue = useRef<{ text: string; audio?: Promise<string | null> }[]>([]);
+  const spoken = useRef<{ words: string[]; at: number }[]>([]);   // what AXIOM said lately, for the echo filter
+  const echoUntil = useRef(0);                                    // a tail after playback: the recogniser reports late
   const playing = useRef(false);
   const streamBuf = useRef("");
   const afterSpeech = useRef<null | (() => void)>(null);
@@ -68,12 +76,18 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
   const playNext = useCallback(async () => {
     if (playing.current) return;
     const item = queue.current.shift();
-    if (!item) { speakingRef.current = false; playing.current = false; setState("idle"); const f = afterSpeech.current; afterSpeech.current = null; f?.(); return; }
+    if (!item) {
+      speakingRef.current = false; playing.current = false; echoUntil.current = Date.now() + 2500; setState("idle");
+      if (armed.current) setTimeout(() => { if (armed.current && !speakingRef.current) spinRef.current?.(); }, 700);   // ears back on
+      const f = afterSpeech.current; afterSpeech.current = null; f?.(); return;
+    }
     playing.current = true; speakingRef.current = true; setState("speaking");
+    try { rec.current?.abort?.(); } catch {}          // half-duplex: the mic cannot hear AXIOM if it is off
+    spoken.current = [...spoken.current.filter((x) => Date.now() - x.at < 25_000), { words: norm(item.text), at: Date.now() }];
     if (queue.current[0] && !queue.current[0].audio) queue.current[0].audio = render(queue.current[0].text);   // one ahead
     const url = await (item.audio ?? render(item.text));
     let settled = false;
-    const finish = () => { if (settled) return; settled = true; playing.current = false; playNext(); };
+    const finish = () => { if (settled) return; settled = true; playing.current = false; echoUntil.current = Date.now() + 2500; playNext(); };
     setTimeout(finish, Math.max(6000, item.text.length * 110));   // an audio element that never fires onended cannot hold the queue
     if (url) {
       const a = player.current ?? new Audio(); player.current = a; audioRef.current = a;
@@ -163,15 +177,37 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
   // restart in onend is not enough — it dies and the desk goes deaf without
   // saying so. So: one supervisor, a fresh recogniser each time, a heartbeat
   // that notices when it has not been alive recently, and backoff on errors.
-  const armed = useRef(false);          // the wake word should be running
   const oneShot = useRef(false);        // next result is a question, not a wake word
   const running = useRef(false);        // the recogniser is live right now (onstart → onend)
   const startedAt = useRef(0);
   const fails = useRef(0);
 
+  // Chrome hands us its transcript after the audio has played, so AXIOM's own
+  // voice arrives glued to the front of what Sai says ("Yes, Sai?" came back
+  // as "yes sign open the eye"). Subtract the words it just spoke, loosely —
+  // the recogniser mangles them — and ignore what is left if it is only echo.
+  const deEcho = useCallback((t: string): string => {
+    let words = norm(t);
+    for (const utt of spoken.current) {
+      let i = 0, j = 0, matched = 0;
+      while (i < words.length && j < utt.words.length) {
+        if (like(words[i], utt.words[j])) { i++; j++; matched++; }
+        else if (j + 1 < utt.words.length && like(words[i], utt.words[j + 1])) { i++; j += 2; matched++; }
+        else break;
+      }
+      if (matched >= Math.min(2, utt.words.length)) words = words.slice(i);
+    }
+    return words.join(" ");
+  }, []);
+
   const handle = useCallback((t: string) => {
     setHeard(t); setTimeout(() => setHeard((h) => (h === t ? "" : h)), 6000);
     if (speakingRef.current) { if (/\b(stop|quiet|enough|shut up)\b/i.test(t)) hush(); return; }
+    if (Date.now() < echoUntil.current || spoken.current.length) {
+      const rest = deEcho(t);
+      if (!rest || rest.length < 3) return;                       // it only heard itself
+      if (rest !== norm(t).join(" ")) t = rest;                   // AXIOM's words removed, Sai's kept
+    }
     if (oneShot.current) { oneShot.current = false; ask(t); return; }
     if (!WAKE.test(t)) return;
     const q = t.replace(WAKE, "").replace(/^[,.\s]+/, "").trim();
@@ -180,7 +216,7 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
     oneShot.current = true;               // "Axiom?" — answer, then take the next thing said as the question
     speak("Yes, Sai?");
     setTimeout(() => { oneShot.current = false; }, 12_000);
-  }, [ask, hush, speak]);
+  }, [ask, hush, speak, deEcho]);
 
   const spin = useCallback(() => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -199,6 +235,7 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
     };
     try { r.start(); rec.current = r; } catch { running.current = false; }
   }, [handle]);
+  spinRef.current = spin;
 
   // the heartbeat: Chrome stops the recogniser on its own (silence, a blur, a
   // network hiccup) and simply stops listening. Spin a new one whenever it is
@@ -208,6 +245,7 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
     const t = setInterval(() => {
       if (!armed.current || micOk === false) return;
       if (fails.current > 8) { setMicOk(false); return; }
+      if (speakingRef.current) return;                       // deliberately deaf while it talks
       if (!running.current) { spin(); return; }
       if (Date.now() - startedAt.current > 4 * 60_000 && !speakingRef.current) spin();   // refresh before Chrome's own limits bite
     }, 1500);

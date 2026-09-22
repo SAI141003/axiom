@@ -142,13 +142,18 @@ export async function GET() {
     }
   }
 
-  // calendar: day → { pnl, trades } for the month grid
-  const calendar: Record<string, { pnl: number; trades: number }> = {};
+  // calendar: day → { pnl, trades, by } — the total AND where it came from,
+  // strategy by strategy, biggest contribution first, so a day's number is
+  // never a figure you have to take on trust.
+  const calendar: Record<string, { pnl: number; trades: number; by: { s: string; pnl: number; trades: number; wins: number }[] }> = {};
   for (const d of sortedDays) {
     const strats = days[d];
+    const by = Object.entries(strats).map(([s, v]: [string, any]) => ({ s, pnl: Number(v.pnl.toFixed(2)), trades: v.trades, wins: v.wins ?? 0 }))
+      .sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl));
     calendar[d] = {
-      pnl: Number(Object.values(strats).reduce((a: number, s: any) => a + s.pnl, 0).toFixed(2)),
-      trades: Object.values(strats).reduce((a: number, s: any) => a + s.trades, 0),
+      pnl: Number(by.reduce((a, x) => a + x.pnl, 0).toFixed(2)),
+      trades: by.reduce((a, x) => a + x.trades, 0),
+      by,
     };
   }
 

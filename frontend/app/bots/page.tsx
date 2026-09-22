@@ -74,7 +74,7 @@ function Fleet() {
   return (
     <div className="flex flex-col gap-4">
       {goat && (
-        <div className="hud-glass rounded-2xl p-4 flex flex-wrap items-center gap-4" role="status">
+        <button onClick={() => { window.location.href = "/bots?tab=weather"; }} className="hud-glass rounded-2xl p-4 flex flex-wrap items-center gap-4 w-full text-left" style={{ cursor: "pointer" }} title="open the weather book — every trade, the picks, the curve">
           <span className="hud-page-icon" style={{ width: 40, height: 40, color: "var(--hud-gold)", background: "var(--hud-gold-soft)", boxShadow: "inset 0 0 0 1px rgba(245,185,66,0.3), 0 0 30px -8px rgba(245,185,66,0.5)" }} aria-hidden><CloudSun size={18} /></span>
           <div className="min-w-0 flex-1">
             <div className="text-[10px] tracking-[0.22em] font-bold font-mono" style={{ color: "var(--hud-gold)" }}>THE MONEY GOAT — WEATHER</div>
@@ -86,7 +86,8 @@ function Fleet() {
             <div><div className="text-[8px] tracking-widest" style={{ color: "var(--hud-muted)" }}>TRADES</div><div className="text-2xl font-bold" style={{ color: "var(--hud-text)" }}>{goat.trades}</div></div>
             <div><div className="text-[8px] tracking-widest" style={{ color: "var(--hud-muted)" }}>TODAY</div><div className="text-2xl font-bold" style={{ color: (goat.today?.pnl ?? 0) >= 0 ? "var(--hud-green)" : "var(--hud-red)" }}>{goat.today ? `${goat.today.pnl >= 0 ? "+" : ""}${usd(goat.today.pnl)}` : "—"}</div></div>
           </div>
-        </div>
+          <span className="hud-chip" style={{ color: "var(--hud-gold)" }}>open the weather book →</span>
+        </button>
       )}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Kpi label="FLEET BALANCE" value={t ? usd(t.account) : "—"} tone={t && t.pnl >= 0 ? "good" : "bad"} sub={t ? `started at $${t.start}` : ""} />
