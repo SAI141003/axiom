@@ -64,8 +64,10 @@ export default function JarvisDock() {
     <>
       <div className="fixed z-[90] right-5 bottom-5 flex items-center gap-3">
         <AnimatePresence>
+          {j.micOk === false && <motion.button key="mic" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => j.listen(true)} className="hud-chip" style={{ color: "var(--hud-red)" }} title="Chrome blocked the microphone — click the lock icon in the address bar, allow Microphone, then click here">mic blocked — allow it</motion.button>}
+          {j.voiceLocked && <motion.span key="voice" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="hud-chip" style={{ color: "var(--hud-amber)" }}>tap anywhere once to unlock voice</motion.span>}
           {!open && j.state !== "idle" && (
-            <motion.span initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} className="hud-chip" style={{ color: tone }}>{j.state}</motion.span>
+            <motion.span key="state" initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} className="hud-chip" style={{ color: tone }}>{j.state === "listening" ? "listening for “hey Axiom”" : j.state}</motion.span>
           )}
         </AnimatePresence>
         <motion.div whileTap={reduced ? {} : { scale: 0.96 }}>
