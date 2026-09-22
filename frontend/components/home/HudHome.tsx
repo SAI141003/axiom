@@ -82,7 +82,7 @@ export default function HudHome() {
         </div>
         <nav aria-label="Dock" className="hud-dock hud-dock-tight">
           {PAGES.filter((p) => p.href !== "/").map((p) => { const Icon = p.icon; return (
-            <Link key={p.href} href={p.href} className="hud-dock-item" title={`${p.label} — ${p.hint}`} aria-label={p.label}>
+            <Link key={p.href} href={p.href} prefetch={false} className="hud-dock-item" title={`${p.label} — ${p.hint}`} aria-label={p.label}>
               <Icon size={18} strokeWidth={1.6} /><span className="hud-dock-label">{p.label}</span>
             </Link>); })}
         </nav>

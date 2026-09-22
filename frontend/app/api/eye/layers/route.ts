@@ -8,7 +8,7 @@ export async function GET(request: Request) {
   const base = new URL(request.url).origin;
   const [wt, map] = await Promise.all([
     fetch(`${base}/api/weather-trades`, { cache: "no-store" }).then((r) => r.json()).catch(() => null),
-    fetch(`${base}/api/world/map`, { cache: "no-store" }).then((r) => r.json()).catch(() => null),
+    fetch(`${base}/api/world/map?light=1`, { cache: "no-store" }).then((r) => r.json()).catch(() => null),
   ]);
   let cities: Record<string, any> = {};
   try { cities = JSON.parse(await fs.readFile(path.join(process.cwd(), "public", "eye", "stations.json"), "utf-8")); } catch {}

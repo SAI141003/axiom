@@ -48,7 +48,9 @@ ENTRY_MIN = 0.70         # raised from 0.50 — only strong favorites are +EV bo
 # h<14 favorites 50-56% win (−$). Early = forecasting (we lose);
 # late = observing (we win).
 HOUR_MIN = 14
-LOG = Path(__file__).resolve().parent.parent / "logs" / "dryrun_weather.jsonl"
+LOG = Path(__file__).resolve().parent.parent / "logs" / "dryrun_weather.jsonl"          # trades + resolves (small, the book)
+SNAP = Path(__file__).resolve().parent.parent / "logs" / "dryrun_weather_snapshots.jsonl"   # hourly station snapshots (large, state only)
+_snapped_slugs: set = set()
 SCAN_INTERVAL_S = 1800
 
 MONTHS = {m: i + 1 for i, m in enumerate(
@@ -221,6 +223,13 @@ async def multimodel_member_maxes(s: aiohttp.ClientSession, lat: float, lon: flo
 
 
 def log_write(rec: dict) -> None:
+    # snapshots go to their own file: 130k of them had grown the book's log to
+    # half a gigabyte, and every resolve pass and every dashboard read paid for it
+    if rec.get("type") == "snapshot":
+        _snapped_slugs.add(rec["slug"])
+        with SNAP.open("a") as f:
+            f.write(json.dumps(rec) + "\n")
+        return
     with LOG.open("a") as f:
         f.write(json.dumps(rec) + "\n")
 
@@ -502,18 +511,22 @@ async def scan_once(s: aiohttp.ClientSession) -> int:
 
 async def resolve_pass(s: aiohttp.ClientSession) -> int:
     """Find resolved events we snapshotted and record the winning bucket."""
-    if not LOG.exists():
-        return 0
-    slugs = set()
-    for line in LOG.open():
-        try:
-            r = json.loads(line)
-        except Exception:
-            continue
-        if r["type"] == "snapshot":
-            slugs.add(r["slug"])
-        elif r["type"] == "resolve":
-            _seen_resolved.add(r["slug"])
+    if not _seen_resolved and LOG.exists():          # once: the resolves already on the book
+        for line in LOG.open():
+            try:
+                r = json.loads(line)
+                if r["type"] == "resolve":
+                    _seen_resolved.add(r["slug"])
+            except Exception:
+                continue
+    if not _snapped_slugs and SNAP.exists():         # once: slugs seen in the last stretch of snapshots
+        with SNAP.open("rb") as f:
+            f.seek(max(0, SNAP.stat().st_size - 64 * 1024 * 1024))
+            for raw in f:
+                i = raw.find(b'"slug": "')
+                if i >= 0:
+                    _snapped_slugs.add(raw[i + 9:raw.find(b'"', i + 9)].decode())
+    slugs = set(_snapped_slugs)
     n = 0
     for slug in slugs - _seen_resolved:
         ev = await jget(s, f"{GAMMA}/events", params={"slug": slug})

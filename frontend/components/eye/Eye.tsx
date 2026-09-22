@@ -43,6 +43,7 @@ export default function Eye() {
   const [tracked, setTracked] = useState<Ent | null>(null);
   const trackedRef = useRef<Ent | null>(null); trackedRef.current = tracked;
   const [pov, setPov] = useState({ lat: 20, lng: 0, altitude: 2.2 });
+  const povRef = useRef(pov); povRef.current = pov;
   const [contacts, setContacts] = useState<Ent[]>([]);
   const [clock, setClock] = useState("");
   const [ready, setReady] = useState(false);
@@ -105,9 +106,9 @@ export default function Eye() {
     if (on.has("stations")) for (const e of data.current.stations ?? []) if (e.meta.open) labels.push({ lat: e.lat, lon: e.lon, label: e.label, color: e.color });
     g.labelsData(labels);
     // contacts: within 250 km of the tracked entity, else of the camera
-    const c = trackedRef.current ?? { lat: pov.lat, lon: pov.lng };
+    const c = trackedRef.current ?? { lat: povRef.current.lat, lon: povRef.current.lng };
     setContacts(pts.filter((p) => p !== trackedRef.current && km(c, p) <= 250).sort((a, b) => km(c, a) - km(c, b)).slice(0, 14));
-  }, [pov.lat, pov.lng]);
+  }, []);   // stable on purpose: a redraw that changed identity with the camera re-fetched every feed twice a second
 
   // ── the feeds ──
   const load = useCallback(async (id: string) => {
@@ -161,11 +162,15 @@ export default function Eye() {
   useEffect(() => {
     if (!ready) return;
     const timers: any[] = [];
-    for (const l of LAYERS) { load(l.id); if (l.every < 1e11) timers.push(setInterval(() => { if (layersRef.current.find((x) => x.id === l.id)?.on) load(l.id); }, l.every)); }
+    // the globe first, then the feeds in order of weight: light ones now, the heavy ones a beat later
+    const order = ["markets", "stations", "quakes", "launches", "mil", "flights", "sats", "cables", "radio", "datacenters", "dams", "fires", "vessels"];
+    order.forEach((idd, i) => setTimeout(() => load(idd), i < 5 ? 0 : 400 * (i - 4)));
+    for (const l of LAYERS) if (l.every < 1e11) timers.push(setInterval(() => { if (layersRef.current.find((x) => x.id === l.id)?.on) load(l.id); }, l.every));
     timers.push(setInterval(redraw, 1000));   // satellites move
     timers.push(setInterval(() => setClock(new Date().toISOString().slice(11, 19) + "Z"), 1000));
     return () => timers.forEach(clearInterval);
-  }, [ready, load, redraw]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready]);
   useEffect(() => { redraw(); }, [layers, redraw]);
 
   // ── tracking: the camera follows what you clicked ──

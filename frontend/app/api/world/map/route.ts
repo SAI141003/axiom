@@ -39,18 +39,23 @@ function status(ex: typeof EXCHANGES[0]) {
   return { local: hm, open: !weekend && open };
 }
 let quakeCache: { at: number; items: any[] } | null = null;
+let regionCache: { at: number; regions: any[] } | null = null;
 export async function GET(request: Request) {
   const base = new URL(request.url).origin;
+  const light = new URL(request.url).searchParams.get("light") === "1";   // exchanges + chokepoints only (the Eye)
+  if (light) return NextResponse.json({ generated: Date.now(), exchanges: EXCHANGES.map((e) => ({ name: e.name, lat: e.lat, lon: e.lon, tz: e.tz, session: `${e.open}–${e.close}`, ...status(e) })), chokepoints: CHOKEPOINTS, regions: [], quakes: [] });
   let quakes: any[] = quakeCache && Date.now() - quakeCache.at < 10 * 60_000 ? quakeCache.items : [];
   if (!quakes.length) {
     try { const g = await (await fetch("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_day.geojson", { signal: AbortSignal.timeout(12_000), cache: "no-store" })).json();
       quakes = g.features.map((f: any) => ({ mag: f.properties.mag, place: f.properties.place, time: f.properties.time, lon: f.geometry.coordinates[0], lat: f.geometry.coordinates[1] })); quakeCache = { at: Date.now(), items: quakes }; } catch {}
   }
-  const regions: any[] = [];
-  try {
-    const w = await (await fetch(`${base}/api/world?cat=all`, { cache: "no-store" })).json();
+  let regions: any[] = regionCache && Date.now() - regionCache.at < 5 * 60_000 ? regionCache.regions : [];
+  if (!regions.length) try {
+    const w = await (await fetch(`${base}/api/world?cat=all`, { cache: "no-store", signal: AbortSignal.timeout(20_000) })).json();
     for (const r of Object.keys(REGION)) { const n = (w.catalog ?? {})[r] ?? 0; if (n) regions.push({ id: r, lat: REGION[r][0], lon: REGION[r][1], feeds: n }); }
-    for (const r of regions) { try { const c = await (await fetch(`${base}/api/world?cat=${r.id}`, { cache: "no-store" })).json(); r.items = (c.items ?? []).slice(0, 4); r.fresh = (c.items ?? []).filter((x: any) => Date.now() - x.when < 6 * 3600_000).length; } catch { r.items = []; r.fresh = 0; } }
+    // every region at once, not one after another (that took 44 s)
+    await Promise.all(regions.map(async (r) => { try { const c = await (await fetch(`${base}/api/world?cat=${r.id}`, { cache: "no-store", signal: AbortSignal.timeout(15_000) })).json(); r.items = (c.items ?? []).slice(0, 4); r.fresh = (c.items ?? []).filter((x: any) => Date.now() - x.when < 6 * 3600_000).length; } catch { r.items = []; r.fresh = 0; } }));
+    regionCache = { at: Date.now(), regions };
   } catch {}
   return NextResponse.json({ generated: Date.now(), exchanges: EXCHANGES.map((e) => ({ name: e.name, lat: e.lat, lon: e.lon, tz: e.tz, session: `${e.open}–${e.close}`, ...status(e) })), chokepoints: CHOKEPOINTS, quakes, regions });
 }

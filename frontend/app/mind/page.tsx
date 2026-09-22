@@ -35,7 +35,7 @@ export default function JarvisPage() {
   return (
     <div className="hud-bg min-h-screen relative">
       <TopNav />
-      <div className="relative">
+      <div className="relative" style={{ height: "calc(100vh - 56px)", overflow: "hidden" }}>
         <MindScene />
         <div className="absolute top-4 right-4 z-20 flex flex-col items-end gap-2" style={{ width: "min(440px, calc(100vw - 2rem))" }}>
           <div className="flex items-center gap-2">
