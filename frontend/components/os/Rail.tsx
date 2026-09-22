@@ -22,8 +22,8 @@ export default function Rail() {
     const load = async () => {
       try {
         const [f, a] = await Promise.all([fetch("/api/fleet").then((r) => r.json()), fetch("/api/agents").then((r) => r.json())]);
-        const goat = (f.probes ?? []).find((p: any) => p.name === "weather (late-day)");
-        setV({ pnl: f.totals?.pnl, goat: goat?.pnl, running: a.running, total: a.total, down: a.down });
+        const weatherBot = (f.probes ?? []).find((p: any) => p.name === "weather (late-day)");
+        setV({ pnl: f.totals?.pnl, weather: weatherBot?.pnl, running: a.running, total: a.total, down: a.down });
       } catch {}
     };
     load(); const t = setInterval(load, 60_000); return () => clearInterval(t);
@@ -57,7 +57,7 @@ export default function Rail() {
       </nav>
       <div className="hud-rail-foot">
         <Vital label="Fleet" value={v?.pnl != null ? `${v.pnl >= 0 ? "+" : "−"}$${Math.abs(v.pnl).toFixed(0)}` : "—"} tone={v?.pnl >= 0 ? "var(--hud-green)" : "var(--hud-red)"} open={open} />
-        <Vital label="Goat" value={v?.goat != null ? `${v.goat >= 0 ? "+" : "−"}$${Math.abs(v.goat).toFixed(0)}` : "—"} tone="var(--hud-gold)" open={open} />
+        <Vital label="Weather" value={v?.weather != null ? `${v.weather >= 0 ? "+" : "−"}$${Math.abs(v.weather).toFixed(0)}` : "—"} tone="var(--hud-gold)" open={open} />
         <Vital label="Agents" value={v ? `${v.running}/${v.total}` : "—"} tone={v?.down ? "var(--hud-red)" : "var(--hud-green)"} open={open} />
         <button onClick={() => { const n = !pinned; setPinned(n); try { localStorage.setItem("axiom.rail", n ? "open" : "closed"); } catch {} }} className="hud-rail-item mt-1" aria-pressed={pinned} aria-label={pinned ? "collapse rail" : "pin rail open"}>
           {pinned ? <ChevronsLeft size={16} aria-hidden /> : <ChevronsRight size={16} aria-hidden />}

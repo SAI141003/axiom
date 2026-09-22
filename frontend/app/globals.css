@@ -231,7 +231,7 @@ html, body {
   --hud-accent-deep: #1a8fd6;/* deeper accent (gradient bottom) */
   --hud-accent-soft: rgba(76,201,255,0.12);
   --hud-glow:     rgba(76,201,255,0.36);
-  --hud-gold:     #f5b942;   /* power accent: money, the goat, headline numbers (10.5:1) */
+  --hud-gold:     #f5b942;   /* power accent: money, the weather bot, headline numbers (10.5:1) */
   --hud-gold-soft: rgba(245,185,66,0.14);
   /* legacy names remap → one color language across every page */
   --hud-cyan:     #4cc9ff;
