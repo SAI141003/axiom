@@ -8,7 +8,9 @@ export type JarvisState = "idle" | "listening" | "thinking" | "speaking";
 export type BridgeState = "connecting" | "online" | "offline";
 
 const BRIDGE = "ws://127.0.0.1:8788";
-export const WAKE = /\b(hey|ok|okay)\s+axiom\b/i;
+// How Chrome's recogniser actually hears "Axiom": axiom, axium, axeum, axon, axiam, "ax iom", action-ish slips.
+export const WAKE = /\b(?:hey|ok|okay|yo|hi)?[,\s]*(?:axiom|axium|axeum|axeom|axiam|axion|axon|ax\s?i[ou]m|acxiom|exiom)\b[,.!?]*/i;
+export const WAKE_ONLY = /^\s*(?:wake up|are you there|you there|hello|hey|hi|status|what's up|whats up)?\s*[,.!?]*\s*$/i;
 export const BRIEF = "Good morning, Axiom. Give me the status briefing.";
 
 // One AXIOM for the whole desk. The page at /jarvis and the dock on every
@@ -47,6 +49,8 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
   // the browser's own en-GB voice is only the fallback when that route fails,
   // so the desk never switches voices mid-conversation.
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const player = useRef<HTMLAudioElement | null>(null);   // created inside the first gesture, so later plays are allowed
+  const [voiceLocked, setVoiceLocked] = useState(false);
   const speakingRef = useRef(false);
   const hush = useCallback(() => { if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; } try { speechSynthesis.cancel(); } catch {} speakingRef.current = false; setState("idle"); }, []);
   const speak = useCallback(async (text: string) => {
@@ -58,12 +62,13 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
       const r = await fetch("/api/jarvis/tts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: clean }) });
       if (!r.ok) throw new Error(String(r.status));
       const url = URL.createObjectURL(await r.blob());
-      const a = new Audio(url); audioRef.current = a;
-      a.onplay = () => { speakingRef.current = true; setState("speaking"); };
+      const a = player.current ?? new Audio(); player.current = a; audioRef.current = a;
+      a.muted = false; a.volume = 1; a.src = url;
+      a.onplay = () => { speakingRef.current = true; setVoiceLocked(false); setState("speaking"); };
       a.onended = () => { speakingRef.current = false; setState("idle"); URL.revokeObjectURL(url); };
       a.onerror = () => { speakingRef.current = false; setState("idle"); URL.revokeObjectURL(url); };
-      await a.play();
-      return;
+      try { await a.play(); return; }
+      catch (e: any) { if (e?.name === "NotAllowedError") setVoiceLocked(true); throw e; }
     } catch { /* fall through to the browser voice */ }
     if (typeof speechSynthesis === "undefined") { setState("idle"); return; }
     const u = new SpeechSynthesisUtterance(clean);
@@ -133,7 +138,7 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
       if (!t) return;
       // "axiom, stop" cuts it off; anything else heard while it speaks is its own voice
       if (speakingRef.current) { if (/\b(stop|quiet|enough|shut up)\b/i.test(t)) hush(); return; }
-      if (continuous) { if (WAKE.test(t)) { const q = t.replace(WAKE, "").replace(/^[,.\s]+/, "").trim(); ask(q.length > 2 ? q : BRIEF); } }
+      if (continuous) { if (WAKE.test(t)) { const q = t.replace(WAKE, "").replace(/^[,.\s]+/, "").trim(); ask(!q || WAKE_ONLY.test(q) ? BRIEF : q); } }
       else ask(t);
     };
     try { r.start(); rec.current = r; } catch { setState("idle"); }
@@ -153,10 +158,14 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
 
   // Unlock speech on the first gesture so the next reply is heard.
   useEffect(() => {
-    const prime = () => { try { speechSynthesis.resume(); const u = new SpeechSynthesisUtterance(""); u.volume = 0; speechSynthesis.speak(u); } catch {} window.removeEventListener("pointerdown", prime); window.removeEventListener("keydown", prime); };
+    const prime = () => {
+      try { speechSynthesis.resume(); const u = new SpeechSynthesisUtterance(""); u.volume = 0; speechSynthesis.speak(u); } catch {}
+      try { const a = player.current ?? new Audio(); player.current = a; a.muted = true; a.play().catch(() => {}); setTimeout(() => { a.pause(); a.muted = false; }, 50); setVoiceLocked(false); } catch {}
+      window.removeEventListener("pointerdown", prime); window.removeEventListener("keydown", prime);
+    };
     window.addEventListener("pointerdown", prime); window.addEventListener("keydown", prime);
     return () => { window.removeEventListener("pointerdown", prime); window.removeEventListener("keydown", prime); };
   }, []);
 
-  return { state, msgs, bridge, brainName, micOk, wakeOn, ask, forget, listen, stopListening, setWake, hush, brief: () => ask(BRIEF) };
+  return { state, msgs, bridge, brainName, micOk, wakeOn, voiceLocked, ask, forget, listen, stopListening, setWake, hush, brief: () => ask(BRIEF) };
 }
