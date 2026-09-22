@@ -67,6 +67,7 @@ export async function GET(request: Request) {
   const base = new URL(request.url).origin;
   const timed = async (label: string, f: () => Promise<any>) => { const t = Date.now(); try { const r = await f(); return { label, ok: !!r, ms: Date.now() - t, ...r }; } catch (e: any) { return { label, ok: false, ms: Date.now() - t, note: String(e?.message ?? e).slice(0, 80) }; } };
   const services = await Promise.all([
+    timed("Ears · whisper.cpp (local, MIT weights)", async () => { const r = await fetch(`${base}/api/jarvis/stt`, { cache: "no-store" }); const d = await r.json(); return { ok: !!d.ok, note: d.ok ? `${d.model}${d.warm ? " · warm" : ""}` : (d.note ?? "not running — launchctl kickstart -k gui/$UID/com.polymarket.stt") }; }),
     timed("Voice · edge-tts en-GB Ryan", async () => { const r = await fetch(`${base}/api/jarvis/tts`, { cache: "no-store" }); const d = await r.json(); return { ok: d.ok, note: d.engine }; }),
     timed("Bridge · ws://127.0.0.1:8788", () => new Promise((res) => { const s = net.connect(8788, "127.0.0.1"); s.setTimeout(2000); s.on("connect", () => { s.destroy(); res({ ok: true, note: "listening" }); }); s.on("error", () => res({ ok: false, note: "not running — cd jarvis && npm start" })); s.on("timeout", () => { s.destroy(); res({ ok: false, note: "timeout" }); }); })),
     timed("MiroFish swarm · :5001", async () => { const r = await fetch(`${base}/api/mirofish`, { cache: "no-store" }); const d = await r.json(); return { ok: !!d.online, note: d.online ? `${d.population} personas on ${d.micro_model}` : "offline" }; }),

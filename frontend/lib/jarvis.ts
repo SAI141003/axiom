@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Ears, whisperReady } from "./ears";
 
 export type Msg = { role: "you" | "jarvis"; text: string; tools?: string[]; brain?: "bridge" | "local" };
 export type JarvisState = "idle" | "listening" | "thinking" | "speaking";
@@ -58,8 +59,12 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
   const [voiceLocked, setVoiceLocked] = useState(false);
   const [heard, setHeard] = useState<string>("");   // the last thing the recogniser transcribed, shown for a few seconds
   const speakingRef = useRef(false);
+  const ears = useRef<Ears | null>(null);
+  const [engine, setEngine] = useState<"whisper" | "browser" | "">("");
   const armed = useRef(false);          // the wake word should be running
   const spinRef = useRef<null | (() => void)>(null);
+  const handleRef = useRef<null | ((t: string) => void)>(null);
+  const engineRef = useRef<"whisper" | "browser" | "">("");
   const queue = useRef<{ text: string; audio?: Promise<string | null> }[]>([]);
   const spoken = useRef<{ words: string[]; at: number }[]>([]);   // what AXIOM said lately, for the echo filter
   const echoUntil = useRef(0);                                    // a tail after playback: the recogniser reports late
@@ -78,11 +83,12 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
     const item = queue.current.shift();
     if (!item) {
       speakingRef.current = false; playing.current = false; echoUntil.current = Date.now() + 2500; setState("idle");
-      if (armed.current) setTimeout(() => { if (armed.current && !speakingRef.current) spinRef.current?.(); }, 700);   // ears back on
+      if (armed.current) setTimeout(() => { if (armed.current && !speakingRef.current) { ears.current?.resume(); spinRef.current?.(); } }, 700);   // ears back on
       const f = afterSpeech.current; afterSpeech.current = null; f?.(); return;
     }
     playing.current = true; speakingRef.current = true; setState("speaking");
     try { rec.current?.abort?.(); } catch {}          // half-duplex: the mic cannot hear AXIOM if it is off
+    ears.current?.pause();
     spoken.current = [...spoken.current.filter((x) => Date.now() - x.at < 25_000), { words: norm(item.text), at: Date.now() }];
     if (queue.current[0] && !queue.current[0].audio) queue.current[0].audio = render(queue.current[0].text);   // one ahead
     const url = await (item.audio ?? render(item.text));
@@ -219,6 +225,17 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
   }, [ask, hush, speak, deEcho]);
 
   const spin = useCallback(() => {
+    if (ears.current?.live) { running.current = true; startedAt.current = Date.now(); return; }
+    if (engineRef.current === "whisper") {
+      const e = new Ears({
+        onText: (t) => { running.current = true; startedAt.current = Date.now(); handleRef.current?.(t); },
+        onState: (st) => { running.current = st !== "idle"; startedAt.current = Date.now(); if (st === "listening") setState((x) => (x === "idle" ? "listening" : x)); if (st === "thinking") setState((x) => (x === "listening" ? "thinking" : x)); },
+        onError: (err) => { if (err === "not-allowed") { setMicOk(false); armed.current = false; setWakeOn(false); } else fails.current++; },
+      });
+      ears.current = e;
+      e.start().then((ok) => { setMicOk(ok); running.current = ok; startedAt.current = Date.now(); if (!ok) ears.current = null; });
+      return;
+    }
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) { setMicOk(false); return; }
     try { rec.current?.abort?.(); } catch {}
@@ -236,6 +253,7 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
     try { r.start(); rec.current = r; } catch { running.current = false; }
   }, [handle]);
   spinRef.current = spin;
+  handleRef.current = handle;
 
   // the heartbeat: Chrome stops the recogniser on its own (silence, a blur, a
   // network hiccup) and simply stops listening. Spin a new one whenever it is
@@ -259,17 +277,21 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
     spin();
   }, [spin]);
 
-  const stopListening = useCallback(() => { armed.current = false; wakeRef.current = false; setWakeOn(false); try { rec.current?.abort?.(); } catch {} setState((s) => (s === "listening" ? "idle" : s)); }, []);
+  const stopListening = useCallback(() => { armed.current = false; wakeRef.current = false; setWakeOn(false); try { rec.current?.abort?.(); } catch {} ears.current?.stop(); ears.current = null; running.current = false; setState((s) => (s === "listening" ? "idle" : s)); }, []);
   const setWake = useCallback((on: boolean) => { try { localStorage.setItem(WAKE_KEY, on ? "on" : "off"); } catch {} if (on) listen(); else stopListening(); }, [listen, stopListening]);
+
+  // Whisper if it is installed on this machine, the browser recogniser if not.
+  useEffect(() => { let ok = true; whisperReady().then((w) => { if (!ok) return; engineRef.current = w ? "whisper" : "browser"; setEngine(w ? "whisper" : "browser"); }); return () => { ok = false; }; }, []);
 
   // Always on: arm the wake word on mount when this instance owns the mic.
   useEffect(() => {
     if (opts.listen === false) return;
     if (!wakeArmed()) return;
-    const t = setTimeout(() => listen(), 800);
-    return () => { clearTimeout(t); armed.current = false; try { rec.current?.abort?.(); } catch {} };
+    if (!engine) return;                                   // wait until we know which engine
+    const t = setTimeout(() => listen(), 400);
+    return () => { clearTimeout(t); armed.current = false; try { rec.current?.abort?.(); } catch {} ears.current?.stop(); ears.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [opts.listen]);
+  }, [opts.listen, engine]);
 
   // Unlock speech on the first gesture so the next reply is heard.
   useEffect(() => {
@@ -284,5 +306,5 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
 
   // a stuck "speaking" is the one state that deafens the desk; never allow it past a minute
   useEffect(() => { if (state !== "speaking") return; const t = setTimeout(() => { if (speakingRef.current) hush(); }, 60_000); return () => clearTimeout(t); }, [state, hush]);
-  return { state, msgs, bridge, brainName, micOk, wakeOn, voiceLocked, heard, ask, forget, listen, stopListening, setWake, hush, speak, brief: () => ask(BRIEF) };
+  return { state, msgs, bridge, brainName, micOk, wakeOn, voiceLocked, heard, engine, ask, forget, listen, stopListening, setWake, hush, speak, brief: () => ask(BRIEF) };
 }
