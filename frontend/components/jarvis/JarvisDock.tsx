@@ -86,7 +86,7 @@ export default function JarvisDock() {
               <Sparkles size={15} style={{ color: tone }} aria-hidden />
               <div className="min-w-0">
                 <div className="text-[11px] font-bold tracking-[0.22em] font-mono" style={{ color: "var(--hud-text)" }}>AXIOM</div>
-                <div className="text-[9px] truncate font-mono" style={{ color: "var(--hud-muted)" }}>{j.bridge === "online" ? `${j.brainName || "platform AI"} · on ${PAGE_NAMES[pathname] ?? pathname}` : j.bridge === "connecting" ? "connecting…" : "local fallback — start the bridge for full power"}</div>
+                <div className="text-[9px] truncate font-mono" style={{ color: "var(--hud-muted)" }}>{j.bridge === "online" ? `${j.brainName || "platform AI"}${j.engine === "whisper" ? " · whisper ears" : ""} · on ${PAGE_NAMES[pathname] ?? pathname}` : j.bridge === "connecting" ? "connecting…" : "local fallback — start the bridge for full power"}</div>
               </div>
               <div className="flex-1" />
               <button onClick={() => j.speak("I'm here, Sai. The mic is on and I'm listening for my name.")} className="hud-btn" title="hear AXIOM (also unlocks audio in the browser)">VOICE</button>
