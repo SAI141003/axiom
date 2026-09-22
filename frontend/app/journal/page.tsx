@@ -76,6 +76,7 @@ export default function JournalPage() {
   const a = data?.analytics;
   const strategies = Object.entries<any>(data?.strategies ?? {}).sort((x, y) => y[1].pnl - x[1].pnl);
 
+  const [pickedDay, setPickedDay] = useState<string | null>(null);
   // calendar grid for the selected month
   const cal = useMemo(() => {
     const first = new Date(Date.UTC(month.y, month.m, 1));
@@ -341,10 +342,15 @@ export default function JournalPage() {
                              : "rgba(23,27,36,0.35)";
               const border = rec ? (win ? "rgba(52,211,153,0.65)" : "rgba(248,113,113,0.65)")
                                   : "rgba(35,40,56,0.6)";
+              const top = (rec?.by ?? []).slice(0, 2);
+              const sel = c && pickedDay === c.key;
               return (
-                <div key={i} className="rounded p-1.5 min-h-[58px] border"
-                     style={{ background: c ? bg : "transparent", borderColor: c ? border : "transparent",
-                              boxShadow: rec ? `inset 0 0 0 1px ${win ? "rgba(52,211,153,0.25)" : "rgba(248,113,113,0.25)"}` : "none" }}>
+                <button key={i} onClick={() => c && rec && setPickedDay(sel ? null : c.key)} disabled={!c || !rec}
+                     title={rec ? `${c!.key}: ${(rec.by ?? []).map((b: any) => `${b.s} ${b.pnl >= 0 ? "+" : ""}${b.pnl}`).join(" · ")}` : undefined}
+                     className="rounded p-1.5 min-h-[72px] border text-left"
+                     style={{ background: c ? bg : "transparent", borderColor: c ? (sel ? "var(--hud-accent)" : border) : "transparent",
+                              boxShadow: sel ? "0 0 0 1px var(--hud-accent)" : rec ? `inset 0 0 0 1px ${win ? "rgba(52,211,153,0.25)" : "rgba(248,113,113,0.25)"}` : "none",
+                              cursor: rec ? "pointer" : "default" }}>
                   {c && (
                     <>
                       <div className="text-[9px]" style={{ color: "var(--hud-muted)" }}>{c.day}</div>
@@ -353,16 +359,58 @@ export default function JournalPage() {
                           <div className="text-[11px] font-bold tabular-nums" style={{ color: win ? "#6ee7b7" : "#fca5a5" }}>
                             {win ? "+" : ""}{rec.pnl}
                           </div>
-                          <div className="text-[8px]" style={{ color: "var(--hud-muted)" }}>{rec.trades} tr</div>
+                          {/* where the day's number came from */}
+                          {top.map((b: any) => (
+                            <div key={b.s} className="flex justify-between gap-1 text-[8px] leading-[1.35] tabular-nums" style={{ color: "var(--hud-muted)" }}>
+                              <span className="truncate">{b.s.replace("-", " ").slice(0, 9)}</span>
+                              <span style={{ color: b.pnl >= 0 ? "#6ee7b7" : "#fca5a5" }}>{b.pnl >= 0 ? "+" : ""}{Math.round(b.pnl)}</span>
+                            </div>
+                          ))}
+                          {(rec.by?.length ?? 0) > 2 && <div className="text-[8px]" style={{ color: "var(--hud-border-2)" }}>+{rec.by.length - 2} more · {rec.trades} tr</div>}
                         </>
                       )}
                     </>
                   )}
-                </div>
+                </button>
               );
             })}
           </div>
         </motion.div>
+
+        {/* the picked day, in full: every strategy that made or lost the total */}
+        {pickedDay && data?.calendar?.[pickedDay] && (() => {
+          const rec = data.calendar[pickedDay];
+          const total = rec.pnl;
+          const note = (data?.notes ?? []).find((n: any) => n.day === pickedDay);
+          return (
+            <motion.div {...fadeUp} className={panel + " mb-8"}>
+              <div className="flex items-center gap-3 mb-2 flex-wrap">
+                <div className="text-xs font-bold" style={{ color: "var(--hud-text)" }}>{new Date(pickedDay + "T12:00:00Z").toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}</div>
+                <div className="text-sm font-bold tabular-nums" style={{ color: total >= 0 ? GREEN : RED }}>{total >= 0 ? "+" : ""}${total.toFixed(2)}</div>
+                <div className="text-[10px]" style={{ color: "var(--hud-muted)" }}>{rec.trades} trades across {rec.by?.length ?? 0} strategies</div>
+                <span className="flex-1" />
+                <button onClick={() => setPickedDay(null)} className="px-2 py-0.5 text-[10px] rounded border" style={{ borderColor: "var(--hud-border)", color: "var(--hud-muted)" }}>close</button>
+              </div>
+              <div className="flex flex-col gap-1">
+                {(rec.by ?? []).map((b: any) => {
+                  const share = total !== 0 ? Math.min(100, Math.abs(b.pnl / total) * 100) : 0;
+                  return (
+                    <div key={b.s} className="flex items-center gap-2 text-[11px] tabular-nums">
+                      <span className="w-28 truncate" style={{ color: "var(--hud-text)" }}>{b.s}</span>
+                      <span className="w-20 text-right font-bold" style={{ color: b.pnl >= 0 ? GREEN : RED }}>{b.pnl >= 0 ? "+" : ""}${b.pnl.toFixed(2)}</span>
+                      <span className="w-24 text-right" style={{ color: "var(--hud-muted)" }}>{b.trades} tr · {b.trades ? Math.round((b.wins / b.trades) * 100) : 0}% won</span>
+                      <span className="flex-1 h-[6px] rounded" style={{ background: "rgba(255,255,255,0.05)" }}>
+                        <span className="block h-full rounded" style={{ width: `${share}%`, background: b.pnl >= 0 ? GREEN : RED, opacity: 0.8 }} />
+                      </span>
+                      <span className="w-12 text-right text-[9px]" style={{ color: "var(--hud-muted)" }}>{share.toFixed(0)}%</span>
+                    </div>
+                  );
+                })}
+              </div>
+              {note && <div className="mt-3 pt-2 text-[11px] border-t" style={{ borderColor: "var(--hud-border)", color: "var(--hud-muted)" }}>{note.summary ? JSON.stringify(note.summary).slice(0, 300) : ""}{(note.lessons ?? []).slice(0, 2).join(" · ")}</div>}
+            </motion.div>
+          );
+        })()}
 
         {/* ── BRAIN NOTES ── */}
         {heading("B R A I N   N O T E S")}
