@@ -52,6 +52,7 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const player = useRef<HTMLAudioElement | null>(null);   // created inside the first gesture, so later plays are allowed
   const [voiceLocked, setVoiceLocked] = useState(false);
+  const [heard, setHeard] = useState<string>("");   // the last thing the recogniser transcribed, shown for a few seconds
   const speakingRef = useRef(false);
   const queue = useRef<{ text: string; audio?: Promise<string | null> }[]>([]);
   const playing = useRef(false);
@@ -71,13 +72,18 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
     playing.current = true; speakingRef.current = true; setState("speaking");
     if (queue.current[0] && !queue.current[0].audio) queue.current[0].audio = render(queue.current[0].text);   // one ahead
     const url = await (item.audio ?? render(item.text));
-    const finish = () => { playing.current = false; playNext(); };
+    let settled = false;
+    const finish = () => { if (settled) return; settled = true; playing.current = false; playNext(); };
+    setTimeout(finish, Math.max(6000, item.text.length * 110));   // an audio element that never fires onended cannot hold the queue
     if (url) {
       const a = player.current ?? new Audio(); player.current = a; audioRef.current = a;
       a.muted = false; a.volume = 1; a.src = url;
       a.onended = () => { URL.revokeObjectURL(url); finish(); };
       a.onerror = () => { URL.revokeObjectURL(url); finish(); };
-      try { await a.play(); setVoiceLocked(false); return; } catch (e: any) { if (e?.name === "NotAllowedError") setVoiceLocked(true); }
+      try { await a.play(); setVoiceLocked(false); return; }
+      catch (e: any) {
+        if (e?.name === "NotAllowedError") { setVoiceLocked(true); URL.revokeObjectURL(url); queue.current = []; streamBuf.current = ""; playing.current = false; speakingRef.current = false; setState("idle"); const f = afterSpeech.current; afterSpeech.current = null; f?.(); return; }   // no gesture yet: drop the speech, never block the ears
+      }
     }
     // fallback: the browser's voice, one fixed en-GB choice
     if (typeof speechSynthesis === "undefined") { finish(); return; }
@@ -85,7 +91,9 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
     const vs = speechSynthesis.getVoices();
     const v = vs.find((x) => /Daniel/i.test(x.name) && /en[-_]GB/i.test(x.lang)) ?? vs.find((x) => /Google UK English Male/i.test(x.name)) ?? vs.find((x) => /en[-_]GB/i.test(x.lang));
     if (v) u.voice = v;
-    u.onend = finish; u.onerror = finish;
+    let done = false; const once = () => { if (!done) { done = true; finish(); } };
+    u.onend = once; u.onerror = once;
+    setTimeout(once, Math.max(4000, item.text.length * 90));   // a synthesis that never reports back cannot hold the desk mute
     speechSynthesis.speak(u);
   }, [render]);
 
@@ -149,44 +157,79 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
 
   const forget = useCallback(() => { ws.current?.send(JSON.stringify({ type: "forget" })); setMsgs([]); }, []);
 
-  const listen = useCallback((continuous: boolean) => {
+  // ── The ears ────────────────────────────────────────────────────────────
+  // Chrome's SpeechRecognition stops on its own constantly: silence, a tab
+  // blur, a network hiccup, an "aborted" it never explains. A one-shot
+  // restart in onend is not enough — it dies and the desk goes deaf without
+  // saying so. So: one supervisor, a fresh recogniser each time, a heartbeat
+  // that notices when it has not been alive recently, and backoff on errors.
+  const armed = useRef(false);          // the wake word should be running
+  const oneShot = useRef(false);        // next result is a question, not a wake word
+  const running = useRef(false);        // the recogniser is live right now (onstart → onend)
+  const startedAt = useRef(0);
+  const fails = useRef(0);
+
+  const handle = useCallback((t: string) => {
+    setHeard(t); setTimeout(() => setHeard((h) => (h === t ? "" : h)), 6000);
+    if (speakingRef.current) { if (/\b(stop|quiet|enough|shut up)\b/i.test(t)) hush(); return; }
+    if (oneShot.current) { oneShot.current = false; ask(t); return; }
+    if (!WAKE.test(t)) return;
+    const q = t.replace(WAKE, "").replace(/^[,.\s]+/, "").trim();
+    if (q && !WAKE_ONLY.test(q)) { ask(q); return; }
+    if (/status|what.s up|whats up|wake up|brief/i.test(q)) { ask(BRIEF); return; }
+    oneShot.current = true;               // "Axiom?" — answer, then take the next thing said as the question
+    speak("Yes, Sai?");
+    setTimeout(() => { oneShot.current = false; }, 12_000);
+  }, [ask, hush, speak]);
+
+  const spin = useCallback(() => {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) { setMicOk(false); return; }
-    rec.current?.stop();
-    const r = new SR(); r.lang = "en-US"; r.continuous = continuous; r.interimResults = false;
-    r.onstart = () => { setMicOk(true); setState("listening"); };
-    r.onerror = (e: any) => { if (e.error === "not-allowed") setMicOk(false); setState("idle"); };
-    r.onend = () => {
-      if (continuous && wakeRef.current) { try { r.start(); } catch {} return; }
-      setState((s) => (s === "listening" ? "idle" : s));
-      if (!continuous && wakeRef.current) setTimeout(() => listen(true), 400);   // the one-shot question is over: back to the wake word
+    try { rec.current?.abort?.(); } catch {}
+    const r = new SR(); r.lang = "en-US"; r.continuous = true; r.interimResults = false; r.maxAlternatives = 1;
+    r.onstart = () => { running.current = true; startedAt.current = Date.now(); setMicOk(true); fails.current = 0; setState((s) => (s === "idle" ? "listening" : s)); };
+    r.onerror = (e: any) => {
+      if (e.error === "not-allowed" || e.error === "service-not-allowed") { running.current = false; setMicOk(false); armed.current = false; setWakeOn(false); return; }
+      if (e.error !== "no-speech" && e.error !== "aborted") fails.current++;
     };
+    r.onend = () => { running.current = false; setState((s) => (s === "listening" ? "idle" : s)); };
     r.onresult = (e: any) => {
       const t = Array.from(e.results).slice(e.resultIndex).map((x: any) => x[0].transcript).join(" ").trim();
-      if (!t) return;
-      // "axiom, stop" cuts it off; anything else heard while it speaks is its own voice
-      if (speakingRef.current) { if (/\b(stop|quiet|enough|shut up)\b/i.test(t)) hush(); return; }
-      if (continuous) { if (WAKE.test(t)) { const q = t.replace(WAKE, "").replace(/^[,.\s]+/, "").trim();
-        if (!q || WAKE_ONLY.test(q)) {
-          // "Axiom?" — answer like a person and take the question, one shot; nothing said → back to the wake word
-          if (/status|what.s up|whats up|wake up/i.test(q)) { ask(BRIEF); return; }
-          afterSpeech.current = () => listen(false);
-          speak("Yes, Sai?");
-        } else ask(q); } }
-      else ask(t);
+      if (t) handle(t);
     };
-    try { r.start(); rec.current = r; } catch { setState("idle"); }
-  }, [ask, hush]);
+    try { r.start(); rec.current = r; } catch { running.current = false; }
+  }, [handle]);
 
-  const stopListening = useCallback(() => { rec.current?.stop(); }, []);
-  const setWake = useCallback((on: boolean) => { wakeRef.current = on; setWakeOn(on); try { localStorage.setItem(WAKE_KEY, on ? "on" : "off"); } catch {} if (on) listen(true); else { rec.current?.stop(); rec.current = null; } }, [listen]);
+  // the heartbeat: Chrome stops the recogniser on its own (silence, a blur, a
+  // network hiccup) and simply stops listening. Spin a new one whenever it is
+  // not running, and force a fresh one every few minutes because a long-lived
+  // session goes quietly deaf.
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (!armed.current || micOk === false) return;
+      if (fails.current > 8) { setMicOk(false); return; }
+      if (!running.current) { spin(); return; }
+      if (Date.now() - startedAt.current > 4 * 60_000 && !speakingRef.current) spin();   // refresh before Chrome's own limits bite
+    }, 1500);
+    return () => clearInterval(t);
+  }, [spin, micOk]);
+  useEffect(() => { const onVis = () => { if (!document.hidden && armed.current) spin(); }; document.addEventListener("visibilitychange", onVis); return () => document.removeEventListener("visibilitychange", onVis); }, [spin]);
+
+  const listen = useCallback((asQuestion = false) => {
+    if (asQuestion) oneShot.current = true;
+    armed.current = true; wakeRef.current = true; setWakeOn(true); fails.current = 0; setMicOk(null);
+    spin();
+  }, [spin]);
+
+  const stopListening = useCallback(() => { armed.current = false; wakeRef.current = false; setWakeOn(false); try { rec.current?.abort?.(); } catch {} setState((s) => (s === "listening" ? "idle" : s)); }, []);
+  const setWake = useCallback((on: boolean) => { try { localStorage.setItem(WAKE_KEY, on ? "on" : "off"); } catch {} if (on) listen(); else stopListening(); }, [listen, stopListening]);
 
   // Always on: arm the wake word on mount when this instance owns the mic.
   useEffect(() => {
     if (opts.listen === false) return;
     if (!wakeArmed()) return;
-    const t = setTimeout(() => { wakeRef.current = true; setWakeOn(true); listen(true); }, 800);
-    return () => { clearTimeout(t); rec.current?.stop(); };
+    const t = setTimeout(() => listen(), 800);
+    return () => { clearTimeout(t); armed.current = false; try { rec.current?.abort?.(); } catch {} };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opts.listen]);
 
@@ -201,5 +244,7 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
     return () => { window.removeEventListener("pointerdown", prime); window.removeEventListener("keydown", prime); };
   }, []);
 
-  return { state, msgs, bridge, brainName, micOk, wakeOn, voiceLocked, ask, forget, listen, stopListening, setWake, hush, brief: () => ask(BRIEF) };
+  // a stuck "speaking" is the one state that deafens the desk; never allow it past a minute
+  useEffect(() => { if (state !== "speaking") return; const t = setTimeout(() => { if (speakingRef.current) hush(); }, 60_000); return () => clearTimeout(t); }, [state, hush]);
+  return { state, msgs, bridge, brainName, micOk, wakeOn, voiceLocked, heard, ask, forget, listen, stopListening, setWake, hush, speak, brief: () => ask(BRIEF) };
 }
