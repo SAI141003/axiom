@@ -10,11 +10,11 @@ export default function LiveStats() {
     fetch("/api/fleet").then((r) => r.json()).then(setFleet).catch(() => {});
     fetch("/api/proving-ground").then((r) => r.json()).then(setPg).catch(() => {});
   }, []);
-  const t = fleet?.totals; const s = pg?.report; const goat = (fleet?.probes ?? []).find((p: any) => p.name === "weather (late-day)");
+  const t = fleet?.totals; const s = pg?.report; const weatherBot = (fleet?.probes ?? []).find((p: any) => p.name === "weather (late-day)");
   const stats = [
     { k: "PAPER FLEET", v: t ? `${t.pnl >= 0 ? "+" : "−"}$${Math.abs(t.pnl).toFixed(0)}` : "—", sub: fleet ? `${fleet.accounts?.length ?? 0} accounts · ${t?.trades ?? 0} trades · ${fleet.daysTracked} days` : "loading", tone: t ? (t.pnl >= 0 ? "var(--hud-green)" : "var(--hud-red)") : undefined },
     { k: "SAFETY ASSERTIONS", v: s ? s.total_runs.toLocaleString() : "10,500", sub: s ? `${s.total_fails} failures · ${s.scenarios?.length ?? 35} scenarios` : "0 failures" },
-    { k: "MONEY GOAT · WEATHER", v: goat ? `${goat.pnl >= 0 ? "+" : "−"}$${Math.abs(goat.pnl).toFixed(0)} · ${(goat.winRate * 100).toFixed(0)}%` : "—", sub: goat ? `${goat.trades} trades · the proven edge` : "loading", tone: "var(--hud-gold)" },
+    { k: "WEATHER BOT", v: weatherBot ? `${weatherBot.pnl >= 0 ? "+" : "−"}$${Math.abs(weatherBot.pnl).toFixed(0)} · ${(weatherBot.winRate * 100).toFixed(0)}%` : "—", sub: weatherBot ? `${weatherBot.trades} trades · the proven edge` : "loading", tone: "var(--hud-gold)" },
     { k: "MODE", v: "DRY-RUN", sub: "no live orders", tone: "var(--hud-amber)" },
   ];
   return (

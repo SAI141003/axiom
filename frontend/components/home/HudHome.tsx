@@ -35,7 +35,7 @@ export default function HudHome() {
     const h = (e: Event) => setJstate((e as CustomEvent).detail); window.addEventListener("axiom:jarvis-state", h);
     return () => { clearInterval(t); clearInterval(c); window.removeEventListener("axiom:jarvis-state", h); };
   }, []);
-  const t = fleet?.totals; const goat = (fleet?.probes ?? []).find((p: any) => p.name === "weather (late-day)"); const s = pg?.report;
+  const t = fleet?.totals; const weatherBot = (fleet?.probes ?? []).find((p: any) => p.name === "weather (late-day)"); const s = pg?.report;
   const tone = jstate === "listening" ? "var(--hud-green)" : jstate === "thinking" ? "var(--hud-amber)" : jstate === "speaking" ? "var(--hud-accent-2)" : "var(--hud-accent)";
   const ask = (q: string) => window.dispatchEvent(new CustomEvent("axiom:jarvis-ask", { detail: q }));
   const lines: string[] = (sum?.summary ?? "").split("\n").map((l: string) => l.replace(/^\d+[.)]\s*/, "").trim()).filter(Boolean).slice(0, 4);
@@ -55,7 +55,7 @@ export default function HudHome() {
           {(fleet?.accounts ?? []).map((a: any) => (
             <Row key={a.key} k={a.name.toUpperCase()} v={`$${(a.account ?? 0).toFixed(0)} · ${a.pnl >= 0 ? "+" : "−"}$${Math.abs(a.pnl ?? 0).toFixed(0)}`} tone={a.pnl >= 0 ? "var(--hud-green)" : "var(--hud-red)"} />
           ))}
-          {goat && <Row k="WEATHER · GOAT" v={`${usd0(goat.pnl)} · ${(goat.winRate * 100).toFixed(0)}%`} tone="var(--hud-gold)" />}
+          {weatherBot && <Row k="WEATHER BOT" v={`${usd0(weatherBot.pnl)} · ${(weatherBot.winRate * 100).toFixed(0)}%`} tone="var(--hud-gold)" />}
         </Panel>
         <div className="min-h-0 flex-1 overflow-hidden"><AiHealth compact /></div>
       </div>
@@ -69,7 +69,7 @@ export default function HudHome() {
               <Brain size={56} strokeWidth={1.4} color="#05070d" />
             </Link>
           </ReactorStage>
-          <RingGauge label="money goat" value={goat ? usd0(goat.pnl) : "—"} sub={goat ? `${(goat.winRate * 100).toFixed(0)}% · ${goat.trades} trades` : ""} pct={goat ? goat.winRate : 0} tone="var(--hud-gold)" size={136} />
+          <RingGauge label="weather bot" value={weatherBot ? usd0(weatherBot.pnl) : "—"} sub={weatherBot ? `${(weatherBot.winRate * 100).toFixed(0)}% · ${weatherBot.trades} trades` : ""} pct={weatherBot ? weatherBot.winRate : 0} tone="var(--hud-gold)" size={136} />
         </div>
         <div className="text-center -mt-1">
           <div className="text-[11px] tracking-[0.4em] font-mono font-bold" style={{ color: tone, textShadow: `0 0 14px ${tone}` }}>A.X.I.O.M. · {jstate.toUpperCase()}</div>

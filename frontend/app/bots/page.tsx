@@ -68,23 +68,23 @@ function Fleet() {
   const pnlBars = accounts.map((a) => ({ name: a.name, pnl: a.pnl ?? 0 }));
   const winBars = accounts.map((a) => ({ name: a.name, win: (a.winRate ?? 0) * 100, trades: a.trades ?? 0 }));
   const equity: any[] = d?.equity ?? [];
-  const goat = (d?.probes ?? []).find((p: any) => p.name === "weather (late-day)");
+  const weatherBot = (d?.probes ?? []).find((p: any) => p.name === "weather (late-day)");
   const keys = accounts.map((a) => a.name).filter((k) => equity.some((row) => row[k] != null));
 
   return (
     <div className="flex flex-col gap-4">
-      {goat && (
+      {weatherBot && (
         <button onClick={() => { window.location.href = "/bots?tab=weather"; }} className="hud-glass rounded-2xl p-4 flex flex-wrap items-center gap-4 w-full text-left" style={{ cursor: "pointer" }} title="open the weather book — every trade, the picks, the curve">
           <span className="hud-page-icon" style={{ width: 40, height: 40, color: "var(--hud-gold)", background: "var(--hud-gold-soft)", boxShadow: "inset 0 0 0 1px rgba(245,185,66,0.3), 0 0 30px -8px rgba(245,185,66,0.5)" }} aria-hidden><CloudSun size={18} /></span>
           <div className="min-w-0 flex-1">
-            <div className="text-[10px] tracking-[0.22em] font-bold font-mono" style={{ color: "var(--hud-gold)" }}>THE MONEY GOAT — WEATHER</div>
+            <div className="text-[10px] tracking-[0.22em] font-bold font-mono" style={{ color: "var(--hud-gold)" }}>WEATHER BOT — THE PROVEN EARNER</div>
             <div className="prose-sans text-[12px]" style={{ color: "var(--hud-muted)" }}>station observations vs market buckets · trades only after hour 14 of the day · the one proven edge on the desk</div>
           </div>
           <div className="flex gap-5 tabular-nums font-mono text-right">
-            <div><div className="text-[8px] tracking-widest" style={{ color: "var(--hud-muted)" }}>PROFIT</div><div className="text-2xl font-bold" style={{ color: "var(--hud-gold)", textShadow: "0 0 24px var(--hud-gold-soft)" }}>+{usd(goat.pnl)}</div></div>
-            <div><div className="text-[8px] tracking-widest" style={{ color: "var(--hud-muted)" }}>WIN RATE</div><div className="text-2xl font-bold" style={{ color: "var(--hud-text)" }}>{(goat.winRate * 100).toFixed(0)}%</div></div>
-            <div><div className="text-[8px] tracking-widest" style={{ color: "var(--hud-muted)" }}>TRADES</div><div className="text-2xl font-bold" style={{ color: "var(--hud-text)" }}>{goat.trades}</div></div>
-            <div><div className="text-[8px] tracking-widest" style={{ color: "var(--hud-muted)" }}>TODAY</div><div className="text-2xl font-bold" style={{ color: (goat.today?.pnl ?? 0) >= 0 ? "var(--hud-green)" : "var(--hud-red)" }}>{goat.today ? `${goat.today.pnl >= 0 ? "+" : ""}${usd(goat.today.pnl)}` : "—"}</div></div>
+            <div><div className="text-[8px] tracking-widest" style={{ color: "var(--hud-muted)" }}>PROFIT</div><div className="text-2xl font-bold" style={{ color: "var(--hud-gold)", textShadow: "0 0 24px var(--hud-gold-soft)" }}>+{usd(weatherBot.pnl)}</div></div>
+            <div><div className="text-[8px] tracking-widest" style={{ color: "var(--hud-muted)" }}>WIN RATE</div><div className="text-2xl font-bold" style={{ color: "var(--hud-text)" }}>{(weatherBot.winRate * 100).toFixed(0)}%</div></div>
+            <div><div className="text-[8px] tracking-widest" style={{ color: "var(--hud-muted)" }}>TRADES</div><div className="text-2xl font-bold" style={{ color: "var(--hud-text)" }}>{weatherBot.trades}</div></div>
+            <div><div className="text-[8px] tracking-widest" style={{ color: "var(--hud-muted)" }}>TODAY</div><div className="text-2xl font-bold" style={{ color: (weatherBot.today?.pnl ?? 0) >= 0 ? "var(--hud-green)" : "var(--hud-red)" }}>{weatherBot.today ? `${weatherBot.today.pnl >= 0 ? "+" : ""}${usd(weatherBot.today.pnl)}` : "—"}</div></div>
           </div>
           <span className="hud-chip" style={{ color: "var(--hud-gold)" }}>open the weather book →</span>
         </button>
