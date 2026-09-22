@@ -45,42 +45,66 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
     setMsgs((p) => { const n = [...p]; const last = n[n.length - 1]; if (last?.role === "jarvis") fn(last); return n; });
   }, []);
 
-  // One voice. The server renders AXIOM's neural voice (edge-tts, en-GB Ryan);
-  // the browser's own en-GB voice is only the fallback when that route fails,
-  // so the desk never switches voices mid-conversation.
+  // One voice, spoken as it arrives. Sentences are cut from the stream as they
+  // complete and rendered by the server (edge-tts, en-GB Ryan) one ahead of
+  // playback, so AXIOM starts talking on the first sentence, not the last.
+  // The browser's own en-GB voice is only the fallback when that route fails.
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const player = useRef<HTMLAudioElement | null>(null);   // created inside the first gesture, so later plays are allowed
   const [voiceLocked, setVoiceLocked] = useState(false);
   const speakingRef = useRef(false);
-  const hush = useCallback(() => { if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; } try { speechSynthesis.cancel(); } catch {} speakingRef.current = false; setState("idle"); }, []);
-  const speak = useCallback(async (text: string) => {
-    const clean = (text || "").replace(/[*_#`]/g, "").trim();
-    if (!voiceRef.current || !clean) { setState("idle"); return; }
-    try { speechSynthesis.cancel(); } catch {}
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
-    try {
-      const r = await fetch("/api/jarvis/tts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: clean }) });
-      if (!r.ok) throw new Error(String(r.status));
-      const url = URL.createObjectURL(await r.blob());
+  const queue = useRef<{ text: string; audio?: Promise<string | null> }[]>([]);
+  const playing = useRef(false);
+  const streamBuf = useRef("");
+  const afterSpeech = useRef<null | (() => void)>(null);
+
+  const hush = useCallback(() => { queue.current = []; streamBuf.current = ""; afterSpeech.current = null; if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; } try { speechSynthesis.cancel(); } catch {} speakingRef.current = false; playing.current = false; setState("idle"); }, []);
+
+  const render = useCallback(async (text: string): Promise<string | null> => {
+    try { const r = await fetch("/api/jarvis/tts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text }) }); if (!r.ok) return null; return URL.createObjectURL(await r.blob()); } catch { return null; }
+  }, []);
+
+  const playNext = useCallback(async () => {
+    if (playing.current) return;
+    const item = queue.current.shift();
+    if (!item) { speakingRef.current = false; playing.current = false; setState("idle"); const f = afterSpeech.current; afterSpeech.current = null; f?.(); return; }
+    playing.current = true; speakingRef.current = true; setState("speaking");
+    if (queue.current[0] && !queue.current[0].audio) queue.current[0].audio = render(queue.current[0].text);   // one ahead
+    const url = await (item.audio ?? render(item.text));
+    const finish = () => { playing.current = false; playNext(); };
+    if (url) {
       const a = player.current ?? new Audio(); player.current = a; audioRef.current = a;
       a.muted = false; a.volume = 1; a.src = url;
-      a.onplay = () => { speakingRef.current = true; setVoiceLocked(false); setState("speaking"); };
-      a.onended = () => { speakingRef.current = false; setState("idle"); URL.revokeObjectURL(url); };
-      a.onerror = () => { speakingRef.current = false; setState("idle"); URL.revokeObjectURL(url); };
-      try { await a.play(); return; }
-      catch (e: any) { if (e?.name === "NotAllowedError") setVoiceLocked(true); throw e; }
-    } catch { /* fall through to the browser voice */ }
-    if (typeof speechSynthesis === "undefined") { setState("idle"); return; }
-    const u = new SpeechSynthesisUtterance(clean);
-    u.rate = 1.0; u.pitch = 0.95;
+      a.onended = () => { URL.revokeObjectURL(url); finish(); };
+      a.onerror = () => { URL.revokeObjectURL(url); finish(); };
+      try { await a.play(); setVoiceLocked(false); return; } catch (e: any) { if (e?.name === "NotAllowedError") setVoiceLocked(true); }
+    }
+    // fallback: the browser's voice, one fixed en-GB choice
+    if (typeof speechSynthesis === "undefined") { finish(); return; }
+    const u = new SpeechSynthesisUtterance(item.text); u.rate = 1.0; u.pitch = 0.95;
     const vs = speechSynthesis.getVoices();
     const v = vs.find((x) => /Daniel/i.test(x.name) && /en[-_]GB/i.test(x.lang)) ?? vs.find((x) => /Google UK English Male/i.test(x.name)) ?? vs.find((x) => /en[-_]GB/i.test(x.lang));
     if (v) u.voice = v;
-    u.onstart = () => { speakingRef.current = true; setState("speaking"); };
-    u.onend = () => { speakingRef.current = false; setState("idle"); };
-    u.onerror = () => { speakingRef.current = false; setState("idle"); };
+    u.onend = finish; u.onerror = finish;
     speechSynthesis.speak(u);
-  }, []);
+  }, [render]);
+
+  const enqueue = useCallback((text: string) => {
+    const clean = (text || "").replace(/[*_#`]/g, "").replace(/\s+/g, " ").trim();
+    if (!voiceRef.current || !clean) return;
+    queue.current.push({ text: clean, audio: queue.current.length === 0 && !playing.current ? render(clean) : undefined });
+    playNext();
+  }, [playNext, render]);
+
+  // feed the stream: cut at sentence ends, speak each one as it completes
+  const feed = useCallback((delta: string) => {
+    streamBuf.current += delta;
+    const m = streamBuf.current.match(/^[\s\S]*?[.!?](?=\s|$)/);
+    if (m && m[0].trim().length > 12) { enqueue(m[0]); streamBuf.current = streamBuf.current.slice(m[0].length); }
+  }, [enqueue]);
+  const flush = useCallback(() => { const rest = streamBuf.current.trim(); streamBuf.current = ""; if (rest) enqueue(rest); else if (!playing.current && !queue.current.length) setState("idle"); }, [enqueue]);
+
+  const speak = useCallback((text: string) => { streamBuf.current = ""; queue.current = []; enqueue(text); if (!text?.trim()) setState("idle"); }, [enqueue]);
 
   useEffect(() => {
     let alive = true, timer: any;
@@ -94,9 +118,9 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
           let m: any; try { m = JSON.parse(e.data); } catch { return; }
           if (m.type === "ready" && m.brain) setBrainName(m.brain === "claude" ? "Claude Agent SDK" : "platform AI");
           else if (m.type === "brain" && typeof m.brain === "string") setBrainName(m.brain.replace(/^(\w+)\/.*?\/?([^/]+)$/, "$1 · $2"));
-          else if (m.type === "delta") patchLast((l) => { l.text += m.text; });
+          else if (m.type === "delta") { patchLast((l) => { l.text += m.text; }); feed(m.text); }
           else if (m.type === "tool") patchLast((l) => { l.tools = [...(l.tools ?? []), m.name]; });
-          else if (m.type === "done") { patchLast((l) => { l.text = m.text || l.text; l.brain = "bridge"; }); speak(m.text); }
+          else if (m.type === "done") { patchLast((l) => { l.text = m.text || l.text; l.brain = "bridge"; }); flush(); }
           else if (m.type === "error") setMsgs((p) => [...p, { role: "jarvis", text: m.text, brain: "bridge" }]);
           else if (m.type === "ui" && m.op === "navigate" && typeof m.href === "string" && m.href.startsWith("/")) { routerRef.current.push(m.href); window.dispatchEvent(new Event("axiom:jarvis-open")); }
           else if (m.type === "ui" && m.op === "eye") { const fire = () => window.dispatchEvent(new CustomEvent("axiom:eye", { detail: m })); fire(); setTimeout(fire, 2500); }
@@ -106,7 +130,7 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
     };
     connect();
     return () => { alive = false; clearTimeout(timer); ws.current?.close(); };
-  }, [patchLast, speak]);
+  }, [patchLast, feed, flush]);
 
   const ask = useCallback(async (raw: string) => {
     const text = raw.trim(); if (!text) return;
@@ -121,7 +145,7 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
       patchLast((l) => { l.text = d.text; l.brain = "local"; });
       speak(d.text);
     } catch { patchLast((l) => { l.text = "The desk is not answering."; }); setState("idle"); }
-  }, [patchLast, speak]);
+  }, [patchLast, feed, flush]);
 
   const forget = useCallback(() => { ws.current?.send(JSON.stringify({ type: "forget" })); setMsgs([]); }, []);
 
@@ -132,13 +156,23 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
     const r = new SR(); r.lang = "en-US"; r.continuous = continuous; r.interimResults = false;
     r.onstart = () => { setMicOk(true); setState("listening"); };
     r.onerror = (e: any) => { if (e.error === "not-allowed") setMicOk(false); setState("idle"); };
-    r.onend = () => { if (continuous && wakeRef.current) { try { r.start(); } catch {} } else setState((s) => (s === "listening" ? "idle" : s)); };
+    r.onend = () => {
+      if (continuous && wakeRef.current) { try { r.start(); } catch {} return; }
+      setState((s) => (s === "listening" ? "idle" : s));
+      if (!continuous && wakeRef.current) setTimeout(() => listen(true), 400);   // the one-shot question is over: back to the wake word
+    };
     r.onresult = (e: any) => {
       const t = Array.from(e.results).slice(e.resultIndex).map((x: any) => x[0].transcript).join(" ").trim();
       if (!t) return;
       // "axiom, stop" cuts it off; anything else heard while it speaks is its own voice
       if (speakingRef.current) { if (/\b(stop|quiet|enough|shut up)\b/i.test(t)) hush(); return; }
-      if (continuous) { if (WAKE.test(t)) { const q = t.replace(WAKE, "").replace(/^[,.\s]+/, "").trim(); ask(!q || WAKE_ONLY.test(q) ? BRIEF : q); } }
+      if (continuous) { if (WAKE.test(t)) { const q = t.replace(WAKE, "").replace(/^[,.\s]+/, "").trim();
+        if (!q || WAKE_ONLY.test(q)) {
+          // "Axiom?" — answer like a person and take the question, one shot; nothing said → back to the wake word
+          if (/status|what.s up|whats up|wake up/i.test(q)) { ask(BRIEF); return; }
+          afterSpeech.current = () => listen(false);
+          speak("Yes, Sai?");
+        } else ask(q); } }
       else ask(t);
     };
     try { r.start(); rec.current = r; } catch { setState("idle"); }

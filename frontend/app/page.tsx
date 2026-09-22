@@ -10,6 +10,7 @@ export default function Home() {
       <div className="hud-ambient" aria-hidden />
       <TopNav />
       <main className="relative hud-screen font-mono">
+        <h1 className="sr-only">AXIOM — the desk</h1>
         <HudHome />
       </main>
     </div>

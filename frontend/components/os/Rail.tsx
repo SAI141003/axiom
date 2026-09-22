@@ -46,7 +46,7 @@ export default function Rail() {
             {g.pages.filter((p) => p.href !== "/mind").map((p) => {
               const Icon = p.icon; const active = p.href === current?.href;
               return (
-                <Link key={p.href} href={p.href} aria-current={active ? "page" : undefined} className="hud-rail-item" data-active={active || undefined} title={open ? undefined : `${p.label} — ${p.hint}`}>
+                <Link key={p.href} href={p.href} prefetch={false} aria-current={active ? "page" : undefined} className="hud-rail-item" data-active={active || undefined} title={open ? undefined : `${p.label} — ${p.hint}`}>
                   <Icon size={17} strokeWidth={1.7} aria-hidden />
                   <span className="hud-rail-label"><b>{p.label}</b><small>{p.hint}</small></span>
                 </Link>
