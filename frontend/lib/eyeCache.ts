@@ -1,4 +1,4 @@
-// One tiny cache for the Eye's proxies: every layer is live, but upstreams are
+// One tiny cache for God's Eye's proxies: every layer is live, but upstreams are
 // public and rate-limited, so each is fetched at most once per window and
 // the age is reported with the data. Never a fallback fixture: an upstream
 // that fails returns its error and the last good copy, clearly aged.

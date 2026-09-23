@@ -553,7 +553,7 @@ input, textarea, select { cursor: text; }
 .hud-dock-tight .hud-dock-label { font-size: 9px; max-width: 64px; }
 .hud-clamp3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
-/* ═══ THE EYE — full-bleed globe with a tactical HUD (after gods-eye-view) ═ */
+/* ═══ GOD'S EYE — full-bleed globe with a tactical HUD (after gods-eye-view) ═ */
 .eye { position: relative; height: calc(100vh - 56px); width: 100%; overflow: hidden; background: #000; }
 .eye-globe { position: absolute; inset: 0; }
 .eye-globe canvas { outline: none; }
