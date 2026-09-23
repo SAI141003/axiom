@@ -493,6 +493,15 @@ async function liveBooks() {
   return rows.length ? rows.join("\n") + `\n(as of ${s?.ts ? new Date(s.ts * 1000).toISOString().slice(0, 16) : "?"} UTC)` : "(engine_status.json missing — run dryrun/brain.py)";
 }
 
+// A turn with no tools does not need the tool catalogue, the memory or the
+// desk state — and every token of prompt is latency. Persona and the live
+// books are enough to talk like himself about what he already knows.
+async function lightPrompt() {
+  const persona = await readText(PERSONA, "");
+  const keep = persona.split("\n## ").filter((s, i) => i === 0 || /^(Personality|Talking with Sai|Voice)/.test(s)).join("\n## ");
+  return `${keep}\n\nLIVE BOOKS (fresh from the logs — never quote a number that is not here or in front of you)\n${await liveBooks()}\n\nAnswer in two or three spoken sentences. No markdown, no lists.`;
+}
+
 async function systemPrompt() {
   const memory = await readText(MEMORY, await readText(join(HERE, "memory.example.md"), "(empty)"));
   const persona = await readText(PERSONA, "");
@@ -581,6 +590,7 @@ function nearest(t, args) {
 }
 const score = (cand, s) => { const c = cand.toLowerCase().replace(/^\/?api\//, "").replace(/[^a-z0-9]/g, ""); if (!c || !s) return 0; if (c === s) return 100; if (c.includes(s) || s.includes(c)) return 50 + Math.min(c.length, s.length); let k = 0; for (const ch of new Set(s)) if (c.includes(ch)) k++; return k; };
 
+const deadLanes = new Set();     // 401/402/403 — the key is the problem, not the moment
 async function chat(messages, tools, send, force) {
   const errs = [];
   // Groq's free tier rejects anything over ~8k tokens per minute per model
@@ -588,7 +598,7 @@ async function chat(messages, tools, send, force) {
   // freshness, a deep read) goes straight to NIM's 128k+ context instead of
   // burning a minute failing through the fast lanes first.
   const approxTokens = (JSON.stringify(messages).length + JSON.stringify(tools).length) / 4;
-  const lanes = (await providers()).filter((p) => approxTokens < 6000 || !["groq", "cerebras"].includes(p.name));
+  const lanes = (await providers()).filter((p) => !deadLanes.has(p.name) && (approxTokens < 6000 || !["groq", "cerebras"].includes(p.name)));
   // Resource reallocation: lanes past 80% of a learned budget or inside a 429
   // cooldown are skipped up front, so the turn moves on before the lane dies.
   const skip = await avoidLanes();
@@ -597,6 +607,8 @@ async function chat(messages, tools, send, force) {
     const order = p.name === "groq" ? [...p.models.slice(groqTurn++ % p.models.length), ...p.models.slice(0, groqTurn % p.models.length)] : [picked.get(p.name), ...p.models];
     for (const model of order.filter((v, i, a) => v && a.indexOf(v) === i)) {
       if (skip.has(`${p.name}:${model}`)) { errs.push(`${p.name}/${model} skipped (budget)`); continue; }
+      let retried = false;
+      models: for (;;) {
       try {
         const r = await fetch(`${p.base}/chat/completions`, { method: "POST", signal: AbortSignal.timeout(p.name === "nvidia" ? 120_000 : 60_000),
           headers: { "content-type": "application/json", authorization: `Bearer ${p.key}` },
@@ -608,8 +620,9 @@ async function chat(messages, tools, send, force) {
             ...(model.includes("nemotron") ? { chat_template_kwargs: { enable_thinking: false } } : {}) }) });
         if (!r.ok) { let j = {}; try { j = await r.json(); } catch {} const e = `${p.name}/${model} ${r.status} ${JSON.stringify(j.error ?? "").slice(0, 160)}`; errs.push(e); console.error("[brain] fallback:", e);
           if (r.status === 429) await recordLimit(p.name, model, j.error?.message ?? JSON.stringify(j));
-          else if ([401, 402, 403].includes(r.status)) await recordLimit(p.name, model, `HTTP ${r.status} (key or billing) — try again in 24h0m0s`);
+          else if ([401, 402, 403].includes(r.status)) { await recordLimit(p.name, model, `HTTP ${r.status} (key or billing) — try again in 24h0m0s`); deadLanes.add(p.name); console.error("[brain] lane", p.name, `is ${r.status} — dropped for this run`); }
           else await recordUsage(p.name, model, null, `http ${r.status}`, 0);
+          if (r.status === 503 && !retried) { retried = true; await new Promise((res) => setTimeout(res, 400)); continue models; }
           if (![400, 404, 410, 429, 503].includes(r.status)) break; continue; }
         // stream: text deltas go to the browser as they arrive; tool calls are assembled
         const msg = { role: "assistant", content: "", tool_calls: [] }; const calls = new Map(); let buf = ""; let usage = null;
@@ -625,6 +638,8 @@ async function chat(messages, tools, send, force) {
         if (!msg.content.trim() && !msg.tool_calls) { errs.push(`${p.name}/${model} empty`); console.error("[brain] empty answer from", `${p.name}/${model}`); continue; }
         picked.set(p.name, model); return { msg, brain: `${p.name}/${model}` };
       } catch (e) { errs.push(`${p.name}/${model} ${String(e.message).slice(0, 60)}`); break; }
+      break;
+      }
     }
   }
   throw new Error("no platform brain answered: " + errs.join(" | "));
@@ -655,7 +670,9 @@ const TOPICS = [
   [/second opinion|cross.?check|ask astra|ask the 550|deep think/i, ["second_opinion"]],
   [/test|pytest/i, ["run_tests"]],
 ];
+const SMALL_TALK = /^(hi|hey|hello|yo|good (morning|evening|afternoon)|how are you|how'?s it going|what'?s up|thanks?|thank you|cheers|nice|cool|ok|okay|nothing|never ?mind|bye|goodnight|good night|see you|who are you|tell me a joke|talk to me|let'?s talk|i'?m (bored|tired|back))\b/i;
 function pickTools(q) {
+  if (SMALL_TALK.test(q.trim()) && q.trim().length < 60) return [];   // a friend answers, it does not go and fetch things
   const want = new Set(CORE_TOOLS);
   for (const [re, names] of TOPICS) if (re.test(q)) names.forEach((x) => want.add(x));
   if (want.size <= CORE_TOOLS.length) ["morning_brief", "news", "health_check"].forEach((x) => want.add(x));
@@ -666,7 +683,7 @@ function pickTools(q) {
 // answering. Replaced by the real answer when it lands.
 const ACK = { navigate: "Opening it.", morning_brief: "Pulling the briefing.", health_check: "Checking every feed.", news: "Reading the wire.", backtest_results: "Checking the backtests.",
   scenario_forecast: "Running the scenarios — about ten seconds.", propose_strategy: "Judging it on holdout — about twenty seconds.", create_bot: "Building it.", read_code: "Reading the code.", arxiv_search: "Searching the literature." };
-function ack(q, picked) { const hit = picked.find((t) => ACK[t.name] && t.name !== "navigate" && t.name !== "desk_api" && t.name !== "fleet_status" && t.name !== "recall"); if (/open|show|go to|take me/i.test(q)) return ACK.navigate; return hit ? ACK[hit.name] : "On it."; }
+function ack(q, picked) { if (!picked.length) return ""; const hit = picked.find((t) => ACK[t.name] && t.name !== "navigate" && t.name !== "desk_api" && t.name !== "fleet_status" && t.name !== "recall"); if (/open|show|go to|take me/i.test(q)) return ""; return hit ? ACK[hit.name] : "On it."; }
 
 // Agent402 matches for a question, as OpenAI-style function tools with real
 // schemas, each running against the local toolbox. Cheap (one /api/find), so
@@ -690,22 +707,58 @@ async function nativeToolbox(q) {
   } catch { return []; }
 }
 
+// "Open the bots" should move the screen now, not after a model has thought
+// about it. Match the page here, send the browser on its way, and let the turn
+// narrate what is already in front of Sai.
+function pageFor(q) {
+  const t = q.toLowerCase();
+  if (!/\b(open|show|go to|take me|bring up|pull up|switch to|let'?s see|jump to)\b/.test(t)) return null;
+  let best = null, score = 0;
+  for (const [href, name, about] of PAGES) {
+    for (const w of `${name} ${href.slice(1)}`.split(/[\s,/]+/).filter((x) => x.length > 2)) {
+      if (t.includes(w) && w.length > score) { best = { href, name, about, api: PAGES.find((p) => p[0] === href)?.[3] }; score = w.length; }
+    }
+  }
+  return best;
+}
+
 async function platformTurn(q, send) {
-  const chosen = pickTools(q);
-  send({ type: "delta", text: ack(q, chosen) + " " });
+  // the dock wraps the question in a [Context: ...] line; intent must be read
+  // from Sai's own words, or "Answer about what they can see" opens /about
+  const said = q.replace(/^\s*\[Context:[\s\S]*?\]\s*/, "").trim() || q;
+  const jump = pageFor(said);
+  if (jump) uiSend({ type: "ui", op: "navigate", href: jump.href });   // the screen moves first
+  const chosen = pickTools(said);
+  const opener = ack(said, chosen);
+  if (opener) send({ type: "delta", text: opener + " " });
   const tools = chosen.map((t) => { const p = zodToJsonSchema(t.schema, { target: "openApi3" }); delete p.$schema;
     for (const v of Object.values(p.properties ?? {})) { if (v.enum && v.enum.length > 12) { v.description = `one of ${v.enum.length} known values; the tool corrects near-misses`; delete v.enum; } }
     return { type: "function", function: { name: t.name, description: t.description.split(/(?<=[.!?])\s/)[0].slice(0, 160), parameters: p } }; });
   // One system: the Agent402 tools that fit this question are not behind a
   // door — they join AXIOM's own tool list for the turn, callable by name.
-  const native = await nativeToolbox(q);
+  // Only when the question reaches outside the desk: the lookup costs a round
+  // trip and most turns do not need it.
+  const OUTSIDE = /\b(insider|13f|edgar|filing|sec|fred|yield|cpi|treasury|funding|perp|open interest|defi|tvl|stablecoin|token|mint|whois|dns|tls|ocr|pdf|decode|jwt|convert|black.?scholes|bond|ytm|irr|npv|forecast|holt|regression|correlation|geocode|fx|exchange rate|weather in|news about|price of)\b/i;
+  const native = OUTSIDE.test(said) ? await nativeToolbox(said) : [];
   for (const n of native) tools.push(n.def);
+  if (jump) { const i = tools.findIndex((t) => t.function.name === "navigate"); if (i >= 0) tools.splice(i, 1); }   // already there; do not open it twice
+  // the page Sai is now looking at, read while the model is still warming up
+  const pageData = jump?.api ? deskGet(jump.api).then((r) => String(r).slice(0, 3500)).catch(() => null) : null;
   let history = (await loadThread()).slice(-8).map((m) => (m.role === "tool" ? { ...m, content: String(m.content).slice(0, 500) } : m));
   const firstUser = history.findIndex((m) => m.role === "user"); history = firstUser >= 0 ? history.slice(firstUser) : [];   // never start on an orphaned tool result
-  const messages = [{ role: "system", content: (await systemPrompt()).slice(0, 8000) }, ...history, { role: "user", content: q }];
+  const light = !tools.length || (jump && chosen.length === 0);
+  if (light) history = history.slice(-4);
+  const messages = [{ role: "system", content: light ? await lightPrompt() : (await systemPrompt()).slice(0, 8000) }, ...history, { role: "user", content: q }];
+  if (jump) {
+    const d = await pageData;
+    messages.push({ role: "system", content: `You have ALREADY opened ${jump.href} (${jump.name}) — it is on Sai's screen now. ${d ? `Its live data, just read: ${d}` : `It shows: ${jump.about}`}\nTell him what is on it in two or three spoken sentences, leading with the number or fact that matters most. No lists.` });
+    tools.length = 0;   // the page's own data is in hand: answer in one breath, no round trips
+    messages[0] = { role: "system", content: await lightPrompt() };
+  }
   // A question about numbers always starts with a fleet_status call: a small
   // model will otherwise repeat a figure from an earlier turn instead of the
   // live one, and nothing on this desk may quote a stale P&L.
+  const Q = said;
   const NUMBERS = /p&l|pnl|profit|\b(our|the) (loss|trades|book|books|balance|account)|losing|winning|win rate|how (is|are) .*(bot|fleet|book|desk|doing)|fleet|desk status|the numbers/i;
   // Likewise a command is an action, not a memory: "stop trading crypto" must
   // hit fleet_control this turn, whatever was said before.
@@ -714,9 +767,9 @@ async function platformTurn(q, send) {
   // a trade order names an action AND a size or a symbol; "the short version" is not an order
   const TRADE = /\b(buy|sell|short)\b[^.]{0,40}\b(\$?\d+|dollars?|usd|[A-Z]{2,5}(\/USD|-USD)?)\b|\bclose (my|the) [^.]{0,30}position|\btake profit on\b|\bget out of\b/, MSG = /\b(message|text|imessage|email|mail)\b.*\b(to|him|her|them)\b|\bsend (a |an )?(message|text|email|mail)/i;
   const OPEN = /\b(open|show me|go to|take me to|bring up|pull up|switch to)\b/i;
-  let force = OPEN.test(q) && has("eye") && /\b(eye|globe|world|map|satellite|flight)\b/i.test(q) ? "eye"
-    : OPEN.test(q) && has("navigate") ? "navigate"
-    : TRADE.test(q) && has("trade") ? "trade" : MSG.test(q) && has("send_message") ? "send_message" : POWER.test(q) && has("set_power") ? "set_power" : CONTROL.test(q) && has("fleet_control") ? "fleet_control" : NUMBERS.test(q) && has("fleet_status") ? "fleet_status" : undefined;
+  let force = OPEN.test(Q) && has("eye") && /\b(eye|globe|world|map|satellite|flight)\b/i.test(q) ? "eye"
+    : OPEN.test(Q) && has("navigate") ? "navigate"
+    : TRADE.test(Q) && has("trade") ? "trade" : MSG.test(Q) && has("send_message") ? "send_message" : POWER.test(Q) && has("set_power") ? "set_power" : CONTROL.test(Q) && has("fleet_control") ? "fleet_control" : NUMBERS.test(Q) && has("fleet_status") ? "fleet_status" : undefined;
   let answer = "", brain = "";
   let lastSig = "", acts = 0;
   for (let step = 0; step < 24; step++) {
@@ -761,6 +814,14 @@ async function platformTurn(q, send) {
     try { const { msg } = await chat(messages, [], send); answer = msg.content ?? ""; messages.push({ role: "assistant", content: answer }); } catch {}
   }
   await saveThread(messages.slice(1));   // everything but the system prompt
+  // Asked for a brief, so the brief is kept: the same words he just heard,
+  // written down and dated, without spending a second model turn on it.
+  if (/\b(brief|catch me up|overnight|what happened|morning)\b/i.test(said) && answer.length > 80) {
+    const day = new Date().toLocaleDateString("en-CA");   // Sai's day, not UTC's
+    await mkdir(NOTES, { recursive: true }).catch(() => {});
+    await writeFile(join(NOTES, `${day}-brief.md`), `# Briefing ${day}\n\n_${new Date().toISOString()}_\n\n${answer}\n`).catch(() => {});
+    send({ type: "ui", op: "toast", text: `brief saved — jarvis/notes/${day}-brief.md` });
+  }
   return { answer: answer || "I could not complete that.", brain };
 }
 const BRAIN = (process.env.JARVIS_BRAIN || "platform").toLowerCase();
