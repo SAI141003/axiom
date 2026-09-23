@@ -594,3 +594,7 @@ html[data-sensor="nvg"] body::after { backdrop-filter: grayscale(1) brightness(1
 html[data-sensor="flir"] body::after { backdrop-filter: grayscale(1) invert(1) contrast(1.3) brightness(0.9); }
 html[data-sensor="noir"] body::after { backdrop-filter: grayscale(1) contrast(1.25); }
 @media (max-width: 900px) { .eye-l, .eye-r { display: none; } .eye-tl { min-width: 0; right: 12px; } }
+
+/* a conclusion replacing the one before it, rather than snapping */
+.hud-fade-in { animation: hudFadeIn 0.5s var(--hud-ease) both; }
+@keyframes hudFadeIn { from { opacity: 0; transform: translateY(3px) } to { opacity: 1; transform: none } }

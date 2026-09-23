@@ -29,7 +29,7 @@ export default function JarvisPage() {
   const [input, setInput] = useState("");
   const [panel, setPanel] = useState(true);
   const [health, setHealth] = useState(false);
-  const j = useJarvis({ voice });
+  const j = useJarvis({ voice, primary: true });   // the mind page owns the microphone while it is open
   const tone = toneFor(j.state);
 
   return (

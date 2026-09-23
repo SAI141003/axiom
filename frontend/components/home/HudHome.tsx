@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Brain } from "lucide-react";
+import BrainCore from "@/components/BrainCore";
+import BrainNote from "./BrainNote";
 import { RingGauge, ReactorStage } from "@/components/hud/Gauges";
 import AiHealth from "@/components/hud/AiHealth";
 import { PAGES } from "@/components/nav/pages";
@@ -21,6 +22,23 @@ export default function HudHome() {
   const [wire, setWire] = useState<any[]>([]);
   const [sum, setSum] = useState<any>(null);
   const [jstate, setJstate] = useState("idle");
+  // The brain's motes come from what it has concluded, not from fills: the
+  // home page is not the trade tape.
+  const [motes, setMotes] = useState<any[]>([]);
+  useEffect(() => {
+    let live = true;
+    const pull = () => fetch("/api/journal", { cache: "no-store" }).then((r) => r.json()).then((j) => {
+      if (!live) return;
+      setMotes((j?.lessons ?? []).slice(0, 14).map((l: any) => ({
+        label: String(l.note ?? "").slice(0, 46),
+        kind: l.kind === "EDGE" ? "win" : l.kind === "LEAK" ? "loss" : "opinion",
+        mag: l.stable ? 1 : 0.6,
+      })));
+    }).catch(() => {});
+    pull();
+    const t = setInterval(pull, 120_000);
+    return () => { live = false; clearInterval(t); };
+  }, []);
   const [clock, setClock] = useState("");
   useEffect(() => {
     const load = () => {
@@ -65,15 +83,16 @@ export default function HudHome() {
         <div className="flex items-center justify-center gap-6 xl:gap-10 w-full">
           <RingGauge label="fleet p&l" value={t ? usd0(t.pnl) : "—"} sub={t ? `of $${t.start}` : ""} pct={t ? Math.max(0.02, Math.min(1, t.account / t.start)) : 0} tone={t && t.pnl >= 0 ? "var(--hud-green)" : "var(--hud-red)"} size={136} />
           <ReactorStage tone={tone} size={340}>
-            <Link href="/mind" aria-label="AXIOM — the mind" className="grid place-items-center rounded-full" style={{ width: 124, height: 124, background: `radial-gradient(circle at 40% 35%, #ffffff 0%, ${tone} 40%, var(--hud-accent-deep) 100%)`, boxShadow: `0 0 34px ${tone}, 0 0 90px ${tone}55` }}>
-              <Brain size={56} strokeWidth={1.4} color="#05070d" />
+            <Link href="/mind" aria-label="AXIOM — the mind" className="grid place-items-center">
+              <BrainCore size={248} activity={jstate === "idle" ? 0.4 : 0.85} motes={motes} />
             </Link>
           </ReactorStage>
           <RingGauge label="weather bot" value={weatherBot ? usd0(weatherBot.pnl) : "—"} sub={weatherBot ? `${(weatherBot.winRate * 100).toFixed(0)}% · ${weatherBot.trades} trades` : ""} pct={weatherBot ? weatherBot.winRate : 0} tone="var(--hud-gold)" size={136} />
         </div>
         <div className="text-center -mt-1">
           <div className="text-[11px] tracking-[0.4em] font-mono font-bold" style={{ color: tone, textShadow: `0 0 14px ${tone}` }}>A.X.I.O.M. · {jstate.toUpperCase()}</div>
-          <div className="prose-sans text-[11.5px] mt-0.5" style={{ color: "var(--hud-muted)" }}>say “hey Axiom” — it is listening on every page</div>
+          <div className="prose-sans text-[11.5px] mt-0.5" style={{ color: "var(--hud-muted)" }}>say “hey Axiom” — or just “hey buddy”; it is listening on every page</div>
+          <div className="mt-1.5"><BrainNote /></div>
         </div>
         <div className="flex gap-2 flex-wrap justify-center">
           <button onClick={() => ask(BRIEF)} className="hud-btn hud-btn-accent" style={{ minHeight: 32 }}>Brief me</button>
