@@ -125,14 +125,21 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
   }, [playNext, render]);
 
   // feed the stream: cut at sentence ends, speak each one as it completes
+  const spokeAny = useRef(false);
   const feed = useCallback((delta: string) => {
     streamBuf.current += delta;
-    const m = streamBuf.current.match(/^[\s\S]*?[.!?](?=\s|$)/);
-    if (m && m[0].trim().length > 12) { enqueue(m[0]); streamBuf.current = streamBuf.current.slice(m[0].length); }
+    const sentence = streamBuf.current.match(/^[\s\S]*?[.!?](?=\s|$)/);
+    if (sentence && sentence[0].trim().length > 10) { spokeAny.current = true; enqueue(sentence[0]); streamBuf.current = streamBuf.current.slice(sentence[0].length); return; }
+    // the very first thing said may start on a clause, so the voice begins
+    // while the rest is still being written
+    if (!spokeAny.current) {
+      const clause = streamBuf.current.match(/^[\s\S]{25,}?[,;:—](?=\s)/);
+      if (clause) { spokeAny.current = true; enqueue(clause[0]); streamBuf.current = streamBuf.current.slice(clause[0].length); }
+    }
   }, [enqueue]);
-  const flush = useCallback(() => { const rest = streamBuf.current.trim(); streamBuf.current = ""; if (rest) enqueue(rest); else if (!playing.current && !queue.current.length) setState("idle"); }, [enqueue]);
+  const flush = useCallback(() => { spokeAny.current = false; const rest = streamBuf.current.trim(); streamBuf.current = ""; if (rest) enqueue(rest); else if (!playing.current && !queue.current.length) setState("idle"); }, [enqueue]);
 
-  const speak = useCallback((text: string) => { streamBuf.current = ""; queue.current = []; enqueue(text); if (!text?.trim()) setState("idle"); }, [enqueue]);
+  const speak = useCallback((text: string) => { streamBuf.current = ""; spokeAny.current = false; queue.current = []; enqueue(text); if (!text?.trim()) setState("idle"); }, [enqueue]);
 
   useEffect(() => {
     let alive = true, timer: any;

@@ -1,22 +1,27 @@
-"""AXIOM's ears — Whisper running on this machine.
+"""AXIOM's ears and voice — both running on this machine.
 
-whisper.cpp (pywhispercpp) with OpenAI's MIT-licensed weights. The model is
-loaded once and kept warm; the dashboard POSTs an utterance and gets back the
-words that were actually said. Nothing leaves the machine.
+Ears: whisper.cpp (pywhispercpp) with OpenAI's MIT-licensed weights. Chrome's
+own recogniser paraphrases — "Axiom" comes back "action", "yes Sai" comes back
+"yes sign" — this writes down what was said.
 
-Chrome's own recogniser paraphrases: "Axiom" comes back "action", "yes Sai"
-comes back "yes sign", short commands get rewritten. This does not.
+Voice: Piper (MIT), the same open speech stack. edge-tts was a network call to
+Microsoft for every sentence and measured 5.7-9.1 s on a cold phrase, which is
+what made AXIOM feel slow; Piper renders the same sentence in 40-370 ms here.
+
+Both models load once and stay warm. Nothing leaves the machine.
 
   .venv/bin/python signals/stt_server.py          (launchd: com.polymarket.stt, :5002)
 """
 from __future__ import annotations
 
+import io
 import json
 import os
 import shutil
 import subprocess
 import tempfile
 import time
+import wave
 from pathlib import Path
 
 # launchd gives us a bare PATH, so find ffmpeg where Homebrew actually put it
@@ -32,7 +37,18 @@ PROMPT = ("AXIOM. The Eye. The desk. Sai. Weather bot, flow bot, meme bot, optio
           "oracle-lag, gamma-pulse, ccxt strategy, stocks bot, pre-market. Polymarket, Kraken, "
           "Hyperliquid. Open the Eye. Brief me. Pause trading.")
 
+VOICE = os.getenv("PIPER_VOICE", str(ROOT / ".data" / "piper" / "en_GB-alan-medium.onnx"))
+
 _model = None
+_voice = None
+
+
+def voice():
+    global _voice
+    if _voice is None:
+        from piper import PiperVoice
+        _voice = PiperVoice.load(VOICE)
+    return _voice
 
 
 def model():
@@ -69,17 +85,35 @@ async def h_transcribe(request: web.Request) -> web.Response:
                               "engine": "whisper.cpp", "model": Path(MODEL).name})
 
 
+async def h_speak(request: web.Request) -> web.Response:
+    """One sentence in, a WAV out. The dashboard asks for these one at a time
+    while AXIOM is still talking, so this has to answer in well under a second."""
+    t0 = time.time()
+    body = await request.json()
+    said = str(body.get("text") or "").strip()
+    if not said:
+        return web.json_response({"error": "no text"}, status=400)
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        voice().synthesize_wav(said[:1200], w)
+    wav = buf.getvalue()
+    return web.Response(body=wav, content_type="audio/wav",
+                        headers={"x-engine": "piper", "x-ms": str(int((time.time() - t0) * 1000))})
+
+
 async def h_health(_: web.Request) -> web.Response:
     return web.json_response({"ok": Path(MODEL).exists(), "engine": "whisper.cpp",
-                              "model": Path(MODEL).name, "warm": _model is not None})
+                              "model": Path(MODEL).name, "warm": _model is not None,
+                              "voice": {"ok": Path(VOICE).exists(), "engine": "piper",
+                                        "model": Path(VOICE).name, "warm": _voice is not None}})
 
 
 def main() -> None:
     app = web.Application(client_max_size=32 * 1024 * 1024)
-    app.add_routes([web.get("/", h_health), web.post("/transcribe", h_transcribe)])
-    print(f"[stt] whisper.cpp on :{PORT} — model {Path(MODEL).name}", flush=True)
-    model()          # load before the first utterance, not during it
-    print("[stt] model warm", flush=True)
+    app.add_routes([web.get("/", h_health), web.post("/transcribe", h_transcribe), web.post("/speak", h_speak)])
+    print(f"[stt] whisper.cpp + piper on :{PORT} — {Path(MODEL).name}, {Path(VOICE).name}", flush=True)
+    model(); voice()          # load before the first utterance, not during it
+    print("[stt] ears and voice warm", flush=True)
     web.run_app(app, host="127.0.0.1", port=PORT, print=None)
 
 
