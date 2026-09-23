@@ -13,7 +13,8 @@ interface Bucket {
 }
 
 interface CityReport {
-  slug: string; title: string; city: string; station: string;
+  slug: string; eventDate: string; buyFrom: number;
+  pick: { side: "YES" | "NO"; question: string; price: number; model: number } | null; title: string; city: string; station: string;
   obsSource?: string; metarN?: number; gridObserved?: number | null;
   probSource?: string; nMembers?: number;
   forecastMax: number | null; observedMax: number | null;
@@ -29,6 +30,7 @@ export default function WeatherPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "plays" | "station">("all");
   const [picks, setPicks] = useState<any[] | null>(null);
+  const [day, setDay] = useState<string | null>(null);
 
   const load = async () => {
     try {
@@ -50,11 +52,18 @@ export default function WeatherPage() {
     return () => clearInterval(t);
   }, []);
 
-  const shown = reports.filter((r) =>
+  const days = Array.from(new Set(reports.map((r) => r.eventDate))).sort();
+  const today = new Date().toLocaleDateString("sv-SE");
+  const activeDay = day && days.includes(day) ? day : (days.find((d) => d >= today) ?? days[0]);
+  const dayLabel = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+  const inDay = reports.filter((r) => r.eventDate === activeDay);
+  const ahead = inDay.filter((r) => r.pick).sort((a, b) => a.buyFrom - b.buyFrom);
+  const at = (ms: number) => new Date(ms).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
+  const shown = inDay.filter((r) =>
     filter === "plays" ? !!r.bestPlay
     : filter === "station" ? r.obsSource === "metar"
     : true);
-  const plays = reports.filter((r) => r.bestPlay).length;
+  const plays = inDay.filter((r) => r.bestPlay).length;
 
   const maxEdge = (r: CityReport) =>
     Math.max(...r.buckets.map((b) => Math.abs(b.edge)), 0);
@@ -112,6 +121,50 @@ export default function WeatherPage() {
                 </span>
                 <span className="shrink-0 w-16 text-right uppercase text-[10px] font-bold" style={{ color: tone }}>
                   {p.status === "buy" ? "buyable" : p.status}
+                </span>
+              </a>
+            );
+          })}
+        </section>
+
+        {/* by day: today and the days Polymarket has already listed */}
+        <div className="flex gap-2 mb-3 flex-wrap" role="tablist" aria-label="Market day">
+          {days.map((d) => (
+            <button key={d} role="tab" aria-selected={d === activeDay} onClick={() => setDay(d)}
+                    className={`hud-chip ${d === activeDay ? "hud-nav-active" : ""}`}
+                    style={{ color: d === activeDay ? undefined : "var(--hud-muted)", cursor: "pointer" }}>
+              {d === today ? "TODAY" : dayLabel(d).toUpperCase()} ({reports.filter((r) => r.eventDate === d).length})
+            </button>
+          ))}
+        </div>
+        <section className="hud-panel hud-panel-static p-3 mb-4" aria-label="Picks for this day">
+          <div className="flex items-baseline justify-between gap-2 mb-2 flex-wrap">
+            <h2 className="text-[11px] tracking-[0.25em] font-bold m-0" style={{ color: "var(--hud-accent)" }}>
+              {activeDay ? `PICKS · ${dayLabel(activeDay).toUpperCase()}` : "PICKS"}
+            </h2>
+            <span className="prose-sans text-[11px]" style={{ color: "var(--hud-muted)" }}>
+              the bot&apos;s rule applied now · it only buys from 2 PM city time, when the day&apos;s high is mostly observed — before that these are forecasts, which it measured winning just 50–56%
+            </span>
+          </div>
+          {ahead.length === 0 ? (
+            <p className="text-[11px]" style={{ color: "var(--hud-muted)" }}>{loading ? "scanning…" : "no market passes the bot's rule for this day yet — prices and forecasts move, check back"}</p>
+          ) : ahead.map((r) => {
+            const live = Date.now() >= r.buyFrom;
+            return (
+              <a key={r.slug} href={`https://polymarket.com/event/${r.slug}`} target="_blank" rel="noreferrer"
+                 className="flex items-center gap-3 py-1.5 text-[12px] hover:underline min-w-0"
+                 style={{ borderBottom: "1px solid var(--hud-border)" }}>
+                <span className="shrink-0 font-bold px-1.5 rounded text-[11px]"
+                      style={{ color: r.pick!.side === "YES" ? "var(--hud-green)" : "var(--hud-red)", border: "1px solid currentColor" }}>
+                  BUY {r.pick!.side}
+                </span>
+                <span className="truncate prose-sans" style={{ color: "var(--hud-text)" }}>{r.pick!.question}</span>
+                <span className="flex-1" />
+                <span className="shrink-0 tabular-nums" style={{ color: "var(--hud-muted)" }}>
+                  {Math.round(r.pick!.price * 100)}¢ · model {Math.round(r.pick!.model * 100)}%
+                </span>
+                <span className="shrink-0 w-32 text-right text-[10px] font-bold" style={{ color: live ? "var(--hud-green)" : "var(--hud-amber)" }}>
+                  {live ? "BOT WINDOW OPEN" : `PREVIEW · ${at(r.buyFrom)}`}
                 </span>
               </a>
             );
