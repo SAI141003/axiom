@@ -76,6 +76,7 @@ export default function CryptoAutoTrader() {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [stats, setStats] = useState({ resolved: 0, wins: 0, winRate: 0, totalPnl: 0, open: 0 });
   const [log, setLog] = useState<string[]>([]);
+  const [recent, setRecent] = useState<any[]>([]);
   const [clock, setClock] = useState(0);
 
   const statesRef = useRef(states);
@@ -99,6 +100,7 @@ export default function CryptoAutoTrader() {
         const data = await res.json();
         setTrades(data.trades ?? []);
         setStats(data.stats ?? stats);
+        setRecent(data.recent ?? []);
       }
     } catch {}
   }, []);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -369,7 +371,12 @@ export default function CryptoAutoTrader() {
           <div className="hud-panel hud-panel-static p-4 overflow-hidden">
             <div className="text-xs tracking-widest mb-2 glow-cyan">ACTIVITY LOG</div>
             <div className="flex flex-col gap-1 overflow-y-auto text-[11px]" style={{ maxHeight: 180 }}>
-              {log.length === 0 && <span style={{ color: "var(--hud-muted)" }}>Waiting for first window entry… trades fire in the first {ENTRY_WINDOW}s of each 5-min window when momentum ≥ threshold.</span>}
+              {recent.map((r, i) => (
+                <div key={`d${i}`} style={{ color: r.traded ? "var(--hud-green)" : "var(--hud-muted)" }}>
+                  {new Date(r.ts * 1000).toLocaleTimeString()} BTC {r.traded ? `TRADED ${r.side} @ ${(r.ask * 100).toFixed(1)}¢` : `skipped — ${r.why}`} · move {r.move >= 0 ? "+" : ""}{r.move.toFixed(1)}bp
+                </div>
+              ))}
+              {log.length === 0 && recent.length === 0 && <span style={{ color: "var(--hud-muted)" }}>Waiting for first window entry… trades fire in the first {ENTRY_WINDOW}s of each 5-min window when momentum ≥ threshold.</span>}
               {log.map((l, i) => <div key={i} style={{ color: "var(--hud-text)" }}>{l}</div>)}
             </div>
           </div>
@@ -384,7 +391,7 @@ export default function CryptoAutoTrader() {
                 <th className="text-left px-3 py-2">ASSET</th>
                 <th className="text-left px-3 py-2">SIDE</th>
                 <th className="text-right px-3 py-2">ENTRY</th>
-                <th className="text-right px-3 py-2">OPEN→CLOSE</th>
+                <th className="text-right px-3 py-2">BTC AT OPEN</th>
                 <th className="text-left px-3 py-2">STATUS</th>
                 <th className="text-right px-3 py-2">P&L</th>
               </tr>
@@ -393,13 +400,13 @@ export default function CryptoAutoTrader() {
               {[...trades].reverse().slice(0, 25).map((t) => (
                 <tr key={t.id} className="hud-row">
                   <td className="px-3 py-1.5" style={{ color: "var(--hud-muted)" }}>
-                    {new Date(t.windowStart * 1000).toLocaleTimeString()}
+                    {new Date(t.windowStart * 1000).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
                   </td>
                   <td className="px-3 py-1.5 font-bold uppercase">{t.asset}</td>
                   <td className="px-3 py-1.5 font-bold" style={{ color: t.side === "UP" ? "var(--hud-green)" : "var(--hud-red)" }}>{t.side}</td>
                   <td className="text-right px-3 py-1.5">{(t.entryPrice * 100).toFixed(1)}¢</td>
                   <td className="text-right px-3 py-1.5" style={{ color: "var(--hud-muted)" }}>
-                    {t.windowOpen ? `${t.windowOpen.toFixed(t.windowOpen > 100 ? 0 : 4)} → ${t.windowClose?.toFixed(t.windowClose! > 100 ? 0 : 4)}` : "…"}
+                    {t.windowOpen ? `${t.windowOpen.toFixed(t.windowOpen > 100 ? 0 : 4)}${t.windowClose != null ? ` → ${t.windowClose.toFixed(t.windowClose > 100 ? 0 : 4)}` : ""}` : "—"}
                   </td>
                   <td className="px-3 py-1.5">
                     {t.status === "open" && <span className="glow-cyan">OPEN</span>}
