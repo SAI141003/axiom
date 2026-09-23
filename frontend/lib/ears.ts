@@ -40,7 +40,7 @@ export type EarsEvents = {
 const SILENCE_MS = 420;         // speech is over after this much quiet — every ms here is a ms Sai waits
 const MIN_SPEECH_MS = 180;      // shorter than this is a cough, not a word
 const MAX_UTTERANCE_MS = 15_000;
-const PREROLL_MS = 400;         // kept before the gate opens so the first word survives
+const PREROLL_MS = 500;         // kept before the gate opens so the first word survives
 const OUT_RATE = 16_000;        // what whisper.cpp wants
 
 export async function whisperReady(): Promise<boolean> {
@@ -171,6 +171,12 @@ export class Ears {
       let s = 0; for (let k = 0; k < step; k++) s += flat[i * step + k] || 0;
       out[i] = s / step;
     }
+    // Turning the browser's auto gain off keeps the gate honest, but it also
+    // means a quietly spoken sentence arrives quiet, and Whisper guesses at
+    // quiet audio. Lift the whole utterance to a consistent level instead —
+    // after the gate, so it cannot affect what counts as speech.
+    let peak = 0; for (let i = 0; i < out.length; i++) { const a = Math.abs(out[i]); if (a > peak) peak = a; }
+    if (peak > 0.001 && peak < 0.85) { const g = Math.min(12, 0.85 / peak); for (let i = 0; i < out.length; i++) out[i] *= g; }
 
     if (this.inFlight) return;           // still transcribing the last one
     this.inFlight = true;
