@@ -10,7 +10,17 @@ export type BridgeState = "connecting" | "online" | "offline";
 
 const BRIDGE = "ws://127.0.0.1:8788";
 // How Chrome's recogniser actually hears "Axiom": axiom, axium, axeum, axon, axiam, "ax iom", action-ish slips.
-export const WAKE = /\b(?:hey|ok|okay|yo|hi)?[,\s]*(?:axiom|axium|axeum|axeom|axiam|axion|axon|ax\s?i[ou]m|acxiom|exiom)\b[,.!?]*/i;
+// A speech model writes down what it heard, not what was meant: measured on
+// real speech, base.en returns "Hay Axiom", "Axem", "Acts him", "action".
+// Widening the name costs nothing; the bigger model that spells it correctly
+// costs 1.3 seconds on every sentence, which is the whole conversation.
+export const WAKE = /\b(?:hey|hay|ok|okay|yo|hi|a)?[,\s]*(?:axiom|axioms|axium|axeum|axeom|axiam|axion|axon|axem|axum|axm|acxiom|exiom|exium|ax\s?i[ou]m|acts?\s?(?:him|em|iom)|action(?=[,.!?\s]|$)|access\s?him|ac\s?slum)\b[,.!?]*/i;
+// Sai does not always use the name — "hey buddy, how are you" is him talking
+// to AXIOM just as much as "hey Axiom" is. Any friendly address at the start
+// of a sentence opens the conversation; it has to be at the start, so that
+// mentioning a mate in passing does not wake the desk.
+export const ADDRESS = /^\s*(?:hey|hi|hello|yo|ok|okay|hiya|oi)?[,\s]*(?:buddy|bud|mate|man|dude|boss|pal|friend|brother|bro|jarvis|chief|sir)\b[,.!?]*/i;
+
 export const WAKE_ONLY = /^\s*(?:wake up|are you there|you there|hello|hey|hi|status|what's up|whats up)?\s*[,.!?]*\s*$/i;
 export const BRIEF = "Good morning, Axiom. Give me the status briefing.";
 
@@ -265,9 +275,10 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
       ask(t.trim());
       return;
     }
-    if (!WAKE.test(t)) return;
+    const addressed = ADDRESS.test(t);
+    if (!WAKE.test(t) && !addressed) return;
     openUntil.current = Date.now() + CONVERSATION_MS;
-    const q = t.replace(WAKE, "").replace(/^[,.\s]+/, "").trim();
+    const q = t.replace(WAKE, "").replace(addressed ? ADDRESS : /(?!)/, "").replace(/^[,.\s]+/, "").trim();
     if (q && !WAKE_ONLY.test(q)) { ask(q); return; }
     if (/status|what.s up|whats up|wake up|brief/i.test(q)) { ask(BRIEF); return; }
     oneShot.current = true;               // "Axiom?" — answer, then take the next thing said as the question
