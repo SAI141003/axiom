@@ -26,7 +26,7 @@ vals = [loss[k] for k in lab]
 fig, ax = plt.subplots(figsize=(W, 2.5))
 wedges, *_ = ax.pie(vals, startangle=90, colors=C[:len(vals)],
                     wedgeprops=dict(width=0.45, edgecolor="white", linewidth=0.6))
-ax.legend(wedges, [f"{k} — {v/tot*100:.1f}%  (\\${v:,.0f})" for k, v in zip(lab, vals)],
+ax.legend(wedges, [f"{k}, {v/tot*100:.1f}%  (\\${v:,.0f})" for k, v in zip(lab, vals)],
           loc="center left", bbox_to_anchor=(0.98, 0.5), frameon=False)
 ax.set_title(f"Composition of gross loss (total \\${tot:,.0f})")
 fig.savefig("paper/fig_loss_pie.pdf"); plt.close(fig)
@@ -71,7 +71,7 @@ ax.bar(x, lo, color=C[0], label="best observed", width=0.55)
 ax.bar(x, np.array(hi) - np.array(lo), bottom=lo, color=C[5], label="to worst observed", width=0.55)
 ax.set_xticks(x); ax.set_xticklabels(stages, fontsize=6.4)
 ax.set_ylabel("latency (ms)")
-ax.set_title(f"Spoken-turn budget (sum: {sum(lo)}–{sum(hi)} ms)")
+ax.set_title(f"Spoken-turn budget (sum: {sum(lo)} to {sum(hi)} ms)")
 ax.legend(frameon=False, fontsize=6)
 fig.savefig("paper/fig_latency.pdf"); plt.close(fig)
 

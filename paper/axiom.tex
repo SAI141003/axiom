@@ -25,8 +25,8 @@ devicelifecycle@gmail.com}}
 We describe AXIOM, a research desk that runs entirely on one workstation: it
 places paper trades across seven strategies, keeps a written record of what it
 learns, and is operated by speaking to it. Two results are reported. First, a
-voice loop built from open models---Whisper through whisper.cpp for listening
-and Piper for speaking---answers a spoken question in 0.69 to 1.39 seconds end
+voice loop built from open models (Whisper through whisper.cpp for listening
+and Piper for speaking) answers a spoken question in 0.69 to 1.39 seconds end
 to end, with transcription at 105 to 215\,ms, and needs no network and no
 third-party service. Reaching that latency required discarding two designs
 that appear correct and are not: recording microphone audio with
@@ -72,8 +72,8 @@ speech.
 We make three contributions.
 
 \textbf{A measured local voice loop.} Section~\ref{sec:voice} reports a
-complete speech interface---wake word, barge-in, transcription, language
-model, synthesis---running on the operator's own machine with no audio leaving
+complete speech interface covering wake word, barge-in, transcription, language
+model and synthesis, running on the operator's own machine with no audio leaving
 it. We give the latency budget stage by stage and the accuracy-versus-latency
 tradeoff across four speech recognition models.
 
@@ -84,7 +84,7 @@ because every chunk after the first lacks a container header and, once a header
 is restored, carries a timestamp that makes the decoder emit the entire session
 as silence. Separately, an energy gate with any absolute threshold is untenable
 across microphones: the device measured here peaks at 0.0016\,RMS, so a
-threshold of 0.004---a value that seems conservatively low---can never open.
+threshold of 0.004, a value that seems conservatively low, can never open.
 
 \textbf{A full and unflattering forward-test record.} Section~\ref{sec:results}
 reports every strategy the desk runs, including the six that do not survive
@@ -98,8 +98,8 @@ is well documented. White's reality check \cite{white2000} and the deflated
 Sharpe ratio of Bailey and L\'{o}pez de Prado \cite{bailey2014} both address
 the multiple-testing problem directly; Harvey and Liu \cite{harvey2016} argue
 that most published factors do not survive an appropriate haircut. Our
-robustness gate is a simpler device---a permutation test on trade order, from
-which we take a probability that the observed win rate arose by chance---but
+robustness gate is a simpler device, a permutation test on trade order from
+which we take a probability that the observed win rate arose by chance, but
 the motivation is theirs.
 
 \subsection{Open speech models}
@@ -114,8 +114,8 @@ two components.
 
 \subsection{Open-source intelligence feeds}
 The globe described in Section~\ref{sec:arch} aggregates public transponder,
-orbital and seismic data---OpenSky \cite{opensky}, CelesTrak
-\cite{celestrak} and the USGS earthquake feed respectively---in the tradition
+orbital and seismic data from OpenSky \cite{opensky}, CelesTrak
+\cite{celestrak} and the USGS earthquake feed respectively, in the tradition
 of open-source intelligence dashboards. We claim no novelty here; it is context
 for the strategies that consume weather and event data.
 
@@ -137,7 +137,7 @@ cent over the same 279 trades.
 \textbf{Reflection loop.} A nightly process reads the logs, fits simple
 summaries per strategy and per market segment, and writes back a parameter file
 and a dated note in prose. Its conclusions are visible on the desk's home
-screen---for example, that one city was disabled in the weather book and that
+screen. It concluded, for example, that one city was disabled in the weather book and that
 the minimum edge to act was raised to 0.08.
 
 \textbf{Interface.} A Next.js application serves roughly forty pages. Relevant
@@ -172,14 +172,14 @@ the middle of the stream has no header and \texttt{ffmpeg} refuses it outright;
 in our case every spoken command failed with HTTP 503. Prepending the stored
 header fixes the container but not the content: the cluster retains its
 original timestamp, so the decoder emits everything since the session began as
-silence, and the recogniser hallucinates over the gap---we observed
+silence, and the recogniser hallucinates over the gap. We observed
 \texttt{[MUSIC PLAYING]} and ``I'm on camera'' returned for a four-word
 command. Writing PCM directly avoids both problems and costs about twenty lines
 of code.
 
 \subsection{Voice activity detection}
-The gate is a two-threshold energy detector with hysteresis, and---this is the
-part we got wrong twice---it is expressed purely as a multiple of the room's
+The gate is a two-threshold energy detector with hysteresis, and, in the part we got wrong
+twice, it is expressed purely as a multiple of the room's
 own noise floor, which is tracked continuously, including while the operator is
 speaking. Our first version tracked the floor only between utterances. Because
 a real microphone never reaches digital silence, the gate then never closed,
@@ -202,7 +202,7 @@ Our first echo filter compared the transcript against a bag of words the system
 had recently spoken and discarded anything overlapping by more than half. This
 is wrong in a way that is easy to miss and severe in use: the system talks
 about the same subjects the operator asks about. Tested against realistic
-follow-ups, it suppressed four of five, including ``pause the flow bot''---the
+follow-ups, it suppressed four of five, including ``pause the flow bot''. The
 system ignored its operator precisely when he used its own vocabulary.
 
 Echo is better characterised as the same words in the same \emph{order}, as one
@@ -222,8 +222,8 @@ A wake word starts a conversation but does not punctuate one: for 90 seconds
 after any exchange, speech is taken as directed at the system, subject to a
 ten-minute ceiling so that a room full of conversation cannot hold the channel
 open indefinitely. The wake pattern is deliberately permissive, because the
-recogniser's errors are concentrated there---we observed ``Hay Axiom'',
-``Axem'', ``Acts him'' and ``action'' for the same name---and it also accepts
+recogniser's errors are concentrated there. We observed ``Hay Axiom'',
+``Axem'', ``Acts him'' and ``action'' for the same name. It also accepts
 ordinary forms of address such as ``hey buddy''.
 
 \subsection{Latency}
@@ -262,8 +262,8 @@ The \texttt{base.en} model takes 148\,ms at 5.7\% word error.
 
 That comparison is misleading on its own, because the errors are not uniformly
 distributed. Every error \texttt{base.en} made was a spelling of the system's
-name. Measured on the remainder of the sentence---the part that determines what
-the system actually does---\texttt{base.en} scores 0.0\% word error over the
+name. Measured on the remainder of the sentence, the part that determines what
+the system actually does, \texttt{base.en} scores 0.0\% word error over the
 same set, and correctly recognised that it was being addressed in seven cases
 out of seven. We therefore kept the small fast model and widened the wake
 pattern, rather than paying 1.3\,s per sentence to have the name spelled
@@ -299,8 +299,8 @@ the distribution obtained by permuting trade outcomes, and report the
 probability that the observed result arose by chance. We label a strategy
 robust when that probability is small and its expectancy is positive, marginal
 when the evidence is weak in either direction, and not robust otherwise. This
-is a coarse instrument---it does not correct for the number of strategies
-tried, which by the arguments of \cite{harvey2016} it should---and we treat its
+is a coarse instrument. It does not correct for the number of strategies
+tried, which by the arguments of \cite{harvey2016} it should, and we treat its
 verdicts as a filter for attention rather than as proof.
 
 \section{Results}
@@ -360,7 +360,7 @@ Conversely \texttt{vwap-trend} wins under a quarter of its trades and is
 mildly profitable, because its winners are large relative to its losers.
 
 The strategy with the most trades is the least robust. \texttt{crypto-5m} has
-placed 5{,}658 trades---77\% of all activity on the desk---at a 45.4\% win rate
+placed 5{,}658 trades, 77\% of all activity on the desk, at a 45.4\% win rate
 for a loss of $\$1{,}747$. Trade count is a measure of activity, not of edge.
 
 \begin{table}[t]
@@ -421,7 +421,7 @@ fee-true net P\&L over 248 and 279 trades respectively.}
 Fig.~\ref{fig:corr} shows the correlation of daily P\&L between strategies.
 Most pairs are near zero and several are negative, which is the property one
 wants: the books fail independently. This is cold comfort while the aggregate
-expectancy is negative---uncorrelated losses are still losses---but it means
+expectancy is negative, since uncorrelated losses are still losses, but it means
 that if any individual book is fixed, its contribution is additive rather than
 redundant.
 
@@ -499,8 +499,8 @@ administrative one.
 We built a research desk that runs on one machine, speaks and listens without a
 network, and keeps an auditable record of every trade it places. The voice loop
 answers in about a second, and getting there was mostly a matter of discarding
-two plausible designs---container-based audio capture and absolute energy
-gating---that fail for reasons invisible until they are measured.
+two plausible designs, container-based audio capture and absolute energy
+gating, that fail for reasons invisible until they are measured.
 
 The trading record is negative in aggregate and we report it in full: 7{,}312
 trades, a profit factor of 0.81, and one strategy in seven surviving its
