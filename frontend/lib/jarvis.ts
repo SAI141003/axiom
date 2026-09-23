@@ -83,12 +83,13 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
     const item = queue.current.shift();
     if (!item) {
       speakingRef.current = false; playing.current = false; echoUntil.current = Date.now() + 2500; setState("idle");
-      if (armed.current) setTimeout(() => { if (armed.current && !speakingRef.current) { ears.current?.resume(); spinRef.current?.(); } }, 700);   // ears back on
+      ears.current?.duck(false);
+      if (armed.current) setTimeout(() => { if (armed.current && !speakingRef.current) { ears.current?.resume(); spinRef.current?.(); } }, 400);   // ears wide open again
       const f = afterSpeech.current; afterSpeech.current = null; f?.(); return;
     }
     playing.current = true; speakingRef.current = true; setState("speaking");
-    try { rec.current?.abort?.(); } catch {}          // half-duplex: the mic cannot hear AXIOM if it is off
-    ears.current?.pause();
+    try { rec.current?.abort?.(); } catch {}          // the browser recogniser cannot tell AXIOM from Sai; Whisper can
+    ears.current?.duck(true);                         // still listening, so Sai can cut in mid-sentence
     spoken.current = [...spoken.current.filter((x) => Date.now() - x.at < 25_000), { words: norm(item.text), at: Date.now() }];
     if (queue.current[0] && !queue.current[0].audio) queue.current[0].audio = render(queue.current[0].text);   // one ahead
     const url = await (item.audio ?? render(item.text));
@@ -191,6 +192,11 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
   // saying so. So: one supervisor, a fresh recogniser each time, a heartbeat
   // that notices when it has not been alive recently, and backoff on errors.
   const oneShot = useRef(false);        // next result is a question, not a wake word
+  // Once a conversation has started it stays open: Sai does not say a person's
+  // name before every sentence, and he should not have to here either. The
+  // wake word is only how a conversation *begins* after a long silence.
+  const openUntil = useRef(0);
+  const CONVERSATION_MS = 90_000;
   const running = useRef(false);        // the recogniser is live right now (onstart → onend)
   const startedAt = useRef(0);
   const fails = useRef(0);
@@ -215,20 +221,43 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
 
   const handle = useCallback((t: string) => {
     setHeard(t); setTimeout(() => setHeard((h) => (h === t ? "" : h)), 6000);
-    if (speakingRef.current) { if (/\b(stop|quiet|enough|shut up)\b/i.test(t)) hush(); return; }
+    if (speakingRef.current) {
+      if (/\b(stop|quiet|enough|shut up|never ?mind)\b/i.test(t)) { hush(); return; }
+      // Sai talked over the answer. That is a conversation, not an error: stop
+      // talking and take what he said as the next thing to answer — unless it
+      // was AXIOM's own voice coming back round, or a word of agreement.
+      const rest = deEcho(t);
+      const words = rest.split(/\s+/).filter(Boolean);
+      if (words.length < 2) return;
+      if (/^(yeah|yes|right|ok|okay|sure|mm+|uh ?huh|got it|nice|cool|thanks)\b/i.test(rest)) return;   // he is just following along
+      hush();
+      openUntil.current = Date.now() + CONVERSATION_MS;
+      ask(rest);
+      return;
+    }
     if (Date.now() < echoUntil.current || spoken.current.length) {
       const rest = deEcho(t);
       if (!rest || rest.length < 3) return;                       // it only heard itself
       if (rest !== norm(t).join(" ")) t = rest;                   // AXIOM's words removed, Sai's kept
     }
-    if (oneShot.current) { oneShot.current = false; ask(t); return; }
+    if (oneShot.current) { oneShot.current = false; openUntil.current = Date.now() + CONVERSATION_MS; ask(t); return; }
+    if (Date.now() < openUntil.current && !WAKE.test(t)) {
+      // mid-conversation: no name needed, just answer — but a stray noise
+      // Whisper turned into one word is not a question
+      const words = t.trim().split(/\s+/).filter(Boolean);
+      if (words.length < 2) return;
+      openUntil.current = Date.now() + CONVERSATION_MS;
+      ask(t.trim());
+      return;
+    }
     if (!WAKE.test(t)) return;
+    openUntil.current = Date.now() + CONVERSATION_MS;
     const q = t.replace(WAKE, "").replace(/^[,.\s]+/, "").trim();
     if (q && !WAKE_ONLY.test(q)) { ask(q); return; }
     if (/status|what.s up|whats up|wake up|brief/i.test(q)) { ask(BRIEF); return; }
     oneShot.current = true;               // "Axiom?" — answer, then take the next thing said as the question
     speak("Yes, Sai?");
-    setTimeout(() => { oneShot.current = false; }, 12_000);
+    setTimeout(() => { oneShot.current = false; }, 20_000);
   }, [ask, hush, speak, deEcho]);
 
   const spin = useCallback(() => {

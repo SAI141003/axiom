@@ -33,11 +33,15 @@ ROOT = Path(__file__).resolve().parent.parent
 MODEL = os.getenv("WHISPER_MODEL", str(ROOT / ".data" / "whisper" / "ggml-base.en.bin"))
 PORT = int(os.getenv("STT_PORT", "5002"))
 # the desk's own vocabulary, so the names it hears every day come back right
-PROMPT = ("AXIOM. The Eye. The desk. Sai. Weather bot, flow bot, meme bot, options bot, "
-          "oracle-lag, gamma-pulse, ccxt strategy, stocks bot, pre-market. Polymarket, Kraken, "
-          "Hyperliquid. Open the Eye. Brief me. Pause trading.")
+PROMPT = ("AXIOM Sai Polymarket Kraken Hyperliquid oracle-lag gamma-pulse ccxt "
+          "premarket weather bot flow bot meme bot options bot stocks bot")
 
 VOICE = os.getenv("PIPER_VOICE", str(ROOT / ".data" / "piper" / "en_GB-alan-medium.onnx"))
+# a shade slower than default and a little less jitter: the measured, unhurried
+# delivery Sai asked for rather than a newsreader's clip
+RATE = float(os.getenv("PIPER_RATE", "1.08"))       # >1 is slower
+NOISE = float(os.getenv("PIPER_NOISE", "0.60"))     # lower is steadier
+NOISE_W = float(os.getenv("PIPER_NOISE_W", "0.75"))
 
 _model = None
 _voice = None
@@ -93,9 +97,11 @@ async def h_speak(request: web.Request) -> web.Response:
     said = str(body.get("text") or "").strip()
     if not said:
         return web.json_response({"error": "no text"}, status=400)
+    from piper import SynthesisConfig
     buf = io.BytesIO()
     with wave.open(buf, "wb") as w:
-        voice().synthesize_wav(said[:1200], w)
+        voice().synthesize_wav(said[:1200], w, syn_config=SynthesisConfig(
+            length_scale=RATE, noise_scale=NOISE, noise_w_scale=NOISE_W, normalize_audio=True))
     wav = buf.getvalue()
     return web.Response(body=wav, content_type="audio/wav",
                         headers={"x-engine": "piper", "x-ms": str(int((time.time() - t0) * 1000))})
