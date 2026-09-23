@@ -20,12 +20,28 @@ const STT = process.env.STT_URL || "http://127.0.0.1:5002";
 // fallback for the case where the local service is down.
 const VOICE = process.env.AXIOM_VOICE || "en-GB-RyanNeural";
 
+// Which voice produced a clip has to be part of its name, or changing the
+// voice leaves every sentence AXIOM has already said playing in the old one.
+// The model and its prosody live in the speech service, so ask it — once a
+// minute is plenty, and a failure falls back to a name that is still stable.
+let voiceId = "piper";
+let voiceCheckedAt = 0;
+async function currentVoice(): Promise<string> {
+  if (Date.now() - voiceCheckedAt < 60_000) return voiceId;
+  try {
+    const d = await (await fetch(`${STT}/`, { cache: "no-store", signal: AbortSignal.timeout(2500) })).json();
+    if (d?.voice?.model) voiceId = `${d.voice.model}|${d.voice.rate ?? ""}`;
+  } catch {}
+  voiceCheckedAt = Date.now();
+  return voiceId;
+}
+
 export async function POST(request: Request) {
   let text = "";
   try { text = String((await request.json()).text ?? ""); } catch {}
   text = text.replace(/[*_#`]/g, "").replace(/\s+/g, " ").trim().slice(0, 1800);
   if (!text) return NextResponse.json({ error: "text required" }, { status: 400 });
-  const key = createHash("sha1").update(`piper|${text}`).digest("hex");
+  const key = createHash("sha1").update(`${await currentVoice()}|${text}`).digest("hex");
   const file = path.join(CACHE, `${key}.wav`);
   try {
     const buf = await fs.readFile(file);

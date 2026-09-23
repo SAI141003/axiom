@@ -84,7 +84,7 @@ export default function HudHome() {
           <RingGauge label="fleet p&l" value={t ? usd0(t.pnl) : "—"} sub={t ? `of $${t.start}` : ""} pct={t ? Math.max(0.02, Math.min(1, t.account / t.start)) : 0} tone={t && t.pnl >= 0 ? "var(--hud-green)" : "var(--hud-red)"} size={136} />
           <ReactorStage tone={tone} size={340}>
             <Link href="/mind" aria-label="AXIOM — the mind" className="grid place-items-center">
-              <BrainCore size={248} activity={jstate === "idle" ? 0.4 : 0.85} motes={motes} />
+              <BrainCore size={248} activity={jstate === "idle" ? 0.4 : 0.85} motes={motes} fps={jstate === "idle" ? 10 : 20} />
             </Link>
           </ReactorStage>
           <RingGauge label="weather bot" value={weatherBot ? usd0(weatherBot.pnl) : "—"} sub={weatherBot ? `${(weatherBot.winRate * 100).toFixed(0)}% · ${weatherBot.trades} trades` : ""} pct={weatherBot ? weatherBot.winRate : 0} tone="var(--hud-gold)" size={136} />

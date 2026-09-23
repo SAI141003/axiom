@@ -165,7 +165,8 @@ async def h_health(_: web.Request) -> web.Response:
     return web.json_response({"ok": Path(MODEL).exists(), "engine": "whisper.cpp",
                               "model": Path(MODEL).name, "warm": _model is not None,
                               "voice": {"ok": Path(VOICE).exists(), "engine": "piper",
-                                        "model": Path(VOICE).name, "warm": _voice is not None}})
+                                        "model": Path(VOICE).name, "rate": RATE,
+                                        "warm": _voice is not None}})
 
 
 def main() -> None:

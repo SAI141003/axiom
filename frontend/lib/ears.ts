@@ -42,6 +42,7 @@ const MIN_SPEECH_MS = 180;      // shorter than this is a cough, not a word
 const MAX_UTTERANCE_MS = 15_000;
 const PREROLL_MS = 500;         // kept before the gate opens so the first word survives
 const OUT_RATE = 16_000;        // what whisper.cpp wants
+const MIN_FLOOR = 2e-4;         // a floor of zero would make every gate infinite
 
 export async function whisperReady(): Promise<boolean> {
   try { const r = await fetch("/api/jarvis/stt", { cache: "no-store" }); return (await r.json()).ok === true; } catch { return false; }
@@ -76,7 +77,8 @@ export class Ears {
   private ducked = false;      // AXIOM is talking: still listening, but only for a real interruption
   private stopped = false;
   private floor = 0.012;                 // follows the room
-  private inFlight = false;              // Whisper serialises; do not queue rubbish behind a real question
+  private inFlight = false;              // Whisper serialises; one at a time
+  private pending: Blob | null = null;   // ...but the newest utterance waits rather than being lost
   private rate = 48_000;
 
   constructor(private ev: EarsEvents) {}
@@ -116,7 +118,7 @@ export class Ears {
       // talking — a real microphone never reaches digital silence, so a floor
       // that only moved between utterances left the gate stuck open and every
       // "utterance" ran to the fifteen-second ceiling.
-      this.floor = rms < this.floor ? this.floor * 0.9 + rms * 0.1 : this.floor * 0.9995 + rms * 0.0005;
+      this.floor = Math.max(MIN_FLOOR, rms < this.floor ? this.floor * 0.9 + rms * 0.1 : this.floor * 0.9995 + rms * 0.0005);
 
       // Two thresholds, not one: speech has to clear the higher bar to open
       // the gate and fall below the lower one to close it, so an ordinary dip
@@ -124,8 +126,12 @@ export class Ears {
       // While AXIOM speaks the ears stay open so Sai can cut in mid-sentence.
       // The browser's echo canceller removes most of AXIOM's own voice; the
       // raised bar removes the rest.
-      const open = this.ducked ? this.floor * 8 + 0.03 : this.floor * 3.5 + 0.004;
-      const close = this.ducked ? this.floor * 5 + 0.02 : this.floor * 2.0 + 0.002;
+      // Purely relative to the room. An absolute term here looked harmless and
+      // was not: measured, this machine's microphone peaks at 0.0016 RMS, so a
+      // gate needing 0.004 could never open — a quiet microphone, or Sai
+      // sitting back from it, and the desk simply never hears him.
+      const open = this.floor * (this.ducked ? 10 : 4);
+      const close = this.floor * (this.ducked ? 6 : 2.2);
       const now = Date.now();
 
       if (rms > (this.speaking ? close : open)) {
@@ -154,10 +160,15 @@ export class Ears {
     this.speaking = false; this.held = []; this.ring = [];
     this.ev.onState?.("listening");
     if (heldMs < MIN_SPEECH_MS || !frames.length) return;
-    // room noise can cross a gate; speech stays loud for a while. Require a
-    // real run of voiced frames before spending a transcription on it.
-    let voiced = 0;
-    for (const f of frames) { let s2 = 0; for (let i = 0; i < f.length; i++) s2 += f[i] * f[i]; if (Math.sqrt(s2 / f.length) > this.floor * 3) voiced++; }
+    // Room noise can cross a gate; speech stays loud for a while. Judge that
+    // against the utterance's own peak, not against the running noise floor —
+    // the floor now tracks continuously and climbs while Sai is talking, so
+    // comparing to it threw away the very sentences it was meant to protect.
+    const rmsOf = (f: Float32Array) => { let s2 = 0; for (let i = 0; i < f.length; i++) s2 += f[i] * f[i]; return Math.sqrt(s2 / f.length); };
+    const levels = frames.map(rmsOf);
+    const loudest = Math.max(...levels);
+    if (loudest < MIN_FLOOR * 2) return;                        // nothing but room tone; the gate has already judged the rest
+    const voiced = levels.filter((l) => l > loudest * 0.25).length;
     if (voiced < frames.length * 0.12) return;
 
     // flatten, then decimate to 16 kHz by averaging — a whole-number ratio, and
@@ -178,10 +189,15 @@ export class Ears {
     let peak = 0; for (let i = 0; i < out.length; i++) { const a = Math.abs(out[i]); if (a > peak) peak = a; }
     if (peak > 0.001 && peak < 0.85) { const g = Math.min(12, 0.85 / peak); for (let i = 0; i < out.length; i++) out[i] *= g; }
 
-    if (this.inFlight) return;           // still transcribing the last one
+    this.send(wav(out, Math.round(this.rate / step)));
+  }
+
+  /** One transcription at a time; the newest waiting utterance follows it. */
+  private send(body: Blob) {
+    if (this.inFlight) { this.pending = body; return; }   // keep the newest, not the oldest
     this.inFlight = true;
     this.ev.onState?.("thinking");
-    fetch("/api/jarvis/stt", { method: "POST", headers: { "content-type": "audio/wav" }, body: wav(out, Math.round(this.rate / step)) })
+    fetch("/api/jarvis/stt", { method: "POST", headers: { "content-type": "audio/wav" }, body })
       .then((r) => r.json())
       .then((d) => {
         this.inFlight = false;
@@ -192,12 +208,13 @@ export class Ears {
         if (said.length > 1) this.ev.onText(said);
         else if (d.error) this.ev.onError?.(d.error);
       })
-      .catch((e) => { this.inFlight = false; this.ev.onState?.("listening"); this.ev.onError?.(String(e?.message ?? e)); });
+      .catch((e) => { this.inFlight = false; this.ev.onState?.("listening"); this.ev.onError?.(String(e?.message ?? e)); })
+      .finally(() => { const next = this.pending; this.pending = null; if (next) this.send(next); });
   }
 
   /** AXIOM is speaking: keep the ears open, but only a real voice gets through. */
   duck(on: boolean) { this.ducked = on; if (on) { this.speaking = false; this.held = []; this.ring = []; } else { this.ring = []; this.held = []; this.lastVoice = Date.now(); } }
-  pause() { this.paused = true; this.speaking = false; this.held = []; this.ring = []; }
+  pause() { this.paused = true; this.speaking = false; this.held = []; this.ring = []; this.pending = null; }
   resume() { this.paused = false; this.ducked = false; this.ring = []; this.held = []; this.floor = 0.012; this.lastVoice = Date.now(); }
 
   stop() {
