@@ -28,6 +28,26 @@ export const BRIEF = "Good morning, Axiom. Give me the status briefing.";
 // other page share this hook, so a conversation started in one continues in
 // the other (the bridge holds the thread; this hook holds the transcript).
 const WAKE_KEY = "axiom.wake";
+// Only one pair of ears on the page. The dock lives in the layout and /mind
+// mounts its own instance, so on that page both were hearing the wake word,
+// both were asking, and Sai heard two AXIOMs answer over each other. A page
+// that asks to be primary takes the microphone; otherwise the first to claim
+// it keeps it until it unmounts.
+let earsOwner: number | null = null;
+let earsPrimary = false;
+let earsEvict: null | (() => void) = null;
+let nextEarsId = 1;
+const claimEars = (id: number, primary: boolean, evict: () => void) => {
+  if (earsOwner === id) { earsPrimary = earsPrimary || primary; earsEvict = evict; return true; }
+  if (earsOwner === null || (primary && !earsPrimary)) {
+    earsEvict?.();                       // the previous owner closes its microphone
+    earsOwner = id; earsPrimary = primary; earsEvict = evict;
+    return true;
+  }
+  return false;
+};
+const releaseEars = (id: number) => { if (earsOwner === id) { earsOwner = null; earsPrimary = false; earsEvict = null; } };
+
 export const wakeArmed = () => { try { return localStorage.getItem(WAKE_KEY) !== "off"; } catch { return true; } };
 
 // The wake word is on by default and stays on: AXIOM listens on every page
@@ -37,7 +57,7 @@ const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/
 const lev = (a: string, b: string) => { const m = a.length, n = b.length; let prev = Array.from({ length: n + 1 }, (_, j) => j); for (let i = 1; i <= m; i++) { const cur = [i]; for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = cur; } return prev[n]; };
 const like = (a: string, b: string) => a === b || (a[0] === b[0] && lev(a, b) <= Math.max(1, Math.floor(Math.max(a.length, b.length) / 2)));
 
-export function useJarvis(opts: { voice?: boolean; context?: () => string; listen?: boolean } = {}) {
+export function useJarvis(opts: { voice?: boolean; context?: () => string; listen?: boolean; primary?: boolean } = {}) {
   const [state, setState] = useState<JarvisState>("idle");
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [bridge, setBridge] = useState<BridgeState>("connecting");
@@ -71,6 +91,8 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
   const speakingRef = useRef(false);
   const ears = useRef<Ears | null>(null);
   const [engine, setEngine] = useState<"whisper" | "browser" | "">("");
+  const meId = useRef(0);
+  if (!meId.current) meId.current = nextEarsId++;
   const armed = useRef(false);          // the wake word should be running
   const spinRef = useRef<null | (() => void)>(null);
   const handleRef = useRef<null | ((t: string) => void)>(null);
@@ -350,8 +372,11 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
     if (opts.listen === false) return;
     if (!wakeArmed()) return;
     if (!engine) return;                                   // wait until we know which engine
+    // another instance may already have the microphone; if we take it from
+    // one, it closes its own before we open ours
+    if (!claimEars(meId.current, opts.primary === true, () => { armed.current = false; try { rec.current?.abort?.(); } catch {} ears.current?.stop(); ears.current = null; })) return;
     const t = setTimeout(() => listen(), 400);
-    return () => { clearTimeout(t); armed.current = false; try { rec.current?.abort?.(); } catch {} ears.current?.stop(); ears.current = null; };
+    return () => { clearTimeout(t); armed.current = false; try { rec.current?.abort?.(); } catch {} ears.current?.stop(); ears.current = null; releaseEars(meId.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [opts.listen, engine]);
 
