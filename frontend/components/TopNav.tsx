@@ -99,7 +99,6 @@ export default function TopNav() {
           <Sparkles size={13} aria-hidden style={{ color: "var(--hud-accent)" }} /><span className="font-mono text-[11px] tracking-widest">AXIOM</span>
         </button>
       )}
-      <span className="hud-chip ml-1" style={{ color: "var(--hud-amber)" }}>Dry-run</span>
     </nav>
     </>
   );
