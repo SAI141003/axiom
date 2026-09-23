@@ -228,7 +228,15 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
   // name before every sentence, and he should not have to here either. The
   // wake word is only how a conversation *begins* after a long silence.
   const openUntil = useRef(0);
-  const CONVERSATION_MS = 90_000;
+  const conversationStart = useRef(0);
+  const CONVERSATION_MS = 90_000;      // no wake word needed within this of the last exchange
+  const CONVERSATION_MAX_MS = 10 * 60_000;   // ...but a room full of talk cannot hold it open all day
+  const openConversation = () => {
+    const now = Date.now();
+    if (now > openUntil.current) conversationStart.current = now;      // a fresh one
+    openUntil.current = now + CONVERSATION_MS;
+  };
+  const conversationOpen = () => Date.now() < openUntil.current && Date.now() - conversationStart.current < CONVERSATION_MAX_MS;
   const running = useRef(false);        // the recogniser is live right now (onstart → onend)
   const startedAt = useRef(0);
   const fails = useRef(0);
@@ -252,17 +260,31 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
   }, []);
 
   // Leaving the ears open so Sai can interrupt means the microphone also hears
-  // AXIOM through the speakers. The echo canceller and the raised gate stop
-  // most of it; this stops the rest, and unlike the prefix filter it works on
-  // a fragment caught from the middle of a sentence: if most of the words were
-  // just spoken by AXIOM, they were not spoken by Sai.
+  // AXIOM through the speakers, and the fragment it catches can come from the
+  // middle of a sentence, past the prefix filter.
+  //
+  // Counting shared words does not work: AXIOM talks about the same things Sai
+  // asks about, so "pause the flow bot" overlapped its last answer by 75% and
+  // was thrown away — the desk ignored him exactly when he used its own terms.
+  // Echo is the same words in the same ORDER, as one unbroken run. A follow-up
+  // reuses the vocabulary but not the sequence. Measured on real answers: echo
+  // scores 1.00, Sai's follow-ups score 0.29-0.75.
   const isOwnVoice = useCallback((t: string): boolean => {
-    const mine = new Set(spoken.current.flatMap((x) => x.words));
-    if (mine.size < 3) return false;
-    const words = norm(t).filter((w) => w.length > 2);
-    if (!words.length) return false;
-    const hits = words.filter((w) => mine.has(w)).length;
-    return hits / words.length > 0.5;
+    const heard = norm(t);
+    if (heard.length < 4) return false;              // too short to tell; let it through
+    for (const utt of spoken.current) {
+      const mine = utt.words;
+      let best = 0;
+      for (let start = 0; start < mine.length; start++) {
+        let run = 0, longest = 0;
+        for (let i = 0, j = start; i < heard.length && j < mine.length; i++, j++) {
+          if (like(heard[i], mine[j])) { run++; longest = Math.max(longest, run); } else run = 0;
+        }
+        best = Math.max(best, longest);
+      }
+      if (best >= 4 && best / heard.length >= 0.85) return true;
+    }
+    return false;
   }, []);
 
   const handle = useCallback((t: string) => {
@@ -278,28 +300,33 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
       if (words.length < 2) return;
       if (/^(yeah|yes|right|ok|okay|sure|mm+|uh ?huh|got it|nice|cool|thanks)\b/i.test(rest)) return;   // he is just following along
       hush();
-      openUntil.current = Date.now() + CONVERSATION_MS;
+      openConversation();
       ask(rest);
       return;
     }
-    if (Date.now() < echoUntil.current || spoken.current.length) {
+    // The ears reopen 400 ms after AXIOM stops, and a room carries its voice a
+    // little longer than that, so the same guard has to hold just after speech
+    // as during it — otherwise its own tail lands in an open conversation and
+    // gets asked back as a question.
+    if (Date.now() < echoUntil.current) {
+      if (isOwnVoice(t)) return;
       const rest = deEcho(t);
       if (!rest || rest.length < 3) return;                       // it only heard itself
       if (rest !== norm(t).join(" ")) t = rest;                   // AXIOM's words removed, Sai's kept
     }
-    if (oneShot.current) { oneShot.current = false; openUntil.current = Date.now() + CONVERSATION_MS; ask(t); return; }
-    if (Date.now() < openUntil.current && !WAKE.test(t)) {
+    if (oneShot.current) { oneShot.current = false; openConversation(); ask(t); return; }
+    if (conversationOpen() && !WAKE.test(t)) {
       // mid-conversation: no name needed, just answer — but a stray noise
       // Whisper turned into one word is not a question
       const words = t.trim().split(/\s+/).filter(Boolean);
       if (words.length < 2) return;
-      openUntil.current = Date.now() + CONVERSATION_MS;
+      openConversation();
       ask(t.trim());
       return;
     }
     const addressed = ADDRESS.test(t);
     if (!WAKE.test(t) && !addressed) return;
-    openUntil.current = Date.now() + CONVERSATION_MS;
+    openConversation();
     const q = t.replace(WAKE, "").replace(addressed ? ADDRESS : /(?!)/, "").replace(/^[,.\s]+/, "").trim();
     if (q && !WAKE_ONLY.test(q)) { ask(q); return; }
     if (/status|what.s up|whats up|wake up|brief/i.test(q)) { ask(BRIEF); return; }

@@ -29,7 +29,8 @@ export default function BrainCore({
   activity = 0.5,
   stars = false,
   motes = [],
-}: { size?: number; activity?: number; stars?: boolean; motes?: DataMote[] }) {
+  fps = 30,
+}: { size?: number; activity?: number; stars?: boolean; motes?: DataMote[]; fps?: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const actRef = useRef(activity);
   actRef.current = activity;
@@ -194,7 +195,10 @@ export default function BrainCore({
     let raf = 0;
     let last = performance.now();
     let lastFrame = 0;
-    const FRAME_MS = 33;   // cap ~30fps + pause when tab hidden — halves CPU/fan
+    // The mind page is the brain; on the home page it is a thumbnail beside
+    // the numbers, and it was costing the better part of a third of a core all
+    // day — which the ears and the speech service then had to compete with.
+    const FRAME_MS = 1000 / Math.max(1, fps);   // + paused when the tab is hidden
 
     const render = (now: number) => {
       if (document.hidden || now - lastFrame < FRAME_MS) { raf = requestAnimationFrame(render); return; }
