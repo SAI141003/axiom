@@ -170,7 +170,7 @@ async function critic(q: string, decision: string, finalP: number, digest: strin
 
 async function swarmVote(q: string): Promise<{ p: number | null; voices: any[]; micro: any[] }> {
   try {
-    const r = await fetch("http://localhost:3000/api/mirofish", {
+    const r = await fetch("http://localhost:3300/api/mirofish", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ question: q }), signal: AbortSignal.timeout(70_000),
     }).then((x) => x.json());

@@ -41,7 +41,7 @@ import { fileURLToPath } from "node:url";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "..");
 const PORT = Number(process.env.JARVIS_PORT ?? 8788);
-const DESK = process.env.AXIOM_DESK_URL ?? "http://localhost:3000";
+const DESK = process.env.AXIOM_DESK_URL ?? "http://localhost:3300";
 const PY = join(ROOT, ".venv", "bin", "python");
 const MEMORY = join(HERE, "memory.md");
 const JOURNAL = join(HERE, "journal.jsonl");

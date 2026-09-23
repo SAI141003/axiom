@@ -32,7 +32,7 @@ export async function GET() {
 
   let swarmTotal = 0, swarmAlive = 0;
   try {
-    const brain = await fetch("http://localhost:3000/api/brain", { cache: "no-store" }).then((r) => r.json());
+    const brain = await fetch("http://localhost:3300/api/brain", { cache: "no-store" }).then((r) => r.json());
     const agents = brain?.agents ?? [];
     swarmTotal = agents.length;
     swarmAlive = agents.filter((a: any) => a.alive).length;

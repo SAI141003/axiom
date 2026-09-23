@@ -29,7 +29,7 @@ from zoneinfo import ZoneInfo
 import aiohttp
 
 LOG = Path(__file__).resolve().parent.parent / "logs" / "dryrun_options.jsonl"
-SCANNER = "http://localhost:3000/api/options?symbols=NVDA,TSLA,AAPL,MSFT,AMD,GOOGL,META,MU&bankroll=10000"
+SCANNER = "http://localhost:3300/api/options?symbols=NVDA,TSLA,AAPL,MSFT,AMD,GOOGL,META,MU&bankroll=10000"
 BANKROLL = 10_000.0
 ET = ZoneInfo("America/New_York")
 UA = {"User-Agent": "Mozilla/5.0"}

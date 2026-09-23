@@ -11,7 +11,7 @@ const PROMPT = `Weekly freshness study, unattended:
 3. write_note titled "Weekly freshness <date>": what changed, what it means for the desk, and what should be updated, with URLs.
 4. update_desk_state with the current picture.
 5. Four spoken sentences for the morning brief. No markdown.`;
-const ws = new WebSocket("ws://127.0.0.1:8788", { headers: { origin: "http://localhost:3000" } });
+const ws = new WebSocket("ws://127.0.0.1:8788", { headers: { origin: "http://localhost:3300" } });
 setTimeout(() => { console.error("[freshness] timed out"); process.exit(2); }, 20 * 60_000);
 ws.on("open", () => ws.send(JSON.stringify({ type: "ask", text: PROMPT })));
 ws.on("message", (raw) => { const m = JSON.parse(String(raw)); if (m.type === "tool") process.stdout.write(`[freshness] ${m.name}\n`); if (m.type === "done") { console.log(`[freshness] ${new Date().toISOString()}\n${m.text}`); process.exit(0); } });

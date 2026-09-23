@@ -55,7 +55,7 @@ python3 -m venv .venv && ./.venv/bin/pip install -r requirements-core.txt
 cd frontend && npm install && npm run dev
 ```
 
-Open **http://localhost:3000**.
+Open **http://localhost:3300**.
 
 `requirements-core.txt` is the lightweight set — exchange data, math, config and
 tests. It is verified to run the whole quick start from a clean clone.

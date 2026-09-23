@@ -35,7 +35,7 @@ Languages: **Python 3.14** (`.venv/`) + **TypeScript/React**. No C++.
 Everything is launchd (`~/Library/LaunchAgents/com.polymarket.*`), auto-restart + reboot-safe. Manual:
 
 ```bash
-# frontend  → http://localhost:3000
+# frontend  → http://localhost:3300
 cd frontend && npm run dev
 # bot
 NO_DASHBOARD=1 .venv/bin/python main.py
