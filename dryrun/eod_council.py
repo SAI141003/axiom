@@ -54,7 +54,7 @@ def _save(name: str, obj) -> None:
 
 def fetch_review() -> dict | None:
     try:
-        with urllib.request.urlopen("http://localhost:3000/api/council/review", timeout=180) as r:
+        with urllib.request.urlopen("http://localhost:3300/api/council/review", timeout=180) as r:
             return json.load(r)
     except Exception as e:
         print(f"[eod] review fetch failed: {e}", flush=True)

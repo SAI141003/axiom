@@ -3,7 +3,7 @@
 > **Written for:** Any new Claude agent taking over this project  
 > **Last updated:** 2026-07-07  
 > **Project location:** `/Users/saiyaganti/polymarket-hft/`  
-> **Frontend:** `/Users/saiyaganti/polymarket-hft/frontend/` → `http://localhost:3000`
+> **Frontend:** `/Users/saiyaganti/polymarket-hft/frontend/` → `http://localhost:3300`
 
 ---
 
@@ -34,7 +34,7 @@ python main.py         # starts all 15 workers
 ```bash
 cd /Users/saiyaganti/polymarket-hft/frontend
 npm install            # if node_modules missing
-npm run dev            # → http://localhost:3000
+npm run dev            # → http://localhost:3300
 ```
 
 ### With Docker

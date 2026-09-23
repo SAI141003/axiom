@@ -28,7 +28,7 @@ import aiohttp
 
 ROOT = Path(__file__).resolve().parent.parent
 LOG = ROOT / "logs" / "dryrun_premarket.jsonl"
-SCANNER = "http://localhost:3000/api/premarket?budget=1000"
+SCANNER = "http://localhost:3300/api/premarket?budget=1000"
 ET = ZoneInfo("America/New_York")
 UA = {"User-Agent": "Mozilla/5.0"}
 TOP_N = 5

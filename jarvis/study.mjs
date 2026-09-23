@@ -16,7 +16,7 @@ const PROMPT = `Night study. Do this unattended and thoroughly:
 3. Write one note with write_note: what you read (title, authors, URL), the two or three findings that apply, and ONE concrete next step for that bot — a propose_fix with exact before/after if it is a code change, or a propose_strategy if it is a blend.
 4. Rewrite the desk state with update_desk_state so the morning brief starts from it.\n5. Finish with a four-sentence spoken summary for the morning brief. No markdown.`;
 
-const ws = new WebSocket("ws://127.0.0.1:8788", { headers: { origin: "http://localhost:3000" } });
+const ws = new WebSocket("ws://127.0.0.1:8788", { headers: { origin: "http://localhost:3300" } });
 const bail = setTimeout(() => { console.error("[study] timed out"); process.exit(2); }, 15 * 60_000);
 ws.on("open", () => ws.send(JSON.stringify({ type: "ask", text: PROMPT })));
 ws.on("message", (raw) => {

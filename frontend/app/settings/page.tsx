@@ -255,7 +255,7 @@ export default function SettingsPage() {
 
         <p className="text-[10px] mt-6 pb-8" style={{ color: "var(--hud-muted)" }}>
           Storage: AI keys → frontend/.env.local (applied instantly) · account keys → backend .env.
-          Both files are gitignored. This page is served only on localhost — do not expose port 3000
+          Both files are gitignored. This page is served only on localhost — do not expose port 3300
           to the internet with keys stored.
         </p>
       </main>

@@ -25,7 +25,7 @@ const PROMPT = `Autonomous cycle. Nobody is watching; act as the desk's own mind
 7. Finish: update_desk_state with the current picture, and speak three sentences: what you saw, what you did, what you want Sai to decide. No markdown.
 Cap: at most three acts this cycle (pause/resume/restart/power/trade). Doing nothing is a fine outcome when nothing needs doing — say so. Never say you did something the tool did not confirm.`;
 
-const ws = new WebSocket("ws://127.0.0.1:8788", { headers: { origin: "http://localhost:3000" } });
+const ws = new WebSocket("ws://127.0.0.1:8788", { headers: { origin: "http://localhost:3300" } });
 const bail = setTimeout(() => { console.error("[agent] timed out"); process.exit(2); }, 12 * 60_000);
 const tools = [];
 ws.on("open", () => ws.send(JSON.stringify({ type: "ask", text: PROMPT })));
