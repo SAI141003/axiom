@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { promises as fs } from "fs";
+import path from "path";
 
 /**
  * Weather edge scanner — live Polymarket temperature markets vs live meteorology.
@@ -24,6 +26,9 @@ interface Bucket {
 
 interface CityReport {
   slug: string;
+  eventDate: string;            // the day the market resolves on (city-local)
+  buyFrom: number;              // epoch ms: 14:00 city-local — when the bot starts buying
+  pick: { side: "YES" | "NO"; question: string; price: number; model: number } | null;
   title: string;
   city: string;
   station: string;
@@ -157,6 +162,13 @@ const MONTHS: Record<string, number> = {
 };
 
 // "highest-temperature-in-los-angeles-on-july-6-2026" → "2026-07-06"
+// epoch ms of HH:00 on a city-local date, via the zone's offset at that moment
+function localToEpoch(date: string, hour: number, tz: string): number {
+  const guess = Date.parse(`${date}T${String(hour).padStart(2, "0")}:00:00Z`);
+  const asLocal = Date.parse(new Date(guess).toLocaleString("sv-SE", { timeZone: tz }).replace(" ", "T") + "Z");
+  return guess - (asLocal - guess);
+}
+
 function parseEventDate(slug: string): string | null {
   const m = slug.match(/-on-([a-z]+)-(\d+)-(\d{4})$/);
   if (!m) return null;
@@ -167,22 +179,37 @@ function parseEventDate(slug: string): string | null {
 
 export async function GET() {
   // 1. Live weather events from Gamma
+  //    Today's markets fill the first page; tomorrow's (listed ~2 days ahead) the next.
   let events: any[] = [];
   try {
-    const res = await fetch(
-      "https://gamma-api.polymarket.com/events?limit=60&closed=false&tag_slug=weather&order=endDate&ascending=true",
+    const pages = await Promise.all([0, 100, 200].map((off) => fetch(
+      `https://gamma-api.polymarket.com/events?limit=100&offset=${off}&closed=false&tag_slug=weather&order=endDate&ascending=true`,
       { cache: "no-store" },
-    );
-    events = await res.json();
+    ).then((r) => r.json()).catch(() => [])));
+    events = pages.flat();
   } catch {
     return NextResponse.json({ error: "gamma fetch failed" }, { status: 502 });
   }
+  if (!events.length) return NextResponse.json({ error: "gamma fetch failed" }, { status: 502 });
 
-  const tempEvents = events.filter((e) => /highest-temperature-in-/.test(e.slug ?? ""));
+  // the same gate the daemon trades, tuned values when the auto-tuner has set them
+  let gate = { min: 0.70, cap: 0.15 };
+  try {
+    const t = JSON.parse(await fs.readFile(path.join(process.cwd(), "..", ".data", "tuned_params.json"), "utf-8"));
+    gate = { min: t?.weather?.ENTRY_MIN?.value ?? 0.70, cap: t?.weather?.EDGE_CAP?.value ?? 0.15 };
+  } catch {}
+
+  const yesterday = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
+  const seen = new Set<string>();
+  const tempEvents = events.filter((e) => {
+    if (!/highest-temperature-in-/.test(e.slug ?? "") || seen.has(e.slug)) return false;
+    seen.add(e.slug);
+    return (parseEventDate(e.slug) ?? "") >= yesterday;   // drop stale listings
+  });
 
   const reports: CityReport[] = [];
 
-  await Promise.all(tempEvents.slice(0, 30).map(async (ev) => {
+  await Promise.all(tempEvents.slice(0, 200).map(async (ev) => {
     const m = ev.slug.match(/highest-temperature-in-(.+?)-on-/);
     if (!m) return;
     const city = m[1].replace(/-/g, " ");
@@ -326,10 +353,23 @@ export async function GET() {
       ? `${best.edge > 0 ? "BUY YES" : "BUY NO"} "${best.question}" — model ${(best.modelProb * 100).toFixed(0)}% vs market ${(best.marketYes * 100).toFixed(0)}¢ (${best.edge > 0 ? "+" : ""}${(best.edge * 100).toFixed(1)}% edge)`
       : null;
 
+    // The daemon's own rule, minus its clock: moderate edge only, strong
+    // favourite only, no NO below 15¢, and after 14h never against the
+    // observed max. Before 14:00 local this is a preview, not a trade.
+    let pick: CityReport["pick"] = null;
+    if (best && !dayComplete && !unreliable && Math.abs(best.edge) <= gate.cap && best.marketYes > 0.02 && best.marketYes < 0.98) {
+      const side = best.edge > 0 ? "YES" : "NO";
+      const price = side === "YES" ? best.marketYes : 1 - best.marketYes;
+      const lockedNo = side === "NO" && observedMax != null && hoursElapsed >= 14 && best.low - 0.5 <= observedMax && observedMax <= best.high + 0.5;
+      if (price >= gate.min && !lockedNo && !lateRise)
+        pick = { side, question: best.question, price: parseFloat(price.toFixed(3)), model: parseFloat((side === "YES" ? best.modelProb : 1 - best.modelProb).toFixed(3)) };
+    }
     const stationMatch = (ev.description ?? "").match(/recorded (?:at|by) (?:the )?([^,.]+)/i);
 
     reports.push({
       slug: ev.slug,
+      eventDate, pick,
+      buyFrom: localToEpoch(eventDate, 14, geo.tz),
       title: ev.title,
       city,
       station: (stationMatch?.[1]?.trim() ?? "official station") + (icao ? ` [${icao}]` : ""),
