@@ -54,3 +54,8 @@ jarvis/proposals/
 jarvis/notes/
 jarvis/desk_state.md
 jarvis/thread.json
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/p1-*.png
+paper/page-*.png
