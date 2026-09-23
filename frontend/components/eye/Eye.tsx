@@ -240,14 +240,19 @@ export default function Eye() {
               <div className="eye-row"><span>POS</span><b>{tracked.lat.toFixed(3)}, {tracked.lon.toFixed(3)}</b></div>
               {/* a camera is worth watching, not reading: the live player if
                   the feed offers one, the current still if it does not */}
-              {tracked.layer === "cameras" && (tracked.meta.live ? (
-                <iframe src={tracked.meta.live} title={tracked.label} allow="autoplay; fullscreen"
-                        className="w-full rounded mt-1" style={{ aspectRatio: "16/9", border: "1px solid var(--hud-border)", background: "#000" }} />
+              {tracked.layer === "cameras" && (tracked.meta.player ? (
+                <>
+                  <div className="text-[8px] font-mono tracking-widest mt-1" style={{ color: tracked.meta.isLive ? "var(--hud-green)" : "var(--hud-muted)" }}>
+                    {tracked.meta.isLive ? "● LIVE STREAM" : "○ DAY TIMELAPSE — this camera does not stream"}
+                  </div>
+                  <iframe src={tracked.meta.player} title={tracked.label} allow="autoplay; fullscreen"
+                          className="w-full rounded mt-1" style={{ aspectRatio: "16/9", border: "1px solid var(--hud-border)", background: "#000" }} />
+                </>
               ) : tracked.meta.thumb ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={tracked.meta.thumb} alt={tracked.label} className="w-full rounded mt-1" style={{ border: "1px solid var(--hud-border)" }} />
               ) : null)}
-              {Object.entries(tracked.meta).filter(([k, v]) => v !== "" && v != null && !["live", "thumb"].includes(k)).slice(0, 7).map(([k, v]) => <div key={k} className="eye-row"><span>{k.toUpperCase()}</span><b className="truncate" title={String(v)}>{String(v).slice(0, 60)}</b></div>)}
+              {Object.entries(tracked.meta).filter(([k, v]) => v !== "" && v != null && !["player", "thumb", "isLive"].includes(k)).slice(0, 7).map(([k, v]) => <div key={k} className="eye-row"><span>{k.toUpperCase()}</span><b className="truncate" title={String(v)}>{String(v).slice(0, 60)}</b></div>)}
               <div className="flex gap-1 mt-1">
                 {tracked.layer === "radio" && <button onClick={() => play(tracked)} className="eye-chip">{radio?.url === tracked.meta.url ? <><VolumeX size={11} /> stop</> : <><Volume2 size={11} /> listen</>}</button>}
                 <button onClick={() => setTracked(null)} className="eye-chip">release</button>
