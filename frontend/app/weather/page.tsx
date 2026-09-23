@@ -28,6 +28,7 @@ export default function WeatherPage() {
   const [updated, setUpdated] = useState<Date | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "plays" | "station">("all");
+  const [picks, setPicks] = useState<any[] | null>(null);
 
   const load = async () => {
     try {
@@ -37,6 +38,7 @@ export default function WeatherPage() {
         setReports(data.reports ?? []);
         setUpdated(new Date());
       }
+      fetch("/api/weather/picks", { cache: "no-store" }).then((r) => r.json()).then((d) => setPicks(d.picks ?? [])).catch(() => {});
     } finally {
       setLoading(false);
     }
@@ -80,6 +82,41 @@ export default function WeatherPage() {
             ))}
           </div>
         </div>
+
+        {/* the bot's picks on markets that have not resolved, at today's price */}
+        <section className="hud-panel hud-panel-static p-3 mb-4" aria-label="What to buy now">
+          <div className="flex items-baseline justify-between gap-2 mb-2 flex-wrap">
+            <h2 className="text-[11px] tracking-[0.25em] font-bold m-0" style={{ color: "var(--hud-accent)" }}>WHAT TO BUY NOW</h2>
+            <span className="prose-sans text-[11px]" style={{ color: "var(--hud-muted)" }}>
+              the weather bot&apos;s open picks, live prices · paper-tested, not advice · Polymarket is blocked in Canada
+            </span>
+          </div>
+          {picks == null ? (
+            <p className="text-[11px]" style={{ color: "var(--hud-muted)" }}>loading picks…</p>
+          ) : picks.length === 0 ? (
+            <p className="text-[11px]" style={{ color: "var(--hud-muted)" }}>no open picks right now — the bot adds them as markets pass its gate</p>
+          ) : picks.map((p) => {
+            const tone = p.status === "buy" ? "var(--hud-green)" : p.status === "settling" ? "var(--hud-amber)" : "var(--hud-muted)";
+            return (
+              <a key={p.slug + p.side} href={p.url} target="_blank" rel="noreferrer"
+                 className="flex items-center gap-3 py-1.5 text-[12px] hover:underline min-w-0"
+                 style={{ borderBottom: "1px solid var(--hud-border)" }}>
+                <span className="shrink-0 font-bold px-1.5 rounded text-[11px]"
+                      style={{ color: p.side === "YES" ? "var(--hud-green)" : "var(--hud-red)", border: "1px solid currentColor" }}>
+                  BUY {p.side}
+                </span>
+                <span className="truncate prose-sans" style={{ color: "var(--hud-text)" }}>{p.question}</span>
+                <span className="flex-1" />
+                <span className="shrink-0 tabular-nums" style={{ color: "var(--hud-muted)" }}>
+                  bot {Math.round(p.entry * 100)}¢ · now {p.now != null ? `${Math.round(p.now * 100)}¢` : "—"}
+                </span>
+                <span className="shrink-0 w-16 text-right uppercase text-[10px] font-bold" style={{ color: tone }}>
+                  {p.status === "buy" ? "buyable" : p.status}
+                </span>
+              </a>
+            );
+          })}
+        </section>
 
         {loading && reports.length === 0 ? (
           <div className="text-center py-20 text-sm" style={{ color: "var(--hud-muted)" }}>
