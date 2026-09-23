@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
 export const dynamic = "force-dynamic";
-// The desk's own geography for the Eye: the weather bot's stations with their
+// The desk's own geography for God's Eye: the weather bot's stations with their
 // live positions, the exchanges and chokepoints the fleet watches.
 export async function GET(request: Request) {
   const base = new URL(request.url).origin;

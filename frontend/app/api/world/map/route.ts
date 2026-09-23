@@ -42,7 +42,7 @@ let quakeCache: { at: number; items: any[] } | null = null;
 let regionCache: { at: number; regions: any[] } | null = null;
 export async function GET(request: Request) {
   const base = new URL(request.url).origin;
-  const light = new URL(request.url).searchParams.get("light") === "1";   // exchanges + chokepoints only (the Eye)
+  const light = new URL(request.url).searchParams.get("light") === "1";   // exchanges + chokepoints only (God's Eye)
   if (light) return NextResponse.json({ generated: Date.now(), exchanges: EXCHANGES.map((e) => ({ name: e.name, lat: e.lat, lon: e.lon, tz: e.tz, session: `${e.open}–${e.close}`, ...status(e) })), chokepoints: CHOKEPOINTS, regions: [], quakes: [] });
   let quakes: any[] = quakeCache && Date.now() - quakeCache.at < 10 * 60_000 ? quakeCache.items : [];
   if (!quakes.length) {

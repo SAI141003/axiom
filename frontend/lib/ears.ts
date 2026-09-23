@@ -37,7 +37,7 @@ export type EarsEvents = {
   onError?: (e: string) => void;
 };
 
-const SILENCE_MS = 700;         // speech is over after this much quiet
+const SILENCE_MS = 420;         // speech is over after this much quiet — every ms here is a ms Sai waits
 const MIN_SPEECH_MS = 180;      // shorter than this is a cough, not a word
 const MAX_UTTERANCE_MS = 15_000;
 const PREROLL_MS = 400;         // kept before the gate opens so the first word survives
@@ -76,6 +76,7 @@ export class Ears {
   private ducked = false;      // AXIOM is talking: still listening, but only for a real interruption
   private stopped = false;
   private floor = 0.012;                 // follows the room
+  private inFlight = false;              // Whisper serialises; do not queue rubbish behind a real question
   private rate = 48_000;
 
   constructor(private ev: EarsEvents) {}
@@ -83,7 +84,7 @@ export class Ears {
   async start(): Promise<boolean> {
     if (this.stream) return true;
     try {
-      this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+      this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false } });
     } catch (e: any) { this.ev.onError?.(e?.name === "NotAllowedError" ? "not-allowed" : String(e?.message ?? e)); return false; }
     this.stopped = false;
     this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -153,6 +154,11 @@ export class Ears {
     this.speaking = false; this.held = []; this.ring = [];
     this.ev.onState?.("listening");
     if (heldMs < MIN_SPEECH_MS || !frames.length) return;
+    // room noise can cross a gate; speech stays loud for a while. Require a
+    // real run of voiced frames before spending a transcription on it.
+    let voiced = 0;
+    for (const f of frames) { let s2 = 0; for (let i = 0; i < f.length; i++) s2 += f[i] * f[i]; if (Math.sqrt(s2 / f.length) > this.floor * 3) voiced++; }
+    if (voiced < frames.length * 0.12) return;
 
     // flatten, then decimate to 16 kHz by averaging — a whole-number ratio, and
     // 48k to 16k is the case every machine here hits
@@ -166,10 +172,13 @@ export class Ears {
       out[i] = s / step;
     }
 
+    if (this.inFlight) return;           // still transcribing the last one
+    this.inFlight = true;
     this.ev.onState?.("thinking");
     fetch("/api/jarvis/stt", { method: "POST", headers: { "content-type": "audio/wav" }, body: wav(out, Math.round(this.rate / step)) })
       .then((r) => r.json())
       .then((d) => {
+        this.inFlight = false;
         this.ev.onState?.("listening");
         // whisper brackets what is not speech — [BLANK_AUDIO], (music) — and
         // that is not something Sai said
@@ -177,7 +186,7 @@ export class Ears {
         if (said.length > 1) this.ev.onText(said);
         else if (d.error) this.ev.onError?.(d.error);
       })
-      .catch((e) => { this.ev.onState?.("listening"); this.ev.onError?.(String(e?.message ?? e)); });
+      .catch((e) => { this.inFlight = false; this.ev.onState?.("listening"); this.ev.onError?.(String(e?.message ?? e)); });
   }
 
   /** AXIOM is speaking: keep the ears open, but only a real voice gets through. */

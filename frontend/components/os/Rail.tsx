@@ -13,9 +13,13 @@ export default function Rail() {
   const current = pageFor(pathname);
   const [pinned, setPinned] = useState(false);
   const [hover, setHover] = useState(false);
+  // Clicking Collapse leaves the pointer on the rail, and hover alone reopens
+  // it — so the button appeared to do nothing. Hold the rail shut until the
+  // pointer actually leaves.
+  const [shut, setShut] = useState(false);
   const [v, setV] = useState<any>(null);
   const [jstate, setJstate] = useState<string>("idle");
-  const open = pinned || hover;
+  const open = pinned || (hover && !shut);
 
   useEffect(() => { try { setPinned(localStorage.getItem("axiom.rail") === "open"); } catch {} }, []);
   useEffect(() => {
@@ -33,7 +37,7 @@ export default function Rail() {
   const tone = jstate === "listening" ? "var(--hud-green)" : jstate === "thinking" ? "var(--hud-amber)" : jstate === "speaking" ? "var(--hud-accent-2)" : "var(--hud-accent)";
 
   return (
-    <aside aria-label="Desk rail" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+    <aside aria-label="Desk rail" onMouseEnter={() => setHover(true)} onMouseLeave={() => { setHover(false); setShut(false); }}
            className="hud-rail hidden md:flex flex-col" data-open={open || undefined}>
       <Link href="/mind" className="hud-rail-head" aria-label="AXIOM" title="AXIOM — the mind">
         <span className="hud-rail-orb" style={{ ["--tone" as any]: tone }}><Brain size={18} strokeWidth={1.7} /></span>
@@ -59,7 +63,7 @@ export default function Rail() {
         <Vital label="Fleet" value={v?.pnl != null ? `${v.pnl >= 0 ? "+" : "−"}$${Math.abs(v.pnl).toFixed(0)}` : "—"} tone={v?.pnl >= 0 ? "var(--hud-green)" : "var(--hud-red)"} open={open} />
         <Vital label="Weather" value={v?.weather != null ? `${v.weather >= 0 ? "+" : "−"}$${Math.abs(v.weather).toFixed(0)}` : "—"} tone="var(--hud-gold)" open={open} />
         <Vital label="Agents" value={v ? `${v.running}/${v.total}` : "—"} tone={v?.down ? "var(--hud-red)" : "var(--hud-green)"} open={open} />
-        <button onClick={() => { const n = !pinned; setPinned(n); try { localStorage.setItem("axiom.rail", n ? "open" : "closed"); } catch {} }} className="hud-rail-item mt-1" aria-pressed={pinned} aria-label={pinned ? "collapse rail" : "pin rail open"}>
+        <button onClick={() => { const n = !pinned; setPinned(n); setShut(!n); try { localStorage.setItem("axiom.rail", n ? "open" : "closed"); } catch {} }} className="hud-rail-item mt-1" aria-pressed={pinned} aria-label={pinned ? "collapse rail" : "pin rail open"}>
           {pinned ? <ChevronsLeft size={16} aria-hidden /> : <ChevronsRight size={16} aria-hidden />}
           <span className="hud-rail-label"><b>{pinned ? "Collapse" : "Pin open"}</b></span>
         </button>

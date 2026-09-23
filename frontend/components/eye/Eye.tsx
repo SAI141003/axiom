@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Plane, Shield, Satellite, Activity, Radio, Rocket, Cable, Server, Waves, Flame, Ship, CloudSun, Landmark, Crosshair, Eye as EyeIcon, Volume2, VolumeX, LocateFixed } from "lucide-react";
+import { Plane, Shield, Satellite, Activity, Radio, Rocket, Cable, Server, Waves, Flame, Ship, CloudSun, Landmark, Crosshair, Eye as EyeIcon, Volume2, VolumeX, LocateFixed, Camera } from "lucide-react";
 
 /**
- * THE EYE — the desk's god's-eye view, after bilawalsidhu/gods-eye-view:
+ * GOD'S EYE — the desk's god's-eye view, after bilawalsidhu/gods-eye-view:
  * a globe of live public data, every layer a real feed, a tactical HUD, a
  * contacts roster, sensor modes, click-to-track, and AXIOM's voice on top.
  * No layer is ever simulated: a feed that fails shows its error and its age.
@@ -18,6 +18,7 @@ const LAYERS: Layer[] = [
   { id: "vessels", label: "Vessels", icon: Ship, color: "#22c55e", on: false, every: 30_000, needsKey: "AISSTREAM_API_KEY" },
   { id: "fires", label: "Fires", icon: Flame, color: "#fb923c", on: false, every: 30 * 60_000, needsKey: "FIRMS_MAP_KEY" },
   { id: "radio", label: "Radio", icon: Radio, color: "#a78bfa", on: false, every: 6 * 3600_000 },
+  { id: "cameras", label: "Cameras", icon: Camera, color: "#e879f9", on: false, every: 10 * 60_000, needsKey: "WINDY_WEBCAMS_KEY" },
   { id: "launches", label: "Launches", icon: Rocket, color: "#f5b942", on: true, every: 15 * 60_000 },
   { id: "cables", label: "Sub cables", icon: Cable, color: "#1a8fd6", on: false, every: 24 * 3600_000 },
   { id: "datacenters", label: "Datacenters", icon: Server, color: "#4cc9ff", on: false, every: 1e12 },
@@ -127,6 +128,10 @@ export default function Eye() {
         const d = await fetch("/api/eye/quakes").then((r) => r.json());
         data.current.quakes = (d.items ?? []).map((q: any): Ent => ({ layer: id, id: q.id, label: `M${q.mag?.toFixed(1)} ${q.place}`, lat: q.lat, lon: q.lon, alt: 0.01, color: q.mag >= 5 ? "#ef4444" : q.mag >= 3 ? "#f59e0b" : "#fca5a5", size: Math.max(0.15, (q.mag ?? 1) * 0.12), meta: { mag: q.mag, depth_km: Math.round(q.depth), when: new Date(q.time).toUTCString().slice(5, 22) } }));
         setMeta({ count: data.current.quakes.length, age: d.age, error: d.error, source: d.source });
+      } else if (id === "cameras") {
+        const d = await fetch("/api/eye/cameras").then((r) => r.json());
+        data.current.cameras = (d.items ?? []).map((c: any): Ent => ({ layer: id, id: c.id, label: c.title || c.city || "camera", lat: c.lat, lon: c.lon, alt: 0.01, size: 0.22, color: "#e879f9", meta: c }));
+        setMeta({ count: data.current.cameras.length, age: d.age, error: d.error ?? (d.configured === false ? d.note : undefined), source: d.source });
       } else if (id === "radio") {
         const d = await fetch("/api/eye/radio").then((r) => r.json());
         data.current.radio = (d.items ?? []).map((s: any): Ent => ({ layer: id, id: s.id, label: s.name, lat: s.lat, lon: s.lon, alt: 0.008, color: "#a78bfa", size: 0.16, meta: { country: s.country, tags: s.tags, codec: s.codec, url: s.url } }));
@@ -163,7 +168,7 @@ export default function Eye() {
     if (!ready) return;
     const timers: any[] = [];
     // the globe first, then the feeds in order of weight: light ones now, the heavy ones a beat later
-    const order = ["markets", "stations", "quakes", "launches", "mil", "flights", "sats", "cables", "radio", "datacenters", "dams", "fires", "vessels"];
+    const order = ["markets", "stations", "quakes", "launches", "mil", "flights", "sats", "cables", "radio", "cameras", "datacenters", "dams", "fires", "vessels"];
     order.forEach((idd, i) => setTimeout(() => load(idd), i < 5 ? 0 : 400 * (i - 4)));
     for (const l of LAYERS) if (l.every < 1e11) timers.push(setInterval(() => { if (layersRef.current.find((x) => x.id === l.id)?.on) load(l.id); }, l.every));
     timers.push(setInterval(redraw, 1000));   // satellites move
@@ -210,7 +215,7 @@ export default function Eye() {
       {hud && (<>
         {/* top-left: readouts */}
         <div className="eye-panel eye-tl">
-          <div className="eye-title"><EyeIcon size={13} /> THE EYE · LIVE</div>
+          <div className="eye-title"><EyeIcon size={13} /> GOD'S EYE · LIVE</div>
           <div className="eye-row"><span>UTC</span><b>{clock}</b></div>
           <div className="eye-row"><span>CAM</span><b>{pov.lat.toFixed(2)}° {pov.lng.toFixed(2)}° · {(pov.altitude * 6371).toFixed(0)} km</b></div>
           <div className="eye-row"><span>TRACKS</span><b>{total.toLocaleString()}</b></div>
@@ -233,7 +238,16 @@ export default function Eye() {
             <div className="eye-track">
               <div className="eye-track-name" style={{ color: tracked.color }}>{tracked.label}</div>
               <div className="eye-row"><span>POS</span><b>{tracked.lat.toFixed(3)}, {tracked.lon.toFixed(3)}</b></div>
-              {Object.entries(tracked.meta).filter(([, v]) => v !== "" && v != null).slice(0, 7).map(([k, v]) => <div key={k} className="eye-row"><span>{k.toUpperCase()}</span><b className="truncate" title={String(v)}>{String(v).slice(0, 60)}</b></div>)}
+              {/* a camera is worth watching, not reading: the live player if
+                  the feed offers one, the current still if it does not */}
+              {tracked.layer === "cameras" && (tracked.meta.live ? (
+                <iframe src={tracked.meta.live} title={tracked.label} allow="autoplay; fullscreen"
+                        className="w-full rounded mt-1" style={{ aspectRatio: "16/9", border: "1px solid var(--hud-border)", background: "#000" }} />
+              ) : tracked.meta.thumb ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={tracked.meta.thumb} alt={tracked.label} className="w-full rounded mt-1" style={{ border: "1px solid var(--hud-border)" }} />
+              ) : null)}
+              {Object.entries(tracked.meta).filter(([k, v]) => v !== "" && v != null && !["live", "thumb"].includes(k)).slice(0, 7).map(([k, v]) => <div key={k} className="eye-row"><span>{k.toUpperCase()}</span><b className="truncate" title={String(v)}>{String(v).slice(0, 60)}</b></div>)}
               <div className="flex gap-1 mt-1">
                 {tracked.layer === "radio" && <button onClick={() => play(tracked)} className="eye-chip">{radio?.url === tracked.meta.url ? <><VolumeX size={11} /> stop</> : <><Volume2 size={11} /> listen</>}</button>}
                 <button onClick={() => setTracked(null)} className="eye-chip">release</button>
@@ -250,7 +264,7 @@ export default function Eye() {
       <div className="eye-chips">
         <button onClick={() => setHud((h) => !h)} className="eye-chip" data-on={hud || undefined}>HUD</button>
         <button onClick={() => { globe.current?.pointOfView({ lat: 49.28, lng: -123.12, altitude: 0.5 }, 1200); }} className="eye-chip"><LocateFixed size={11} /> home</button>
-        <button onClick={() => window.dispatchEvent(new CustomEvent("axiom:jarvis-ask", { detail: "Give me the situation on the Eye: what's live in the sky, on the ground and in our weather book right now. Three sentences." }))} className="eye-chip eye-chip-accent">ask AXIOM</button>
+        <button onClick={() => window.dispatchEvent(new CustomEvent("axiom:jarvis-ask", { detail: "Give me the situation on God's Eye: what's live in the sky, on the ground and in our weather book right now. Three sentences." }))} className="eye-chip eye-chip-accent">ask AXIOM</button>
       </div>
     </div>
   );

@@ -219,6 +219,20 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
     return words.join(" ");
   }, []);
 
+  // Leaving the ears open so Sai can interrupt means the microphone also hears
+  // AXIOM through the speakers. The echo canceller and the raised gate stop
+  // most of it; this stops the rest, and unlike the prefix filter it works on
+  // a fragment caught from the middle of a sentence: if most of the words were
+  // just spoken by AXIOM, they were not spoken by Sai.
+  const isOwnVoice = useCallback((t: string): boolean => {
+    const mine = new Set(spoken.current.flatMap((x) => x.words));
+    if (mine.size < 3) return false;
+    const words = norm(t).filter((w) => w.length > 2);
+    if (!words.length) return false;
+    const hits = words.filter((w) => mine.has(w)).length;
+    return hits / words.length > 0.5;
+  }, []);
+
   const handle = useCallback((t: string) => {
     setHeard(t); setTimeout(() => setHeard((h) => (h === t ? "" : h)), 6000);
     if (speakingRef.current) {
@@ -226,6 +240,7 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
       // Sai talked over the answer. That is a conversation, not an error: stop
       // talking and take what he said as the next thing to answer — unless it
       // was AXIOM's own voice coming back round, or a word of agreement.
+      if (isOwnVoice(t)) return;                    // that was AXIOM, not Sai
       const rest = deEcho(t);
       const words = rest.split(/\s+/).filter(Boolean);
       if (words.length < 2) return;
@@ -258,7 +273,7 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
     oneShot.current = true;               // "Axiom?" — answer, then take the next thing said as the question
     speak("Yes, Sai?");
     setTimeout(() => { oneShot.current = false; }, 20_000);
-  }, [ask, hush, speak, deEcho]);
+  }, [ask, hush, speak, deEcho, isOwnVoice]);
 
   const spin = useCallback(() => {
     if (ears.current?.live) { running.current = true; startedAt.current = Date.now(); return; }
