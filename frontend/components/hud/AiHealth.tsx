@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { ChevronDown, RefreshCw } from "lucide-react";
+import { useCollapsed } from "./useCollapsed";
 
 // Every AI the desk runs on, measured: model, job, latency, state. The desk
 // should never have to guess which brain is answering or why it is slow.
@@ -10,6 +11,9 @@ const TONE: Record<string, string> = { ok: "var(--hud-green)", slow: "var(--hud-
 export default function AiHealth({ compact = false }: { compact?: boolean }) {
   const [d, setD] = useState<any>(null);
   const [busy, setBusy] = useState(false);
+  // Collapsible only in the compact home-screen card; the full view on /mind stays open.
+  const [folded, toggle] = useCollapsed("AI HEALTH", true);
+  const collapsed = compact && folded;
   const load = (refresh = false) => { setBusy(true); fetch(`/api/ai/health${refresh ? "?refresh=1" : ""}`).then((r) => r.json()).then(setD).catch(() => {}).finally(() => setBusy(false)); };
   useEffect(() => { load(); const t = setInterval(() => load(), 10 * 60_000); return () => clearInterval(t); }, []);
   const models: any[] = d?.models ?? [], services: any[] = d?.services ?? [];
@@ -19,12 +23,20 @@ export default function AiHealth({ compact = false }: { compact?: boolean }) {
   const svc = compact ? services.slice(0, 3) : services;
   return (
     <section className={`hud-panel hud-panel-static min-w-0 overflow-hidden ${compact ? "p-3" : "p-4"}`} aria-label="AI health">
-      <div className="flex items-center mb-2 gap-2">
-        <h2 className="text-[9px] tracking-[0.25em] font-bold font-mono m-0 whitespace-nowrap" style={{ color: "var(--hud-accent)" }}>AI HEALTH</h2>
+      <div className={`flex items-center gap-2 ${collapsed ? "" : "mb-2"}`}>
+        {compact ? (
+          <button onClick={toggle} className="flex items-center gap-1.5 shrink-0" aria-expanded={!collapsed} title={collapsed ? "expand" : "collapse"}>
+            <ChevronDown size={11} aria-hidden style={{ color: "var(--hud-accent)", transform: collapsed ? "rotate(-90deg)" : undefined, transition: "transform 150ms" }} />
+            <h2 className="text-[9px] tracking-[0.25em] font-bold font-mono m-0 whitespace-nowrap" style={{ color: "var(--hud-accent)" }}>AI HEALTH</h2>
+          </button>
+        ) : (
+          <h2 className="text-[9px] tracking-[0.25em] font-bold font-mono m-0 whitespace-nowrap" style={{ color: "var(--hud-accent)" }}>AI HEALTH</h2>
+        )}
         {d?.summary && <span className="text-[9px] font-mono truncate" style={{ color: "var(--hud-muted)" }}>{d.summary.ok}/{d.summary.keyed} models answering{d.summary.fastest ? ` · fastest ${d.summary.fastest}` : ""}</span>}
         <span className="flex-1" />
         <button onClick={() => load(true)} className="hud-icon-btn" aria-label="re-measure" title="re-measure every model (spends a little quota)" disabled={busy} style={{ width: 26, height: 26 }}><RefreshCw size={12} className={busy ? "hud-spin" : ""} /></button>
       </div>
+      {!collapsed && <>
       {!d && <p className="prose-sans text-[11px]" style={{ color: "var(--hud-muted)" }}>measuring every model…</p>}
       {shown.map((m, i) => (
         <div key={i} className="flex items-center gap-2 py-[3px] text-[10.5px] font-mono min-w-0" style={{ borderBottom: "1px solid var(--hud-border)" }}>
@@ -51,6 +63,7 @@ export default function AiHealth({ compact = false }: { compact?: boolean }) {
           <span className="truncate max-w-[55%] text-right" style={{ color: "var(--hud-muted)" }} title={s.note}>{s.note}</span>
         </div>
       ))}
+      </>}
     </section>
   );
 }

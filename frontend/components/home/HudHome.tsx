@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import { useEffect, useState } from "react";
 import BrainCore from "@/components/BrainCore";
 import BrainNote from "./BrainNote";
 import { RingGauge, ReactorStage } from "@/components/hud/Gauges";
 import AiHealth from "@/components/hud/AiHealth";
+import { useCollapsed } from "@/components/hud/useCollapsed";
 import { PAGES } from "@/components/nav/pages";
 import { BRIEF } from "@/lib/jarvis";
 
@@ -63,7 +65,7 @@ export default function HudHome() {
       {/* left: the system */}
       <div className="flex flex-col gap-3 min-h-0 order-2 lg:order-1">
         <Panel title="SYSTEM">
-          <Row k="STATUS" v="ONLINE · PAPER · DRY-RUN" tone="var(--hud-green)" />
+          <Row k="STATUS" v="ONLINE · PAPER" tone="var(--hud-green)" />
           <Row k="AGENTS" v={agents ? `${agents.running} / ${agents.total}` : "—"} tone={agents?.down ? "var(--hud-red)" : "var(--hud-green)"} />
           <Row k="SAFETY" v={s ? `${s.total_runs.toLocaleString()} · ${s.total_fails} fail` : "10,500 · 0 fail"} tone="var(--hud-green)" />
           <Row k="FORWARD TEST" v={fleet ? `${fleet.daysTracked} d · ${t?.trades ?? 0} trades` : "—"} />
@@ -75,7 +77,7 @@ export default function HudHome() {
           ))}
           {weatherBot && <Row k="WEATHER BOT" v={`${usd0(weatherBot.pnl)} · ${(weatherBot.winRate * 100).toFixed(0)}%`} tone="var(--hud-gold)" />}
         </Panel>
-        <div className="min-h-0 flex-1 overflow-hidden"><AiHealth compact /></div>
+        <div className="min-h-0 overflow-hidden"><AiHealth compact /></div>
       </div>
 
       {/* centre: the mind and every screen */}
@@ -121,10 +123,17 @@ export default function HudHome() {
 }
 
 function Panel({ title, action, children, grow }: { title: string; action?: React.ReactNode; children: React.ReactNode; grow?: boolean }) {
+  const [collapsed, toggle] = useCollapsed(title);
   return (
-    <section className={`hud-panel hud-panel-static p-3 min-w-0 overflow-hidden ${grow ? "flex-1 min-h-0" : ""}`} aria-label={title}>
-      <div className="flex items-center mb-1.5"><h2 className="text-[9px] tracking-[0.25em] font-bold font-mono m-0" style={{ color: "var(--hud-accent)" }}>{title}</h2><span className="flex-1" />{action}</div>
-      {children}
+    <section className={`hud-panel hud-panel-static p-3 min-w-0 overflow-hidden ${grow && !collapsed ? "flex-1 min-h-0" : ""}`} aria-label={title}>
+      <div className={`flex items-center ${collapsed ? "" : "mb-1.5"}`}>
+        <button onClick={toggle} className="flex items-center gap-1.5 min-w-0" aria-expanded={!collapsed} title={collapsed ? "expand" : "collapse"}>
+          <ChevronDown size={11} aria-hidden style={{ color: "var(--hud-accent)", transform: collapsed ? "rotate(-90deg)" : undefined, transition: "transform 150ms" }} />
+          <h2 className="text-[9px] tracking-[0.25em] font-bold font-mono m-0" style={{ color: "var(--hud-accent)" }}>{title}</h2>
+        </button>
+        <span className="flex-1" />{action}
+      </div>
+      {!collapsed && children}
     </section>
   );
 }
