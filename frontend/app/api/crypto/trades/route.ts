@@ -19,6 +19,7 @@ export interface PaperTrade {
   stake: number;
   signal: string;
   spotAtEntry: number;
+  windowOpen?: number;
   status: "open" | "won" | "lost" | "void";
   pnl?: number;
   ts: number;
@@ -47,12 +48,12 @@ function passesGate(e: Record<string, unknown>, ask: number, g: { min: number; m
     && ask >= g.min && ask <= g.max && news === 0;
 }
 
-async function readDaemonTrades(): Promise<PaperTrade[]> {
+async function readDaemonTrades(): Promise<{ trades: PaperTrade[]; recent: any[] }> {
   let raw: string;
   try {
     raw = await fs.readFile(DAEMON_LOG, "utf-8");
   } catch {
-    return [];
+    return { trades: [], recent: [] };
   }
   const g = await liveGate();
 
@@ -68,6 +69,7 @@ async function readDaemonTrades(): Promise<PaperTrade[]> {
 
   const trades: PaperTrade[] = [];
   for (const [win, e] of Array.from(entries)) {
+    if (!e.traded) continue;          // a skipped window, not a trade — it never resolves
     const side = ((e.side as string) === "UP" ? "UP" : "DOWN") as "UP" | "DOWN";
     const entryPrice = Number(e.ask);
     if (!(entryPrice > 0.01 && entryPrice < 1)) continue;     // skip un-priced windows
@@ -91,6 +93,7 @@ async function readDaemonTrades(): Promise<PaperTrade[]> {
       stake: STAKE,
       signal: `move=${e.move_bp}bp cl_lag=${e.cl_lag_bp}bp exch=${exch.consensus_bp ?? "?"}bp p_win=${e.p_win}`,
       spotAtEntry: Number(e.w_open),
+      windowOpen: Number(e.w_open) || undefined,
       status,
       pnl,
       ts,
@@ -99,11 +102,22 @@ async function readDaemonTrades(): Promise<PaperTrade[]> {
     });
   }
   trades.sort((a, b) => a.ts - b.ts);
-  return trades;
+  const recent = Array.from(entries.values()).slice(-15).reverse().map((e) => ({
+    ts: Number(e.ts),
+    traded: Boolean(e.traded),
+    side: (e.side as string) ?? null,
+    ask: typeof e.ask === "number" ? e.ask : null,
+    move: Number(e.move_bp ?? 0),
+    why: e.traded ? "traded"
+      : Number(e.news_10m ?? 0) > 0 ? "news in the window"
+      : !e.side ? "no lag signal"
+      : "outside the price gate",
+  }));
+  return { trades, recent };
 }
 
 export async function GET() {
-  const trades = await readDaemonTrades();
+  const { trades, recent } = await readDaemonTrades();
   // stats reflect the CURRENT-config gate so the page matches the LIVE ENGINE banner
   const gated = trades.filter((t) => t.gated);
   const resolved = gated.filter((t) => t.status === "won" || t.status === "lost");
@@ -112,6 +126,7 @@ export async function GET() {
 
   return NextResponse.json({
     trades: trades.slice(-200),
+    recent,
     stats: {
       total: trades.length,
       resolved: resolved.length,

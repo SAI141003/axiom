@@ -63,6 +63,11 @@ async function fetchWindow(asset: string, ts: number) {
       if (upAsk > 0 && upAsk < 1) { up = upAsk; source = "clob-ask"; }
       if (downAsk > 0 && downAsk < 1) { down = downAsk; if (source !== "clob-ask") source = "clob-ask"; }
       else if (source === "clob-ask") down = +(1 - up).toFixed(4);
+      // an empty side of the book reads as 1¢; asks on a binary sum to ~$1,
+      // so a pair that doesn't is a missing quote, not a price
+      if (Math.abs(up + down - 1) > 0.1) {
+        try { [up, down] = JSON.parse(m.outcomePrices).map(Number); source = "gamma"; } catch {}
+      }
     }
 
     return {
