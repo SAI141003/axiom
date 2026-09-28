@@ -98,7 +98,7 @@ export default function WeatherPage() {
           <div className="flex items-baseline justify-between gap-2 mb-2 flex-wrap">
             <h2 className="text-[11px] tracking-[0.25em] font-bold m-0" style={{ color: "var(--hud-accent)" }}>WHAT TO BUY NOW</h2>
             <span className="prose-sans text-[11px]" style={{ color: "var(--hud-muted)" }}>
-              the weather bot&apos;s open picks, live prices · paper-tested, not advice · Polymarket is blocked in Canada
+              the weather bot&apos;s open picks, live prices · paper-tested, not advice · venue access depends on where you are
             </span>
           </div>
           {picks == null ? (
@@ -213,8 +213,9 @@ export default function WeatherPage() {
                       obs · fc {r.forecastMax?.toFixed(0)}°{r.unit} · {r.hoursElapsed}h
                     </span>
                     <span className="ml-auto text-[11px] font-bold"
-                          style={{ color: edge > 0.08 ? "var(--hud-green)" : "var(--hud-muted)" }}>
-                      {edge > 0 ? `${(edge * 100).toFixed(0)}% edge` : "—"}
+                          title="largest model-vs-market gap; the bot only trades moderate gaps, big ones proved anti-predictive"
+                          style={{ color: r.pick ? "var(--hud-green)" : "var(--hud-muted)" }}>
+                      {r.pick ? "PICK" : edge > 0 ? `gap ${(edge * 100).toFixed(0)}%` : "—"}
                     </span>
                   </div>
 
