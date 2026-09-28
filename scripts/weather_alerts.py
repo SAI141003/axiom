@@ -46,10 +46,25 @@ def perfect(reports: list[dict]) -> list[dict]:
     return sorted(out, key=lambda x: -x["margin"])
 
 
-def send(text: str) -> bool:
-    if not TO:
-        print("ALERT_PHONE is not set in .env")
+def push(text: str) -> bool:
+    """ntfy.sh push to the phone app subscribed to NTFY_TOPIC (no account, no Mac prompt)."""
+    topic = _env("NTFY_TOPIC")
+    if not topic:
         return False
+    try:
+        req = urllib.request.Request(f"https://ntfy.sh/{topic}", data=text.encode(),
+                                     headers={"Title": "AXIOM weather picks", "Tags": "partly_sunny"})
+        urllib.request.urlopen(req, timeout=20)
+        return True
+    except Exception as e:
+        print(f"push failed: {e}")
+        return False
+
+
+def send(text: str) -> bool:
+    pushed = push(text)
+    if not TO:
+        return pushed
     # iMessage first; SMS relays through the paired iPhone ("Text Message Forwarding")
     for service in ("iMessage", "SMS"):
         script = f'''tell application "Messages"
@@ -61,7 +76,7 @@ end tell'''
             return True
         except Exception as e:
             print(f"send via {service} failed: {getattr(e, 'stderr', b'') or e}")
-    return False
+    return pushed
 
 
 def main() -> None:
