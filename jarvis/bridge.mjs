@@ -623,7 +623,7 @@ async function chat(messages, tools, send, force) {
           else if ([401, 402, 403].includes(r.status)) { await recordLimit(p.name, model, `HTTP ${r.status} (key or billing) — try again in 24h0m0s`); deadLanes.add(p.name); console.error("[brain] lane", p.name, `is ${r.status} — dropped for this run`); }
           else await recordUsage(p.name, model, null, `http ${r.status}`, 0);
           if (r.status === 503 && !retried) { retried = true; await new Promise((res) => setTimeout(res, 400)); continue models; }
-          if (![400, 404, 410, 429, 503].includes(r.status)) break; continue; }
+          break; }   // next model — a bare `continue` here re-entered this for(;;) and retried a 429'd model forever
         // stream: text deltas go to the browser as they arrive; tool calls are assembled
         const msg = { role: "assistant", content: "", tool_calls: [] }; const calls = new Map(); let buf = ""; let usage = null;
         const reader = r.body.getReader(); const dec = new TextDecoder();
@@ -635,7 +635,7 @@ async function chat(messages, tools, send, force) {
         for (const line of buf.split("\n")) { const l = line.trim(); if (!l.startsWith("data:") || l.slice(5).trim() === "[DONE]") continue; try { const d = JSON.parse(l.slice(5)).choices?.[0]?.delta; if (d?.content) { msg.content += d.content; send?.({ type: "delta", text: d.content }); } } catch {} }
         msg.tool_calls = [...calls.values()]; if (!msg.tool_calls.length) delete msg.tool_calls;
         await recordUsage(p.name, model, usage, "ok", approxTokens + (msg.content.length + JSON.stringify(msg.tool_calls ?? []).length) / 4);
-        if (!msg.content.trim() && !msg.tool_calls) { errs.push(`${p.name}/${model} empty`); console.error("[brain] empty answer from", `${p.name}/${model}`); continue; }
+        if (!msg.content.trim() && !msg.tool_calls) { errs.push(`${p.name}/${model} empty`); console.error("[brain] empty answer from", `${p.name}/${model}`); break; }
         picked.set(p.name, model); return { msg, brain: `${p.name}/${model}` };
       } catch (e) { errs.push(`${p.name}/${model} ${String(e.message).slice(0, 60)}`); break; }
       break;

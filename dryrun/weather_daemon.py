@@ -287,9 +287,19 @@ async def scan_once(s: aiohttp.ClientSession) -> int:
     # already late-day/observed (0.70+ favorites) routinely fell outside the
     # 25 soonest-ending. Same entry≥0.70/edge≤0.15 gate filters them → pure
     # frequency, zero edge dilution (the extra niche markets fit the thesis).
-    events = await jget(s, f"{GAMMA}/events",
-                        params={"limit": 100, "closed": "false", "tag_slug": "weather",
-                                "order": "endDate", "ascending": "true"})
+    # Page through every open weather event (Gamma caps a page at 100): one
+    # page held ~45 temperature markets, while ~140 are listed across the
+    # world for today and the next two days.
+    events = []
+    for off in range(0, 1000, 100):
+        page = await jget(s, f"{GAMMA}/events",
+                          params={"limit": 100, "offset": off, "closed": "false", "tag_slug": "weather",
+                                  "order": "endDate", "ascending": "true"})
+        if not page:
+            break
+        events.extend(page)
+        if len(page) < 100:
+            break
     if not events:
         return 0
     n = 0
