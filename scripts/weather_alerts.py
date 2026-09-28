@@ -41,7 +41,7 @@ def perfect(reports: list[dict]) -> list[dict]:
             continue
         if p["model"] < p["price"] + 0.05:
             continue
-        out.append({**p, "slug": r["slug"], "margin": p["model"] - p["price"]})
+        out.append({**p, "slug": r["slug"], "buyFrom": r["buyFrom"], "margin": p["model"] - p["price"]})
     return sorted(out, key=lambda x: -x["margin"])
 
 
@@ -73,9 +73,12 @@ def order(p: dict) -> tuple[str, str]:
     m = re.search(r"highest temperature in (.+?) be (.+?) on (\w+ \d+)", p["question"])
     what = f"{m.group(1)} {m.group(2)} ({m.group(3)})" if m else p["question"]
     title = f"BUY {p['side']} · {what}"
+    ist = lambda ms: datetime.fromtimestamp(ms / 1000, IST).strftime("%a %d %b, %I:%M %p IST")
+    # the window runs from 2 PM to midnight in the city
     body = (f"{p['question']}\n"
             f"Buy {p['side']} now at {p['price']*100:.0f}c. Pay no more than {max_price(p)*100:.0f}c.\n"
-            f"Model: {p['model']*100:.0f}% · settles on the airport station.")
+            f"Buy before {ist(p['buyFrom'] + 10 * 3600_000)} (city midnight).\n"
+            f"Sent {datetime.now(IST).strftime('%I:%M %p IST')} · model {p['model']*100:.0f}% · settles on the airport station.")
     return title, body
 
 
