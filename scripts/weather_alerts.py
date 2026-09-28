@@ -7,11 +7,12 @@ pass a strict rule — stricter than the bot's own gate — and never repeats on
   * the bot's gated pick (moderate edge, strong favourite)
   * settled on the real airport station (METAR), not grid data
   * the bot's own buying window is open (2 PM city time or later)
-  * the model gives the side at least 5 points more than the price
+  * the model gives the side at least 10 points more than the price
+  * at most 3 alerts per India day; everything else stays with the paper bot
 
-Backtest on the bot's history (first time each market qualified, 2 PM+):
-bot gate 87 trades 87.4% won $0.83/trade; this rule 68 trades 88.2% won
-$1.05/trade. A tighter 80-95c band did worse (84.8%, $0.14/trade).
+Backtest on the bot's history (first time each market qualified, 2 PM+,
+11 days): bot gate 87.4% won $0.83/trade; +5 points 88.2% $1.05 (~6/day);
++10 points 92.9% won $1.92/trade (~2.5/day). +12 was 100% but only 13 trades.
 
 Nothing qualifies -> nothing is sent.
 """
@@ -30,6 +31,8 @@ def _env(key: str) -> str:
 DESK = "http://localhost:3300/api/weather"
 SENT = Path(__file__).resolve().parent.parent / ".data" / "weather_alerts_sent.json"
 IST = ZoneInfo("Asia/Kolkata")
+MARGIN = 0.10      # model must beat the price by this much
+DAILY_CAP = 3      # alerts per India day
 
 
 def perfect(reports: list[dict]) -> list[dict]:
@@ -39,7 +42,7 @@ def perfect(reports: list[dict]) -> list[dict]:
         p = r.get("pick")
         if not p or r.get("obsSource") != "metar" or now_ms < r["buyFrom"]:
             continue
-        if p["model"] < p["price"] + 0.05:
+        if p["model"] < p["price"] + MARGIN:
             continue
         out.append({**p, "slug": r["slug"], "buyFrom": r["buyFrom"], "margin": p["model"] - p["price"]})
     return sorted(out, key=lambda x: -x["margin"])
@@ -64,8 +67,8 @@ def push(text: str, title: str = "AXIOM weather picks", click: str | None = None
 
 
 def max_price(p: dict) -> float:
-    """Highest price that still passes the rule (model 5+ points above), capped at 97c."""
-    return min(0.97, p["model"] - 0.05)
+    """Highest price that still passes the rule, capped at 97c."""
+    return min(0.97, p["model"] - MARGIN)
 
 
 def order(p: dict) -> tuple[str, str]:
@@ -85,8 +88,11 @@ def order(p: dict) -> tuple[str, str]:
 def main() -> None:
     with urllib.request.urlopen(DESK, timeout=170) as r:
         reports = json.load(r).get("reports", [])
-    sent = set(json.loads(SENT.read_text())) if SENT.exists() else set()
-    picks = [p for p in perfect(reports) if f'{p["slug"]}|{p["side"]}' not in sent][:3]
+    log = json.loads(SENT.read_text()) if SENT.exists() else []   # "YYYY-MM-DD|slug|side" (IST date)
+    today = datetime.now(IST).strftime("%Y-%m-%d")
+    done = {e.split("|", 1)[1] if e[:4].isdigit() else e for e in log}
+    left = DAILY_CAP - sum(1 for e in log if e.startswith(today + "|"))
+    picks = [p for p in perfect(reports) if f'{p["slug"]}|{p["side"]}' not in done][:max(0, left)]
     stamp = datetime.now(IST).strftime("%d %b %I:%M %p IST")
     if not picks:
         print(f"{stamp} no perfect picks")
@@ -96,8 +102,8 @@ def main() -> None:
         if not push(body, title=title, click=f"https://polymarket.com/event/{p['slug']}"):
             picks = picks[:picks.index(p)]   # keep unsent ones for the next run
             break
-    sent.update(f'{p["slug"]}|{p["side"]}' for p in picks)
-    SENT.write_text(json.dumps(sorted(sent)))
+    log += [f'{today}|{p["slug"]}|{p["side"]}' for p in picks]
+    SENT.write_text(json.dumps(log))
     print(f"{stamp} pushed {len(picks)}")
 
 if __name__ == "__main__":
