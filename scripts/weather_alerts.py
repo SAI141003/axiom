@@ -1,5 +1,5 @@
 """
-Weather trade alerts by text message.
+Weather trade alerts, pushed to the ntfy phone app.
 
 Every run reads the desk's live weather scan and texts the top three picks that
 pass a strict rule — stricter than the bot's own gate — and never repeats one:
@@ -15,7 +15,7 @@ $1.05/trade. A tighter 80-95c band did worse (84.8%, $0.14/trade).
 
 Nothing qualifies -> nothing is sent.
 """
-import json, subprocess, time, urllib.request
+import json, re, time, urllib.request
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -27,7 +27,6 @@ def _env(key: str) -> str:
     return ""
 
 
-TO = _env("ALERT_PHONE")   # kept in .env, never in git
 DESK = "http://localhost:3300/api/weather"
 SENT = Path(__file__).resolve().parent.parent / ".data" / "weather_alerts_sent.json"
 IST = ZoneInfo("Asia/Kolkata")
@@ -46,14 +45,17 @@ def perfect(reports: list[dict]) -> list[dict]:
     return sorted(out, key=lambda x: -x["margin"])
 
 
-def push(text: str) -> bool:
+def push(text: str, title: str = "AXIOM weather picks", click: str | None = None) -> bool:
     """ntfy.sh push to the phone app subscribed to NTFY_TOPIC (no account, no Mac prompt)."""
     topic = _env("NTFY_TOPIC")
     if not topic:
         return False
+    headers = {"Title": title.encode("utf-8").decode("latin-1", "ignore"), "Tags": "moneybag", "Priority": "high"}
+    if click:
+        headers["Click"] = click
+        headers["Actions"] = f"view, Open on Polymarket, {click}"
     try:
-        req = urllib.request.Request(f"https://ntfy.sh/{topic}", data=text.encode(),
-                                     headers={"Title": "AXIOM weather picks", "Tags": "partly_sunny"})
+        req = urllib.request.Request(f"https://ntfy.sh/{topic}", data=text.encode(), headers=headers)
         urllib.request.urlopen(req, timeout=20)
         return True
     except Exception as e:
@@ -61,22 +63,20 @@ def push(text: str) -> bool:
         return False
 
 
-def send(text: str) -> bool:
-    pushed = push(text)
-    if not TO:
-        return pushed
-    # iMessage first; SMS relays through the paired iPhone ("Text Message Forwarding")
-    for service in ("iMessage", "SMS"):
-        script = f'''tell application "Messages"
-  set s to 1st account whose service type = {service}
-  send {json.dumps(text)} to participant {json.dumps(TO)} of s
-end tell'''
-        try:
-            subprocess.run(["osascript", "-e", script], check=True, timeout=30, capture_output=True)
-            return True
-        except Exception as e:
-            print(f"send via {service} failed: {getattr(e, 'stderr', b'') or e}")
-    return pushed
+def max_price(p: dict) -> float:
+    """Highest price that still passes the rule (model 5+ points above), capped at 97c."""
+    return min(0.97, p["model"] - 0.05)
+
+
+def order(p: dict) -> tuple[str, str]:
+    """One pick as an exact order: title line and body."""
+    m = re.search(r"highest temperature in (.+?) be (.+?) on (\w+ \d+)", p["question"])
+    what = f"{m.group(1)} {m.group(2)} ({m.group(3)})" if m else p["question"]
+    title = f"BUY {p['side']} · {what}"
+    body = (f"{p['question']}\n"
+            f"Buy {p['side']} now at {p['price']*100:.0f}c. Pay no more than {max_price(p)*100:.0f}c.\n"
+            f"Model: {p['model']*100:.0f}% · settles on the airport station.")
+    return title, body
 
 
 def main() -> None:
@@ -88,15 +88,14 @@ def main() -> None:
     if not picks:
         print(f"{stamp} no perfect picks")
         return
-    lines = [f"AXIOM weather · {stamp}"]
-    for i, p in enumerate(picks, 1):
-        lines.append(f"{i}. BUY {p['side']} @ {p['price']*100:.0f}c (model {p['model']*100:.0f}%)\n{p['question']}\npolymarket.com/event/{p['slug']}")
-    lines.append("Paper-tested, not advice.")
-    if send("\n\n".join(lines)):
-        sent.update(f'{p["slug"]}|{p["side"]}' for p in picks)
-        SENT.write_text(json.dumps(sorted(sent)))
-        print(f"{stamp} sent {len(picks)}")
-
+    for p in picks:
+        title, body = order(p)
+        if not push(body, title=title, click=f"https://polymarket.com/event/{p['slug']}"):
+            picks = picks[:picks.index(p)]   # keep unsent ones for the next run
+            break
+    sent.update(f'{p["slug"]}|{p["side"]}' for p in picks)
+    SENT.write_text(json.dumps(sorted(sent)))
+    print(f"{stamp} pushed {len(picks)}")
 
 if __name__ == "__main__":
     main()
