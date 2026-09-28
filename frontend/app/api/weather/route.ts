@@ -349,9 +349,6 @@ export async function GET() {
     const unreliable = ["chengdu", "qingdao", "cape town"].includes(city) && obsSource !== "metar";
     const best = [...buckets].sort((a, b) => Math.abs(b.edge) - Math.abs(a.edge))[0];
     const lateRise = best && observedMax != null && hoursElapsed >= 16 && best.edge > 0 && best.low > observedMax;
-    const bestPlay = !dayComplete && !unreliable && !lateRise && best && Math.abs(best.edge) > 0.08
-      ? `${best.edge > 0 ? "BUY YES" : "BUY NO"} "${best.question}" — model ${(best.modelProb * 100).toFixed(0)}% vs market ${(best.marketYes * 100).toFixed(0)}¢ (${best.edge > 0 ? "+" : ""}${(best.edge * 100).toFixed(1)}% edge)`
-      : null;
 
     // The daemon's own rule, minus its clock: moderate edge only, strong
     // favourite only, no NO below 15¢, and after 14h never against the
@@ -364,6 +361,11 @@ export async function GET() {
       if (price >= gate.min && !lockedNo && !lateRise)
         pick = { side, question: best.question, price: parseFloat(price.toFixed(3)), model: parseFloat((side === "YES" ? best.modelProb : 1 - best.modelProb).toFixed(3)) };
     }
+    // A card's play is the gated pick and nothing else: the bot measured the
+    // big model-vs-market gaps (|edge| above the cap) as anti-predictive.
+    const bestPlay = pick
+      ? `BUY ${pick.side} "${pick.question}" — ${(pick.price * 100).toFixed(0)}¢, model ${(pick.model * 100).toFixed(0)}%`
+      : null;
     const stationMatch = (ev.description ?? "").match(/recorded (?:at|by) (?:the )?([^,.]+)/i);
 
     reports.push({
@@ -383,11 +385,9 @@ export async function GET() {
     });
   }));
 
-  reports.sort((a, b) => {
-    const ae = Math.max(...a.buckets.map((x) => Math.abs(x.edge)), 0);
-    const be = Math.max(...b.buckets.map((x) => Math.abs(x.edge)), 0);
-    return be - ae;
-  });
+  // picks first, then by when the bot's window opens — not by raw gap, which
+  // put the anti-predictive disagreements at the top
+  reports.sort((a, b) => Number(!!b.pick) - Number(!!a.pick) || a.buyFrom - b.buyFrom);
 
   return NextResponse.json({ generated: Date.now(), count: reports.length, reports });
 }
