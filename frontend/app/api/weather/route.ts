@@ -56,7 +56,10 @@ const geoCache: Record<string, { lat: number; lon: number; tz: string } | null> 
 // METAR (aviationweather.gov) = the station's actual readings = resolution-grade.
 function icaoFromDescription(desc: string): string | null {
   const m = (desc ?? "").match(/wunderground\.com\/history\/daily\/[^\s"']*\/([A-Z0-9]{4})/);
-  return m ? m[1] : null;
+  if (m) return m[1];
+  // since Sept 2026 descriptions cite NOAA: weather.gov/wrh/timeseries?site=rjtt
+  const n = (desc ?? "").match(/weather\.gov\/wrh\/timeseries\?site=([A-Za-z0-9]{4})\b/);
+  return n ? n[1].toUpperCase() : null;
 }
 
 async function metarObservedMax(
@@ -276,8 +279,12 @@ export async function GET() {
       }
     }
 
-    // 3b. Model: ensemble members (ECMWF+GFS) when available, Gaussian fallback
-    const futureMax: number | null = (geo as any)._futureMax ?? null;
+    // 3b. Model: ensemble members (ECMWF+GFS) when available, Gaussian fallback.
+    // Station bias: shift the remaining-hours forecast by today's station-vs-grid
+    // gap (same as the daemon; backtest Brier 0.0212 -> 0.0186).
+    const bias = obsSource === "metar" && gridObserved != null && observedMax != null ? observedMax - gridObserved : 0;
+    const rawFuture: number | null = (geo as any)._futureMax ?? null;
+    const futureMax: number | null = rawFuture != null ? rawFuture + bias : null;
     const dayComplete = hoursElapsed >= 24 || futureMax == null;
     // METAR = same data Wunderground resolves on → only rounding noise remains
     const stationNoise = obsSource === "metar" ? (isF ? 0.6 : 0.35) : (isF ? 0.9 : 0.5);
@@ -286,7 +293,7 @@ export async function GET() {
     const nowKey = new Date().toLocaleString("sv-SE", { timeZone: geo.tz }).replace(" ", "T").slice(0, 13);
     let memberMaxes: number[] = [];
     if (!dayComplete) {
-      memberMaxes = await ensembleMemberMaxes(geo.lat, geo.lon, eventDate, nowKey, isF);
+      memberMaxes = (await ensembleMemberMaxes(geo.lat, geo.lon, eventDate, nowKey, isF)).map((m) => m + bias);
     }
     const probSource = memberMaxes.length >= 15 ? "ensemble" : "gaussian";
 
@@ -346,7 +353,8 @@ export async function GET() {
     // on official station data and grid disagreement there is noise, not edge.
     // Cities excluded by the 10-day historical backtest (dryrun/weather_backtest.py):
     // chengdu/qingdao/cape town lost consistently (grid-vs-station mismatch).
-    const unreliable = ["chengdu", "qingdao", "cape town"].includes(city) && obsSource !== "metar";
+    // Hong Kong settles on the HK Observatory, not an airport — no station feed, no pick
+    const unreliable = (["chengdu", "qingdao", "cape town"].includes(city) && obsSource !== "metar") || city === "hong kong";
     const best = [...buckets].sort((a, b) => Math.abs(b.edge) - Math.abs(a.edge))[0];
     const lateRise = best && observedMax != null && hoursElapsed >= 16 && best.edge > 0 && best.low > observedMax;
 
