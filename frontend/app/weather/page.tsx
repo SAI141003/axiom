@@ -53,12 +53,13 @@ export default function WeatherPage() {
   }, []);
 
   const days = Array.from(new Set(reports.map((r) => r.eventDate))).sort();
-  const today = new Date().toLocaleDateString("sv-SE");
+  const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Kolkata" });
   const activeDay = day && days.includes(day) ? day : (days.find((d) => d >= today) ?? days[0]);
   const dayLabel = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
   const inDay = reports.filter((r) => r.eventDate === activeDay);
   const ahead = inDay.filter((r) => r.pick).sort((a, b) => a.buyFrom - b.buyFrom);
-  const at = (ms: number) => new Date(ms).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
+  // every clock on this page is India time — the desk is run from India
+  const at = (ms: number) => new Date(ms).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) + " IST";
   const shown = inDay.filter((r) =>
     filter === "plays" ? !!r.bestPlay
     : filter === "station" ? r.obsSource === "metar"
@@ -77,7 +78,7 @@ export default function WeatherPage() {
             <h1 className="text-xl font-bold tracking-[0.2em]">WEATHER EDGE SCANNER</h1>
             <p className="text-xs mt-1" style={{ color: "var(--hud-muted)" }}>
               {loading ? "Scanning…" : `${reports.length} cities live`} · station METAR + 82-member
-              ensembles vs market buckets. {updated && `Updated ${updated.toLocaleTimeString()}.`}
+              ensembles vs market buckets. {updated && `Updated ${updated.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata" })} IST.`}
             </p>
           </div>
           <div className="flex gap-2">
@@ -163,7 +164,7 @@ export default function WeatherPage() {
                 <span className="shrink-0 tabular-nums" style={{ color: "var(--hud-muted)" }}>
                   {Math.round(r.pick!.price * 100)}¢ · model {Math.round(r.pick!.model * 100)}%
                 </span>
-                <span className="shrink-0 w-32 text-right text-[10px] font-bold" style={{ color: live ? "var(--hud-green)" : "var(--hud-amber)" }}>
+                <span className="shrink-0 w-48 text-right text-[10px] font-bold" style={{ color: live ? "var(--hud-green)" : "var(--hud-amber)" }}>
                   {live ? "BOT WINDOW OPEN" : `PREVIEW · ${at(r.buyFrom)}`}
                 </span>
               </a>
