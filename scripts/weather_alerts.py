@@ -20,7 +20,14 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-TO = "+17783195274"
+def _env(key: str) -> str:
+    for line in (Path(__file__).resolve().parent.parent / ".env").read_text().splitlines():
+        if line.startswith(key + "="):
+            return line.split("=", 1)[1].strip()
+    return ""
+
+
+TO = _env("ALERT_PHONE")   # kept in .env, never in git
 DESK = "http://localhost:3300/api/weather"
 SENT = Path(__file__).resolve().parent.parent / ".data" / "weather_alerts_sent.json"
 IST = ZoneInfo("Asia/Kolkata")
@@ -40,6 +47,9 @@ def perfect(reports: list[dict]) -> list[dict]:
 
 
 def send(text: str) -> bool:
+    if not TO:
+        print("ALERT_PHONE is not set in .env")
+        return False
     # iMessage first; SMS relays through the paired iPhone ("Text Message Forwarding")
     for service in ("iMessage", "SMS"):
         script = f'''tell application "Messages"
