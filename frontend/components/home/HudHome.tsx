@@ -8,6 +8,7 @@ import BrainNote from "./BrainNote";
 import { RingGauge, ReactorStage } from "@/components/hud/Gauges";
 import AiHealth from "@/components/hud/AiHealth";
 import { useCollapsed } from "@/components/hud/useCollapsed";
+import { useToggle } from "@/lib/toggles";
 import { PAGES } from "@/components/nav/pages";
 import { BRIEF } from "@/lib/jarvis";
 
@@ -42,6 +43,7 @@ export default function HudHome() {
     return () => { live = false; clearInterval(t); };
   }, []);
   const [clock, setClock] = useState("");
+  const voiceMode = useToggle("voice.mode");
   useEffect(() => {
     const load = () => {
       fetch("/api/fleet").then((r) => r.json()).then(setFleet).catch(() => {});
@@ -93,7 +95,7 @@ export default function HudHome() {
         </div>
         <div className="text-center -mt-1">
           <div className="text-[11px] tracking-[0.4em] font-mono font-bold" style={{ color: tone, textShadow: `0 0 14px ${tone}` }}>A.X.I.O.M. · {jstate.toUpperCase()}</div>
-          <div className="prose-sans text-[11.5px] mt-0.5" style={{ color: "var(--hud-muted)" }}>say “hey Axiom” — or just “hey buddy”; it is listening on every page</div>
+          <div className="prose-sans text-[11.5px] mt-0.5" style={{ color: "var(--hud-muted)" }}>{voiceMode ? "say “hey Axiom” — or just “hey buddy”; it is listening on every page" : <>voice mode is off — type to AXIOM, or turn it on in <Link href="/settings" className="underline">Settings</Link></>}</div>
           <div className="mt-1.5"><BrainNote /></div>
         </div>
         <div className="flex gap-2 flex-wrap justify-center">
