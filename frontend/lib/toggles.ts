@@ -9,6 +9,8 @@
 import { useEffect, useState } from "react";
 
 export const TOGGLES: { key: string; label: string; page: string; desc: string }[] = [
+  { key: "voice.mode",         page: "AXIOM",       label: "Voice mode",
+    desc: "Listen for \"hey Axiom\" on every page and speak replies aloud. Off = typed chat only, microphone closed" },
   { key: "crypto.autoTrade",   page: "Auto-Bot",    label: "Auto paper-trading",
     desc: "Enter 5-min positions automatically while the page is open" },
   { key: "intel.autoAnalyze",  page: "Intel",       label: "AI auto-review",

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Ears, whisperReady } from "./ears";
+import { useToggle } from "./toggles";
 
 export type Msg = { role: "you" | "jarvis"; text: string; tools?: string[]; brain?: "bridge" | "local" };
 export type JarvisState = "idle" | "listening" | "thinking" | "speaking";
@@ -64,8 +65,12 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
   const [micOk, setMicOk] = useState<boolean | null>(null);
   const [brainName, setBrainName] = useState<string>("");
   const [wakeOn, setWakeOn] = useState<boolean>(false);
-  const voiceRef = useRef(opts.voice ?? true);
-  voiceRef.current = opts.voice ?? true;
+  // Voice mode (Settings → AXIOM): off closes the microphone and silences replies everywhere
+  const voiceMode = useToggle("voice.mode");
+  const voiceModeRef = useRef(voiceMode);
+  voiceModeRef.current = voiceMode;
+  const voiceRef = useRef((opts.voice ?? true) && voiceMode);
+  voiceRef.current = (opts.voice ?? true) && voiceMode;
   const ctxRef = useRef(opts.context);
   ctxRef.current = opts.context;
   const ws = useRef<WebSocket | null>(null);
@@ -383,6 +388,7 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
   useEffect(() => { const onVis = () => { if (!document.hidden && armed.current) spin(); }; document.addEventListener("visibilitychange", onVis); return () => document.removeEventListener("visibilitychange", onVis); }, [spin]);
 
   const listen = useCallback((asQuestion = false) => {
+    if (!voiceModeRef.current) return;
     if (asQuestion) oneShot.current = true;
     armed.current = true; wakeRef.current = true; setWakeOn(true); fails.current = 0; setMicOk(null);
     spin();
@@ -396,7 +402,7 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
 
   // Always on: arm the wake word on mount when this instance owns the mic.
   useEffect(() => {
-    if (opts.listen === false) return;
+    if (opts.listen === false || !voiceMode) return;
     if (!wakeArmed()) return;
     if (!engine) return;                                   // wait until we know which engine
     // another instance may already have the microphone; if we take it from
@@ -405,7 +411,10 @@ export function useJarvis(opts: { voice?: boolean; context?: () => string; liste
     const t = setTimeout(() => listen(), 400);
     return () => { clearTimeout(t); armed.current = false; try { rec.current?.abort?.(); } catch {} ears.current?.stop(); ears.current = null; releaseEars(meId.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [opts.listen, engine]);
+  }, [opts.listen, engine, voiceMode]);
+
+  // turning voice mode off mid-sentence stops the speaking too
+  useEffect(() => { if (!voiceMode) hush(); }, [voiceMode, hush]);
 
   // Unlock speech on the first gesture so the next reply is heard.
   useEffect(() => {
