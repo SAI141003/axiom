@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import TopNav from "@/components/TopNav";
 import { TrendingUp, Search, PiggyBank } from "lucide-react";
 import Advice from "@/components/invest/Advice";
+import { STOCKS_ONLY } from "@/lib/edition";
 import SipPlanner, { type Market } from "@/components/invest/SipPlanner";
 import { getToggle } from "@/lib/toggles";
 
@@ -432,10 +433,9 @@ export default function StocksPage() {
     <div className="hud-bg">
       <TopNav />
       <main className="max-w-6xl mx-auto p-6 font-mono">
-        <h1 className="inline-flex items-center gap-2 text-xl font-bold tracking-[0.2em] glow-amber"><TrendingUp size={20} aria-hidden /> AI STOCK PLAYBOOK</h1>
+        <h1 className="inline-flex items-center gap-2 text-xl font-bold tracking-[0.2em] glow-amber"><TrendingUp size={20} aria-hidden /> STOCKS</h1>
         <p className="text-xs mt-1 mb-6" style={{ color: "var(--hud-muted)" }}>
-          July 2026 · 5 catalyst trades (2-4 mo) + 5 long-term compounders · live quotes via Yahoo Finance
-          · educational only, not financial advice
+          Your calls, the SIP planner, any-stock research and live supply-chain maps · live quotes via Yahoo Finance · educational only, not financial advice
         </p>
 
         <Advice />
@@ -446,6 +446,11 @@ export default function StocksPage() {
 
         <ChainSection quotes={quotes} />
 
+        {/* ── The July 2026 playbook: hand-written picks, kept on the full desk as a dated snapshot ── */}
+        {!STOCKS_ONLY && <>
+        <div className="hud-panel hud-panel-static p-3 mb-4 prose-sans text-[12px]" style={{ borderColor: "var(--hud-amber)", color: "var(--hud-amber)" }}>
+          The playbook below is a hand-written snapshot from July 2, 2026 — its picks and targets are not tested or updated by the system. Treat it as dated reading, not current calls.
+        </div>
         {/* ── Catalyst trades ── */}
         <h2 className="text-sm font-bold tracking-widest mb-3" style={{ color: "var(--hud-amber)" }}>
           TOP 5 CATALYST TRADES
@@ -538,9 +543,11 @@ export default function StocksPage() {
           ))}
         </div>
 
+        </>}
+
         <p className="text-[10px] pb-8" style={{ color: "var(--hud-muted)" }}>
-          Playbook data from July 2, 2026 snapshots. Targets are analyst consensus + Monte Carlo blends.
-          Educational and entertainment only — not financial advice.
+          {STOCKS_ONLY ? "Live data from public feeds; check prices with your broker before buying. Educational research, not financial advice."
+            : "Playbook data from July 2, 2026 snapshots. Targets are analyst consensus + Monte Carlo blends. Educational and entertainment only — not financial advice."}
         </p>
       </main>
     </div>

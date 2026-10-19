@@ -15,8 +15,8 @@ type Learned = Record<string, { params?: any; evidence?: any; learned_at?: numbe
 const AGO = (s: number) => (s < 90 ? `${Math.round(s)}s` : s < 5400 ? `${Math.round(s / 60)}m` : s < 172800 ? `${Math.round(s / 3600)}h` : `${Math.round(s / 86400)}d`);
 
 /** One short sentence for what a strategy last worked out. */
-function conclusion(name: string, v: { params?: any; evidence?: any }): string {
-  const p = v.params ?? {}, e = v.evidence ?? {};
+function conclusion(name: string, v: { params?: any; evidence?: any } | null): string {
+  const p = v?.params ?? {}, e = v?.evidence ?? {};
   if (name === "weather") {
     const off = (p.disabled_cities ?? []).length;
     return `weather · edge floor ${p.min_flag_edge ?? "—"}${off ? `, ${off} ${off === 1 ? "city" : "cities"} switched off` : ""}`;

@@ -124,7 +124,7 @@ export default function HudHome() {
         <div className="text-center -mt-1">
           <div className="text-[11px] tracking-[0.4em] font-mono font-bold" style={{ color: tone, textShadow: `0 0 14px ${tone}` }}>A.X.I.O.M. · {jstate.toUpperCase()}</div>
           <div className="prose-sans text-[11.5px] mt-0.5" style={{ color: "var(--hud-muted)" }}>{voiceMode ? "say “hey Axiom” — or just “hey buddy”; it is listening on every page" : <>voice mode is off — type to AXIOM, or turn it on in <Link href="/settings" className="underline">Settings</Link></>}</div>
-          <div className="mt-1.5"><BrainNote /></div>
+          {!STOCKS_ONLY && <div className="mt-1.5"><BrainNote /></div>}
         </div>
         <div className="flex gap-2 flex-wrap justify-center">
           <button onClick={() => ask(STOCKS_ONLY ? "Brief me as my investment adviser: my next SIP buy and amounts, any pause or resume calls with the reason, how the S&P 500 and TSX moved, and the news that matters for my holdings. Five short sentences." : BRIEF)} className="hud-btn hud-btn-accent" style={{ minHeight: 32 }}>Brief me</button>
