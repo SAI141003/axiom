@@ -111,6 +111,7 @@ async function deskGet(path) {
 
 // ── The pages AXIOM can open by voice, each with the endpoint that feeds it ──
 const PAGES = [
+  ["/invest", "invest sip etf portfolio plan", "monthly SIP planner, top 20 US and Canadian ETFs, the investor's calls (what to buy, when, why)", "/api/advice"],
   ["/", "home", "the desk at a glance", "/api/fleet"], ["/mind", "jarvis", "the assistant", null], ["/terminal", "terminal", "order book, signal feed, kill switch", "/api/markets"],
   ["/mind", "brain mind reflection", "the mind: reflection loop, feeds, swarm", "/api/brain"], ["/council", "council", "eight role agents debate and rule", "/api/council/review/latest"],
   ["/workforce", "workforce", "the agent roster", "/api/workforce"], ["/connectome", "connectome wiring", "the desk's nervous system read from the code", "/api/connectome"], ["/bots", "bots fleet", "every paper account on one screen", "/api/fleet"],
@@ -129,7 +130,7 @@ const PAGES = [
 const PAGE_HREFS = PAGES.map((p) => p[0]);
 
 // ── Every page's data. Read-only; the routes that act are not listed. ─────────
-const DESK_PATHS = ["/api/agents", "/api/ai", "/api/arb", "/api/backtest-lab", "/api/benchmark", "/api/benchmark/industry", "/api/benchmark/kronos",
+const DESK_PATHS = ["/api/advice", "/api/invest/universe?market=us", "/api/invest/universe?market=ca", "/api/agents", "/api/ai", "/api/arb", "/api/backtest-lab", "/api/benchmark", "/api/benchmark/industry", "/api/benchmark/kronos",
   "/api/benchmark/market", "/api/benchmark/vol", "/api/bots", "/api/brain", "/api/broker/status", "/api/ccxt-bot", "/api/council", "/api/council/review/latest",
   "/api/council/tuner", "/api/crypto/trades", "/api/crypto/window", "/api/data-desk", "/api/deepchain", "/api/fleet", "/api/flow-bot", "/api/gamma-pulse",
   "/api/intel", "/api/journal", "/api/kalshi", "/api/learned", "/api/live/balance", "/api/markets", "/api/meme-bot", "/api/newsdesk",
@@ -545,6 +546,11 @@ ${memory}`;
 
 async function loadState() { try { return JSON.parse(await readFile(STATE, "utf-8")); } catch { return {}; } }
 
+// AXIOM 2.0 (AXIOM_EDITION=stocks in .env): the stocks / ETF / options desk.
+const editionNote = async () => ((await dotenv()).AXIOM_EDITION === "stocks"
+  ? "EDITION: AXIOM 2.0 — stocks, ETFs and options only. There is no Polymarket, no crypto or weather bots and no paper trading on this desk; ignore any tool, memory or note about them. For what the investor should buy, when and why, read desk_api /api/advice (their saved plan's calls) and /api/invest/universe?market=us or ca (the top 20 ETFs); the Invest and Stocks pages hold the SIP planner. You advise; you never place orders.\n\n"
+  : "");
+
 // ── The platform brain: an OpenAI-compatible tool-calling loop ───────────────
 const THREAD = join(HERE, "thread.json");
 async function loadThread() { try { return JSON.parse(await readFile(THREAD, "utf-8")); } catch { return []; } }
@@ -748,12 +754,12 @@ async function platformTurn(q, send) {
   const firstUser = history.findIndex((m) => m.role === "user"); history = firstUser >= 0 ? history.slice(firstUser) : [];   // never start on an orphaned tool result
   const light = !tools.length || (jump && chosen.length === 0);
   if (light) history = history.slice(-4);
-  const messages = [{ role: "system", content: light ? await lightPrompt() : (await systemPrompt()).slice(0, 8000) }, ...history, { role: "user", content: q }];
+  const messages = [{ role: "system", content: (await editionNote()) + (light ? await lightPrompt() : (await systemPrompt()).slice(0, 8000)) }, ...history, { role: "user", content: q }];
   if (jump) {
     const d = await pageData;
     messages.push({ role: "system", content: `You have ALREADY opened ${jump.href} (${jump.name}) — it is on Sai's screen now. ${d ? `Its live data, just read: ${d}` : `It shows: ${jump.about}`}\nTell him what is on it in two or three spoken sentences, leading with the number or fact that matters most. No lists.` });
     tools.length = 0;   // the page's own data is in hand: answer in one breath, no round trips
-    messages[0] = { role: "system", content: await lightPrompt() };
+    messages[0] = { role: "system", content: (await editionNote()) + (await lightPrompt()) };
   }
   // A question about numbers always starts with a fleet_status call: a small
   // model will otherwise repeat a figure from an earlier turn instead of the

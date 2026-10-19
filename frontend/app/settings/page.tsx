@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import TopNav from "@/components/TopNav";
 import { KeyRound } from "lucide-react";
 import { TOGGLES, getToggle, setToggle } from "@/lib/toggles";
+import { STOCKS_ONLY } from "@/lib/edition";
 
 interface KeyRow {
   name: string; scope: "frontend" | "backend"; label: string; group: string;
@@ -106,7 +107,7 @@ export default function SettingsPage() {
         </p>
 
         {/* Trading mode banner */}
-        <div className="hud-panel hud-panel-static p-4 mb-6 text-xs flex items-center gap-3">
+        {!STOCKS_ONLY && <div className="hud-panel hud-panel-static p-4 mb-6 text-xs flex items-center gap-3">
           <span className="hud-led inline-block"
                 style={{ color: dryRun ? "var(--hud-amber)" : "var(--hud-red)", background: dryRun ? "var(--hud-amber)" : "var(--hud-red)" }} />
           <div>
@@ -118,10 +119,10 @@ export default function SettingsPage() {
               in the backend .env — a deliberate two-step safety barrier.
             </div>
           </div>
-        </div>
+        </div>}
 
         {/* Stock focus: the whole machine on the stock desk */}
-        <div className="hud-panel hud-panel-static p-4 mb-6 flex items-start gap-4"
+        {!STOCKS_ONLY && <div className="hud-panel hud-panel-static p-4 mb-6 flex items-start gap-4"
              style={{ borderColor: focus?.stocks ? "var(--hud-green)" : "var(--hud-border)" }}>
           <div className="flex-1">
             <div className="text-[11px] tracking-widest font-bold" style={{ color: focus?.stocks ? "var(--hud-green)" : "var(--hud-accent)" }}>
@@ -145,10 +146,10 @@ export default function SettingsPage() {
             <span style={{ position: "absolute", top: 3, left: focus?.stocks ? 25 : 3, width: 16, height: 16, borderRadius: 99,
                            background: focus?.stocks ? "var(--hud-green)" : "var(--hud-muted)", transition: "left 0.2s" }} />
           </button>
-        </div>
+        </div>}
 
         {/* Strategy bot master switches */}
-        <div className="mb-6">
+        {!STOCKS_ONLY && <div className="mb-6">
           <div className="text-[10px] tracking-widest mb-2" style={{ color: "var(--hud-green)" }}>
             STRATEGY BOTS · MASTER ON / OFF
           </div>
@@ -181,7 +182,7 @@ export default function SettingsPage() {
             Off = the bot stops placing trades (still records data for the learner). Weather is off
             by default — it has been net-negative in testing.
           </div>
-        </div>
+        </div>}
 
         {/* Per-page automation toggles */}
         <div className="mb-6">

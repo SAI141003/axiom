@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import { STOCKS_ONLY, STOCK_PAGES } from "@/lib/edition";
 import {
   Home, Sparkles, Terminal, Brain, Users, Briefcase, Bot, Zap, CloudSun, Sun, LineChart, TrendingUp, Layers, Globe, Activity,
   FlaskConical, Cpu, Eye, Radio, Newspaper, BookOpen, Wallet, ShieldCheck, KeyRound, Network, PiggyBank,
@@ -10,7 +11,7 @@ export type Group = { label: string; pages: Page[] };
 // The desk, in reading order: what is running → where it trades → where it
 // is tested → what it can reach. This one list feeds the nav bar, the command
 // palette and the home page cards.
-export const GROUPS: Group[] = [
+const ALL_GROUPS: Group[] = [
   { label: "Desk", pages: [
     { href: "/",          label: "Home",      hint: "the desk at a glance",                    icon: Home },
     { href: "/mind",    label: "Axiom",    hint: "the mind of the desk — the brain, the feeds, the swarm, and the voice", icon: Brain, keywords: "assistant voice ai brief brain mind reflection" },
@@ -47,6 +48,11 @@ export const GROUPS: Group[] = [
     { href: "/about",     label: "About",     hint: "every source, paper, repo and feed — where it is used and what came of it", icon: BookOpen, keywords: "sources papers credits research about" },
   ]},
 ];
+
+// AXIOM 2.0 shows only the stocks / ETF / options desk
+export const GROUPS: Group[] = STOCKS_ONLY
+  ? ALL_GROUPS.map((g) => ({ ...g, pages: g.pages.filter((p) => STOCK_PAGES.has(p.href)) })).filter((g) => g.pages.length)
+  : ALL_GROUPS;
 
 export const PAGES: Page[] = GROUPS.flatMap((g) => g.pages);
 export const pageFor = (pathname: string) => PAGES.find((p) => p.href === pathname) ?? PAGES.find((p) => p.href !== "/" && pathname.startsWith(p.href));

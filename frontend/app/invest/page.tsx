@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useState } from "react";
 import TopNav from "@/components/TopNav";
 import { PiggyBank, ChevronDown } from "lucide-react";
+import Advice from "@/components/invest/Advice";
 import SipPlanner, { type Market, pc, big, tone, Spark } from "@/components/invest/SipPlanner";
 
 // INVEST — the long-term side of the desk. The 20 largest ETFs in the US and
@@ -37,6 +38,8 @@ export default function InvestPage() {
             ))}
           </div>
         </div>
+
+        <Advice />
 
         <SipPlanner market={market} uni={uni} />
 

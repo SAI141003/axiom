@@ -97,9 +97,30 @@ export default function SipPlanner({ market, uni }: { market: Market; uni?: any 
         </div>
         {err && <p className="text-xs mt-2" style={{ color: "var(--hud-red)" }}>{err}</p>}
       </section>
+      {plan && <SaveBar plan={plan} style={style} />}
       {plan && <Plan plan={plan} style={style} setStyle={setStyle} cur={cur} />}
       {plan && <Watch rows={watch} />}
     </>
+  );
+}
+
+function SaveBar({ plan, style }: any) {
+  const [state, setState] = useState<"" | "saving" | "saved" | "error">("");
+  const save = async () => {
+    setState("saving");
+    const r = await fetch("/api/advice/profile", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ...plan.input, style }) }).catch(() => null);
+    setState(r?.ok ? "saved" : "error");
+  };
+  return (
+    <div className="hud-panel hud-panel-static p-3 mb-3 flex items-center gap-3 flex-wrap" style={{ borderColor: "var(--hud-accent)" }}>
+      <button onClick={save} disabled={state === "saving"} className="hud-btn hud-btn-accent" style={{ minHeight: 34 }}>
+        {state === "saved" ? "✓ Saved — the advisor is on it" : state === "saving" ? "Saving…" : "Save as my plan"}
+      </button>
+      <span className="prose-sans text-[12px]" style={{ color: "var(--hud-muted)" }}>
+        {state === "error" ? "Could not save — is the desk running?" : "The advisor then tells you every monthly buy (the day before and at the time), any sell, and the news on your holdings — on the Stocks page and on your phone (ntfy). One saved plan per market."}
+      </span>
+    </div>
   );
 }
 

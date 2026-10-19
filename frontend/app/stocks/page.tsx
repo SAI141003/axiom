@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import TopNav from "@/components/TopNav";
 import { TrendingUp, Search, PiggyBank } from "lucide-react";
+import Advice from "@/components/invest/Advice";
 import SipPlanner, { type Market } from "@/components/invest/SipPlanner";
 import { getToggle } from "@/lib/toggles";
 
@@ -436,6 +437,8 @@ export default function StocksPage() {
           July 2026 · 5 catalyst trades (2-4 mo) + 5 long-term compounders · live quotes via Yahoo Finance
           · educational only, not financial advice
         </p>
+
+        <Advice />
 
         <SipBox />
 

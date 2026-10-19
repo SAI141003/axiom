@@ -9,6 +9,7 @@ import { RingGauge, ReactorStage } from "@/components/hud/Gauges";
 import AiHealth from "@/components/hud/AiHealth";
 import { useCollapsed } from "@/components/hud/useCollapsed";
 import { useToggle } from "@/lib/toggles";
+import { STOCKS_ONLY } from "@/lib/edition";
 import { PAGES } from "@/components/nav/pages";
 import { BRIEF } from "@/lib/jarvis";
 
@@ -44,6 +45,18 @@ export default function HudHome() {
   }, []);
   const [clock, setClock] = useState("");
   const voiceMode = useToggle("voice.mode");
+  // AXIOM 2.0: the indices and the investor's calls instead of paper accounts
+  const [idx, setIdx] = useState<any[]>([]);
+  const [advice, setAdvice] = useState<any>(null);
+  useEffect(() => {
+    if (!STOCKS_ONLY) return;
+    const load = () => {
+      fetch("/api/quotes?symbols=SPY,XIC.TO,QQQ").then((r) => r.json()).then((d) => setIdx(Array.isArray(d) ? d : [])).catch(() => {});
+      fetch("/api/advice").then((r) => r.json()).then(setAdvice).catch(() => {});
+    };
+    load(); const t = setInterval(load, 60_000); return () => clearInterval(t);
+  }, []);
+  const day = (sym: string) => { const q = idx.find((x) => x.symbol === sym); return q?.price && q?.prevClose ? q.price / q.prevClose - 1 : null; };
   useEffect(() => {
     const load = () => {
       fetch("/api/fleet").then((r) => r.json()).then(setFleet).catch(() => {});
@@ -66,6 +79,18 @@ export default function HudHome() {
     <div className="hud-screen-grid">
       {/* left: the system */}
       <div className="flex flex-col gap-3 min-h-0 order-2 lg:order-1">
+        {STOCKS_ONLY ? (<>
+        <Panel title="SYSTEM">
+          <Row k="STATUS" v="ONLINE · ADVISORY" tone="var(--hud-green)" />
+          <Row k="AGENTS" v={agents ? `${agents.running} / ${agents.total}` : "—"} tone={agents?.down ? "var(--hud-red)" : "var(--hud-green)"} />
+          <Row k="ADVISOR" v={advice?.generated ? `checked ${new Date(advice.generated).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "not run yet"} />
+          <Row k="LOCAL TIME" v={clock} />
+        </Panel>
+        <Panel title="YOUR CALLS" action={<Link href="/stocks" className="text-[9px] font-mono hover:underline" style={{ color: "var(--hud-accent)" }}>ALL →</Link>}>
+          {!advice?.profiles?.length && <p className="prose-sans text-[11px] m-0" style={{ color: "var(--hud-muted)" }}>No plan saved — open <Link href="/invest" className="underline">Invest</Link>, build a SIP and save it.</p>}
+          {(advice?.calls ?? []).slice(0, 4).map((c: any) => <Row key={c.id} k={c.kind} v={c.title.replace(/^(Next|Buy now|Tomorrow)[^:]*:\s*/, "")} tone={c.kind === "PAUSE" ? "var(--hud-amber)" : "var(--hud-green)"} />)}
+        </Panel>
+        </>) : (<>
         <Panel title="SYSTEM">
           <Row k="STATUS" v="ONLINE · PAPER" tone="var(--hud-green)" />
           <Row k="AGENTS" v={agents ? `${agents.running} / ${agents.total}` : "—"} tone={agents?.down ? "var(--hud-red)" : "var(--hud-green)"} />
@@ -79,19 +104,22 @@ export default function HudHome() {
           ))}
           {weatherBot && <Row k="WEATHER BOT" v={`${usd0(weatherBot.pnl)} · ${(weatherBot.winRate * 100).toFixed(0)}%`} tone="var(--hud-gold)" />}
         </Panel>
+        </>)}
         <div className="min-h-0 overflow-hidden"><AiHealth compact /></div>
       </div>
 
       {/* centre: the mind and every screen */}
       <div className="flex flex-col items-center justify-center gap-4 min-h-0 order-1 lg:order-2">
         <div className="flex items-center justify-center gap-6 xl:gap-10 w-full">
-          <RingGauge label="fleet p&l" value={t ? usd0(t.pnl) : "—"} sub={t ? `of $${t.start}` : ""} pct={t ? Math.max(0.02, Math.min(1, t.account / t.start)) : 0} tone={t && t.pnl >= 0 ? "var(--hud-green)" : "var(--hud-red)"} size={136} />
+          {STOCKS_ONLY ? <RingGauge label="s&p 500 today" value={day("SPY") != null ? `${(day("SPY")! * 100).toFixed(2)}%` : "—"} sub="SPY" pct={day("SPY") != null ? Math.min(1, Math.abs(day("SPY")!) * 25) : 0} tone={(day("SPY") ?? 0) >= 0 ? "var(--hud-green)" : "var(--hud-red)"} size={136} /> :
+          <RingGauge label="fleet p&l" value={t ? usd0(t.pnl) : "—"} sub={t ? `of $${t.start}` : ""} pct={t ? Math.max(0.02, Math.min(1, t.account / t.start)) : 0} tone={t && t.pnl >= 0 ? "var(--hud-green)" : "var(--hud-red)"} size={136} />}
           <ReactorStage tone={tone} size={340}>
             <Link href="/mind" aria-label="AXIOM — the mind" className="grid place-items-center">
               <BrainCore size={248} activity={jstate === "idle" ? 0.4 : 0.85} motes={motes} fps={jstate === "idle" ? 10 : 20} />
             </Link>
           </ReactorStage>
-          <RingGauge label="weather bot" value={weatherBot ? usd0(weatherBot.pnl) : "—"} sub={weatherBot ? `${(weatherBot.winRate * 100).toFixed(0)}% · ${weatherBot.trades} trades` : ""} pct={weatherBot ? weatherBot.winRate : 0} tone="var(--hud-gold)" size={136} />
+          {STOCKS_ONLY ? <RingGauge label="tsx today" value={day("XIC.TO") != null ? `${(day("XIC.TO")! * 100).toFixed(2)}%` : "—"} sub="XIC" pct={day("XIC.TO") != null ? Math.min(1, Math.abs(day("XIC.TO")!) * 25) : 0} tone={(day("XIC.TO") ?? 0) >= 0 ? "var(--hud-green)" : "var(--hud-red)"} size={136} /> :
+          <RingGauge label="weather bot" value={weatherBot ? usd0(weatherBot.pnl) : "—"} sub={weatherBot ? `${(weatherBot.winRate * 100).toFixed(0)}% · ${weatherBot.trades} trades` : ""} pct={weatherBot ? weatherBot.winRate : 0} tone="var(--hud-gold)" size={136} />}
         </div>
         <div className="text-center -mt-1">
           <div className="text-[11px] tracking-[0.4em] font-mono font-bold" style={{ color: tone, textShadow: `0 0 14px ${tone}` }}>A.X.I.O.M. · {jstate.toUpperCase()}</div>
@@ -99,7 +127,7 @@ export default function HudHome() {
           <div className="mt-1.5"><BrainNote /></div>
         </div>
         <div className="flex gap-2 flex-wrap justify-center">
-          <button onClick={() => ask(BRIEF)} className="hud-btn hud-btn-accent" style={{ minHeight: 32 }}>Brief me</button>
+          <button onClick={() => ask(STOCKS_ONLY ? "Brief me as my investment adviser: my next SIP buy and amounts, any pause or resume calls with the reason, how the S&P 500 and TSX moved, and the news that matters for my holdings. Five short sentences." : BRIEF)} className="hud-btn hud-btn-accent" style={{ minHeight: 32 }}>Brief me</button>
           <button onClick={() => ask("What's in the news that matters for our positions? Three sentences.")} className="hud-btn" style={{ minHeight: 32 }}>News that matters</button>
           <button onClick={() => ask("Run health_check and tell me what's degraded.")} className="hud-btn" style={{ minHeight: 32 }}>Diagnostics</button>
         </div>

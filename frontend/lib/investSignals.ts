@@ -105,7 +105,8 @@ export async function watch(symbol: string, holdings: string[] = []) {
   // ── the call ──
   const ruleCagr = cagr(1, eqRule, years * 12), holdCagr = cagr(1, eqHold, years * 12);
   // the rule only earns a SELL where this fund's own history says it paid
-  const timingWorks = ruleCagr >= holdCagr - 0.005;
+  // only where the rule beat holding on both return and worst fall
+  const timingWorks = ruleCagr >= holdCagr && maxDD(ruleCurve) > maxDD(holdCurve);
   let action: "BUY" | "BUY ON DIP" | "HOLD" | "SELL";
   let why: string;
   if (!ruleSaysIn && timingWorks) {

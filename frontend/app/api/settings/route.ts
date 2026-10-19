@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { STOCKS_ONLY } from "@/lib/edition";
 import { promises as fs } from "fs";
 import path from "path";
 
@@ -16,7 +17,7 @@ import path from "path";
 const FRONTEND_ENV = path.join(process.cwd(), ".env.local");
 const BACKEND_ENV = path.join(process.cwd(), "..", ".env");
 
-const KEYS: { name: string; scope: "frontend" | "backend"; label: string; group: string }[] = [
+const ALL_KEYS: { name: string; scope: "frontend" | "backend"; label: string; group: string }[] = [
   { name: "GROQ_API_KEY",      scope: "frontend", label: "Groq (fast LLM — console.groq.com)",      group: "AI PROVIDERS" },
   { name: "CEREBRAS_API_KEY",  scope: "frontend", label: "Cerebras (cloud.cerebras.ai)",            group: "AI PROVIDERS" },
   { name: "ANTHROPIC_API_KEY", scope: "frontend", label: "Anthropic Claude",                        group: "AI PROVIDERS" },
@@ -30,6 +31,8 @@ const KEYS: { name: string; scope: "frontend" | "backend"; label: string; group:
   { name: "KALSHI_PRIVATE_KEY_B64",  scope: "frontend", label: "Kalshi RSA private key, base64-encoded PEM (`base64 -i key.pem`)", group: "OTHER VENUES" },
   { name: "HF_TOKEN",                  scope: "backend", label: "HuggingFace token (Kronos downloads)", group: "OTHER" },
 ];
+const KEYS = STOCKS_ONLY ? ALL_KEYS.filter((k) => !/POLYMARKET|KALSHI|HF_TOKEN/.test(k.name)) : ALL_KEYS;
+
 
 async function readEnv(file: string): Promise<{ vals: Record<string, string>; disabled: Set<string> }> {
   try {
