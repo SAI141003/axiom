@@ -53,7 +53,7 @@ if has stt; then
 fi
 
 say "Keys"
-if [ ! -f .env ]; then cp .env.example .env; warn "created .env from .env.example — add your keys there (most of the desk runs keyless; DRY_RUN=true means no real orders)"; else ok ".env present (left untouched)"; fi
+if [ ! -f .env ]; then cp .env.example .env; warn "created .env from .env.example — add your keys there, or on the Settings page once it is running"; else ok ".env present (left untouched)"; fi
 mkdir -p logs .data
 
 if [ -n "$PGBIN" ]; then
@@ -79,7 +79,7 @@ say "Python packages"
 ./.venv/bin/pip install -q -r requirements-core.txt || die "core packages failed"
 ok "core packages"
 if [ "$CORE_ONLY" = 0 ]; then
-  if ./.venv/bin/pip install -q -r requirements.txt; then ok "full packages (ML bots included)"; else warn "some full packages failed — the core desk runs; the Kronos bot may not"; fi
+  if ./.venv/bin/pip install -q -r requirements.txt; then ok "all packages"; else warn "some full packages failed — the core desk runs; the Kronos bot may not"; fi
 fi
 
 if has stt && [ ! -f .data/whisper/ggml-base.en.bin ]; then

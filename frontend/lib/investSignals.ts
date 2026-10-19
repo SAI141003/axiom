@@ -27,7 +27,24 @@ async function daily(symbol: string) {
   } catch { return null; }
 }
 
-async function news(symbol: string, n = 6) {
+async function news(symbol: string, n = 6): Promise<{ title: string; link: string; at: number | null; about: string }[]> {
+  if (!symbol.endsWith(".TO")) return newsFor(symbol, n);
+  // Yahoo's feeds for .TO listings, and the New York feed for the same name,
+  // match loosely (RY returned Rayonier, TD returned Bank of America): keep only
+  // headlines naming the company — its ticker or a distinctive word of its name
+  const base = symbol.replace(/\.TO$/, "").replace("-", ".");
+  const name: string = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=1d&interval=1d`, { headers: UA, cache: "no-store" })
+    .then((r) => r.json()).then((d) => d?.chart?.result?.[0]?.meta?.longName ?? "").catch(() => "");
+  const GENERIC = new Set(["canadian", "canada", "corporation", "corp", "inc", "limited", "ltd", "bank", "group", "the", "of", "and", "company", "trust", "fund", "etf", "index", "ishares", "vanguard", "bmo", "class", "core", "international"]);
+  const word = name.toLowerCase().split(/[^a-z]+/).find((w) => w.length >= 4 && !GENERIC.has(w));
+  const tick = new RegExp(`(^|[^A-Za-z])${base.replace(".", "\\.")}([^A-Za-z]|$)`);
+  const pool = [...(await newsFor(symbol, n * 2)), ...(await newsFor(base, n * 2))];
+  const seen = new Set<string>();
+  return pool.filter((i) => !seen.has(i.title) && (seen.add(i.title), tick.test(i.title) || (word ? i.title.toLowerCase().includes(word) : false)))
+    .sort((a, b) => (b.at ?? 0) - (a.at ?? 0)).slice(0, n).map((i) => ({ ...i, about: symbol }));
+}
+
+async function newsFor(symbol: string, n: number) {
   try {
     const x = await fetch(`https://feeds.finance.yahoo.com/rss/2.0/headline?s=${encodeURIComponent(symbol)}&region=US&lang=en-US`, { headers: UA, cache: "no-store" }).then((r) => r.text());
     const dec = (s: string) => s.replace(/<!\[CDATA\[|\]\]>/g, "").replace(/&amp;/g, "&").replace(/&#39;|&apos;/g, "'").replace(/&quot;/g, '"').trim();
