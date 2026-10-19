@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X, Mic, Sparkles, Send } from "lucide-react";
 import { useJarvis } from "@/lib/jarvis";
+import { STOCKS_ONLY } from "@/lib/edition";
 import { Reactor, toneFor } from "./Reactor";
 import { Transcript } from "./Transcript";
 
@@ -50,7 +51,7 @@ export default function JarvisDock() {
     if (pathname !== "/" || j.bridge !== "online") return;
     try {
       const last = Number(localStorage.getItem("axiom.lastBrief") || 0);
-      if (Date.now() - last > 6 * 3600_000) { localStorage.setItem("axiom.lastBrief", String(Date.now())); setOpen(true); const t = setTimeout(() => j.ask("Good to have you back. Give me the status briefing."), 1200); return () => clearTimeout(t); }
+      if (Date.now() - last > 6 * 3600_000) { localStorage.setItem("axiom.lastBrief", String(Date.now())); setOpen(true); const t = setTimeout(() => j.ask(STOCKS_ONLY ? "Good to have you back. Brief me as my investment adviser: my next SIP buy, any pause or resume calls with the reason, how the S&P 500 and TSX moved, and the news on my holdings." : "Good to have you back. Give me the status briefing."), 1200); return () => clearTimeout(t); }
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, j.bridge]);

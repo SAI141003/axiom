@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Brain, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { GROUPS, pageFor } from "@/components/nav/pages";
+import { STOCKS_ONLY } from "@/lib/edition";
 
 // The OS rail: AXIOM at the head, every screen as an icon, the desk's vitals
 // at the foot. Fixed on the left of every page; expands on hover or pin.
@@ -60,8 +61,8 @@ export default function Rail() {
         ))}
       </nav>
       <div className="hud-rail-foot">
-        <Vital label="Fleet" value={v?.pnl != null ? `${v.pnl >= 0 ? "+" : "−"}$${Math.abs(v.pnl).toFixed(0)}` : "—"} tone={v?.pnl >= 0 ? "var(--hud-green)" : "var(--hud-red)"} open={open} />
-        <Vital label="Weather" value={v?.weather != null ? `${v.weather >= 0 ? "+" : "−"}$${Math.abs(v.weather).toFixed(0)}` : "—"} tone="var(--hud-gold)" open={open} />
+        {!STOCKS_ONLY && <Vital label="Fleet" value={v?.pnl != null ? `${v.pnl >= 0 ? "+" : "−"}$${Math.abs(v.pnl).toFixed(0)}` : "—"} tone={v?.pnl >= 0 ? "var(--hud-green)" : "var(--hud-red)"} open={open} />}
+        {!STOCKS_ONLY && <Vital label="Weather" value={v?.weather != null ? `${v.weather >= 0 ? "+" : "−"}$${Math.abs(v.weather).toFixed(0)}` : "—"} tone="var(--hud-gold)" open={open} />}
         <Vital label="Agents" value={v ? `${v.running}/${v.total}` : "—"} tone={v?.down ? "var(--hud-red)" : "var(--hud-green)"} open={open} />
         <button onClick={() => { const n = !pinned; setPinned(n); setShut(!n); try { localStorage.setItem("axiom.rail", n ? "open" : "closed"); } catch {} }} className="hud-rail-item mt-1" aria-pressed={pinned} aria-label={pinned ? "collapse rail" : "pin rail open"}>
           {pinned ? <ChevronsLeft size={16} aria-hidden /> : <ChevronsRight size={16} aria-hidden />}
