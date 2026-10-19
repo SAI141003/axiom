@@ -1,0 +1,14 @@
+# AXIOM 2.0 — Python services (Council swarm, voice, macro data, advisor)
+aiohttp>=3.9.0
+httpx>=0.27.0
+numpy>=1.26.0
+scipy>=1.13.0
+pydantic>=2.6.0
+pydantic-settings>=2.2.0
+python-dotenv>=1.0.0
+redis>=5.0.0            # client library only; no Redis server is needed
+openai>=1.40.0
+pywhispercpp>=1.2.0     # speech-to-text for "hey Axiom"
+feedparser>=6.0.0
+requests>=2.31.0
+python-dateutil>=2.9.0

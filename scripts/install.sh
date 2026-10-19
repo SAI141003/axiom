@@ -31,18 +31,25 @@ NODE=$(command -v node) || die "node not found — install Node 18+ (brew instal
 [ "$(node -p 'process.versions.node.split(".")[0]')" -ge 18 ] || die "Node 18+ needed, found $(node --version)"
 NPX=$(command -v npx); NODEBIN=$(dirname "$NODE")
 ok "node $(node --version)"
+has() { ls deploy/launchd/*."$1".plist.in >/dev/null 2>&1; }   # is this service part of this edition?
+REDIS=""
+if has redis; then
 REDIS=$(command -v redis-server || true)
 [ -z "$REDIS" ] && for p in /opt/homebrew/opt/redis/bin/redis-server /usr/local/bin/redis-server; do [ -x "$p" ] && REDIS=$p; done
 if [ -n "$REDIS" ]; then ok "redis $("$REDIS" --version | awk '{print $3}')"; else warn "redis-server not found — run: brew install redis   (the bridge and live bot need it; everything else runs without)"; fi
+fi
 PGBIN=""; PGDATA=""
-PGB=$(command -v postgres || ls -d /opt/homebrew/opt/postgresql@*/bin/postgres /usr/local/opt/postgresql@*/bin/postgres 2>/dev/null | tail -1)
+PGB=""; has postgres && PGB=$(command -v postgres || ls -d /opt/homebrew/opt/postgresql@*/bin/postgres /usr/local/opt/postgresql@*/bin/postgres 2>/dev/null | tail -1)
 if [ -n "$PGB" ]; then
   PGBIN=$(dirname "$PGB")
   PGDATA=$(ls -d /opt/homebrew/var/postgresql@* /usr/local/var/postgresql@* 2>/dev/null | tail -1)
   [ -z "$PGDATA" ] && PGDATA="$ROOT/.pgdata"
   ok "postgres $("$PGBIN/postgres" --version | awk '{print $3}') · data $PGDATA"
-else
+elif has postgres; then
   warn "postgres not found — run: brew install postgresql@16   (only the original Polymarket engine, service 'bot', needs it)"
+fi
+if has stt; then
+  command -v ffmpeg >/dev/null || ls /opt/homebrew/bin/ffmpeg /usr/local/bin/ffmpeg >/dev/null 2>&1 && ok "ffmpeg" || warn "ffmpeg not found — run: brew install ffmpeg   (for the \"hey Axiom\" voice; the browser's own speech works without it)"
 fi
 
 say "Keys"
@@ -73,6 +80,13 @@ say "Python packages"
 ok "core packages"
 if [ "$CORE_ONLY" = 0 ]; then
   if ./.venv/bin/pip install -q -r requirements.txt; then ok "full packages (ML bots included)"; else warn "some full packages failed — the core desk runs; the Kronos bot may not"; fi
+fi
+
+if has stt && [ ! -f .data/whisper/ggml-base.en.bin ]; then
+  say "Speech model for the voice (142 MB, once)"
+  mkdir -p .data/whisper
+  curl -fsSL -o .data/whisper/ggml-base.en.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin \
+    && ok "whisper base.en" || warn "download failed — the voice falls back to the browser's speech recognition"
 fi
 
 say "Node packages"
