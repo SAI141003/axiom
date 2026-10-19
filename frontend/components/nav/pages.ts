@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   Home, Sparkles, Terminal, Brain, Users, Briefcase, Bot, Zap, CloudSun, Sun, LineChart, TrendingUp, Layers, Globe, Activity,
-  FlaskConical, Cpu, Eye, Radio, Newspaper, BookOpen, Wallet, ShieldCheck, KeyRound, Network,
+  FlaskConical, Cpu, Eye, Radio, Newspaper, BookOpen, Wallet, ShieldCheck, KeyRound, Network, PiggyBank,
 } from "lucide-react";
 
 export type Page = { href: string; label: string; hint: string; icon: LucideIcon; keywords?: string };
@@ -25,6 +25,7 @@ export const GROUPS: Group[] = [
     { href: "/weather",   label: "Weather",   hint: "station observations vs market buckets",  icon: CloudSun, keywords: "metar ensemble temperature" },
     { href: "/premarket", label: "Pre-Market", hint: "first-20-minute stock picks",            icon: Sun },
     { href: "/options",   label: "Options",   hint: "chains, vol, Kelly-sized recommendations", icon: LineChart, keywords: "calls puts gamma" },
+    { href: "/invest",    label: "Invest",    hint: "monthly SIP planner, top 20 US & Canada ETFs, live buy/sell watch", icon: PiggyBank, keywords: "sip etf portfolio plan mutual fund canada long term" },
     { href: "/stocks",    label: "Stocks",    hint: "sizing and factor view",                   icon: TrendingUp },
     { href: "/arbitrage", label: "Arb",       hint: "neg-risk and cross-venue arbitrage",       icon: Layers, keywords: "kalshi negrisk" },
     { href: "/live",      label: "Markets",   hint: "live market list",                        icon: Globe },

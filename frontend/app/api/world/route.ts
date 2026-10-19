@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import CATALOG from "./catalog.json";
+import { cachedRoute } from "@/lib/swr";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,7 @@ async function category(cat: string) {
   return out;
 }
 
-export async function GET(request: Request) {
+async function compute(request: Request) {
   const url = new URL(request.url);
   const want = url.searchParams.get("cat");
   const counts = Object.fromEntries(ORDER.map((c) => [c, FEEDS.filter((f) => f.cat === c).length]).filter(([, n]) => (n as number) > 0));
@@ -56,4 +57,9 @@ export async function GET(request: Request) {
   const core = (await Promise.all(CORE.map(category))).flat().sort((a, b) => b.when - a.when);
   const categories = CORE.filter((c) => counts[c]).map((c) => ({ id: c, label: LABEL[c], items: (cache.get(c)?.items ?? []).slice(0, 12) }));
   return NextResponse.json({ generated: Date.now(), cat: "all", feeds: CORE.reduce((s, c) => s + (counts[c] ?? 0), 0), items: core.slice(0, 120), categories, catalog: counts, labels: LABEL, total_feeds: FEEDS.length });
+}
+
+// answered from memory in milliseconds; refreshed in the background every 240s
+export async function GET(req: Request) {
+  return cachedRoute(req, "world", 240000, compute);
 }

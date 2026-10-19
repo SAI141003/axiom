@@ -1,6 +1,6 @@
 #!/bin/bash
 # Overnight robustness loop: MC backtest + learner, hourly, on the growing dataset.
-cd /Users/saiyaganti/polymarket-hft
+cd "$(dirname "$0")/.." || exit 1
 OUT="logs/reports/overnight_$(date +%Y%m%d_%H%M).txt"
 {
   echo "════ OVERNIGHT ROBUSTNESS PASS $(date '+%Y-%m-%d %H:%M %Z') ════"

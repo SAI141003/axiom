@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { cachedRoute } from "@/lib/swr";
 
 const run = promisify(exec);
 
@@ -8,7 +9,7 @@ const run = promisify(exec);
 //   - services: launchd-managed processes (daemons, bot, server) — running if
 //     they have a live PID
 //   - swarm: the in-bot MiroFish agents (from /api/brain, with alive flags)
-export async function GET() {
+async function compute(_req: Request) {
   let svcTotal = 0, svcRunning = 0, svcScheduled = 0, svcDown = 0;
   const services: { name: string; state: "running" | "scheduled" | "down" }[] = [];
   try {
@@ -56,4 +57,9 @@ export async function GET() {
     down: svcDown,
     generated: Date.now(),
   });
+}
+
+// answered from memory in milliseconds; refreshed in the background every 20s
+export async function GET(req: Request) {
+  return cachedRoute(req, "agents", 20000, compute);
 }

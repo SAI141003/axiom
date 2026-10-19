@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>KeepAlive</key>
+	<true/>
+	<key>Label</key>
+	<string>com.polymarket.stt</string>
+	<key>ProcessType</key>
+	<string>Interactive</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>__ROOT__/.venv/bin/python</string>
+		<string>__ROOT__/signals/stt_server.py</string>
+	</array>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StandardErrorPath</key>
+	<string>__ROOT__/logs/stt.log</string>
+	<key>StandardOutPath</key>
+	<string>__ROOT__/logs/stt.log</string>
+	<key>WorkingDirectory</key>
+	<string>__ROOT__</string>
+</dict>
+</plist>

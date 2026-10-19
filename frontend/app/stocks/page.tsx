@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import TopNav from "@/components/TopNav";
-import { TrendingUp, Search } from "lucide-react";
+import { TrendingUp, Search, PiggyBank } from "lucide-react";
+import SipPlanner, { type Market } from "@/components/invest/SipPlanner";
 import { getToggle } from "@/lib/toggles";
 
 interface Quote {
@@ -364,6 +365,28 @@ function ChainSection({ quotes }: { quotes: Record<string, Quote> }) {
   );
 }
 
+// SIP: opens the monthly planner right here — amount and years in, a
+// diversified plan of ETFs, sector-leader stocks and metals out.
+function SipBox() {
+  const [open, setOpen] = useState(false);
+  const [market, setMarket] = useState<Market>("us");
+  return (
+    <section className="mb-6" aria-label="SIP">
+      <div className="flex items-center gap-2 flex-wrap mb-3">
+        <button onClick={() => setOpen((o) => !o)} aria-expanded={open} className="hud-btn hud-btn-accent inline-flex items-center gap-2" style={{ minHeight: 40 }}>
+          <PiggyBank size={16} aria-hidden /> {open ? "Close SIP planner" : "SIP — plan a monthly investment"}
+        </button>
+        {open && ([["us", "🇺🇸 US"], ["ca", "🇨🇦 CANADA"]] as const).map(([m, l]) => (
+          <button key={m} onClick={() => setMarket(m)} aria-pressed={market === m} className={`hud-chip ${market === m ? "hud-nav-active" : ""}`}
+                  style={{ cursor: "pointer", color: market === m ? undefined : "var(--hud-muted)" }}>{l}</button>
+        ))}
+        {!open && <span className="prose-sans text-[11px]" style={{ color: "var(--hud-muted)" }}>enter an amount and a period — get the ETFs, stocks and metals to buy each month, back-tested on 20 years of data</span>}
+      </div>
+      {open && <SipPlanner market={market} />}
+    </section>
+  );
+}
+
 export default function StocksPage() {
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
   const [loading, setLoading] = useState(true);
@@ -413,6 +436,8 @@ export default function StocksPage() {
           July 2026 · 5 catalyst trades (2-4 mo) + 5 long-term compounders · live quotes via Yahoo Finance
           · educational only, not financial advice
         </p>
+
+        <SipBox />
 
         <DeepChain />
 

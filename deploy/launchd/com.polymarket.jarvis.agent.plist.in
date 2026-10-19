@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.polymarket.jarvis.agent</string>
+  <key>ProgramArguments</key><array><string>__NODE__</string><string>__ROOT__/jarvis/agent.mjs</string></array>
+  <key>WorkingDirectory</key><string>__ROOT__/jarvis</string>
+  <key>StartInterval</key><integer>1800</integer>
+  <key>StandardOutPath</key><string>__ROOT__/logs/jarvis_agent.log</string>
+  <key>StandardErrorPath</key><string>__ROOT__/logs/jarvis_agent.log</string>
+</dict></plist>

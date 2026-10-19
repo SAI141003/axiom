@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { simulateTerminal, scoreOption } from "@/lib/montecarlo";
+import { cachedRoute } from "@/lib/swr";
 
 /**
  * Options desk — quant analysis of real chains, CALL/PUT recommendation + sizing.
@@ -333,7 +334,7 @@ async function analyzeSymbol(sym: string, bankroll: number) {
   };
 }
 
-export async function GET(request: Request) {
+async function compute(request: Request) {
   const { searchParams } = new URL(request.url);
   const rawSymbols = (searchParams.get("symbols") ?? "NVDA,TSLA,AAPL,MSFT,AMD,GOOGL,META,MU")
     .split(",").map((s) => s.trim().toUpperCase()).filter(Boolean).slice(0, 10);
@@ -349,4 +350,9 @@ export async function GET(request: Request) {
   const failed = symbols.filter((_, i) => results[i].status === "rejected");
 
   return NextResponse.json({ bankroll, results: ok, failed, generated: Date.now() });
+}
+
+// answered from memory in milliseconds; refreshed in the background every 60s
+export async function GET(req: Request) {
+  return cachedRoute(req, "options", 60000, compute);
 }

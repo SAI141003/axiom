@@ -18,6 +18,17 @@ export default function SettingsPage() {
   const [restarting, setRestarting] = useState(false);
   const [tstate, setTstate] = useState<Record<string, boolean>>({});
   const [bots, setBots] = useState<{ key: string; name: string; desc: string; enabled: boolean }[]>([]);
+  const [focus, setFocusState] = useState<{ stocks: boolean; since: number | null; stopped?: string[] } | null>(null);
+  const [focusBusy, setFocusBusy] = useState(false);
+  useEffect(() => { fetch("/api/settings/focus").then((r) => r.json()).then(setFocusState).catch(() => {}); }, []);
+  const flipFocus = async () => {
+    if (!focus) return;
+    setFocusBusy(true);
+    try {
+      const r = await fetch("/api/settings/focus", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ stocks: !focus.stocks }) });
+      const d = await r.json(); setFocusState((f) => ({ ...(f ?? {}), ...d }));
+    } finally { setFocusBusy(false); }
+  };
 
   useEffect(() => {
     setTstate(Object.fromEntries(TOGGLES.map((t) => [t.key, getToggle(t.key)])));
@@ -107,6 +118,33 @@ export default function SettingsPage() {
               in the backend .env — a deliberate two-step safety barrier.
             </div>
           </div>
+        </div>
+
+        {/* Stock focus: the whole machine on the stock desk */}
+        <div className="hud-panel hud-panel-static p-4 mb-6 flex items-start gap-4"
+             style={{ borderColor: focus?.stocks ? "var(--hud-green)" : "var(--hud-border)" }}>
+          <div className="flex-1">
+            <div className="text-[11px] tracking-widest font-bold" style={{ color: focus?.stocks ? "var(--hud-green)" : "var(--hud-accent)" }}>
+              STOCK MARKET FOCUS · {focus?.stocks ? "ON" : "OFF"}
+            </div>
+            <div className="prose-sans text-[12px] mt-1" style={{ color: "var(--hud-text)" }}>
+              On: every non-stock bot and service is stopped — Polymarket weather and crypto bots, the original Polymarket engine,
+              the market websocket, the hourly Monte-Carlo loop, the auto-tuner, World Monitor — so the Mac's memory and processor go to
+              the stock and options bots, the Invest page and the Council. They stay off through restarts until you turn this off.
+            </div>
+            <div className="text-[10px] mt-1" style={{ color: "var(--hud-muted)" }}>
+              Keeps running: options, gamma-pulse, stocks, pre-market and VWAP bots · macro data · news · AXIOM · Council · dashboard.
+              {focus?.stocks && focus.since ? ` On since ${new Date(focus.since).toLocaleString()}.` : ""}
+            </div>
+          </div>
+          <button onClick={flipFocus} disabled={!focus || focusBusy} aria-pressed={!!focus?.stocks} aria-label="Stock market focus"
+                  className="relative flex-shrink-0 mt-1"
+                  style={{ width: 46, height: 24, borderRadius: 99, cursor: "pointer", opacity: focusBusy ? 0.5 : 1,
+                           background: focus?.stocks ? "rgba(62,207,142,0.35)" : "var(--hud-border)",
+                           border: `1px solid ${focus?.stocks ? "var(--hud-green)" : "var(--hud-border)"}`, transition: "all 0.2s" }}>
+            <span style={{ position: "absolute", top: 3, left: focus?.stocks ? 25 : 3, width: 16, height: 16, borderRadius: 99,
+                           background: focus?.stocks ? "var(--hud-green)" : "var(--hud-muted)", transition: "left 0.2s" }} />
+          </button>
         </div>
 
         {/* Strategy bot master switches */}

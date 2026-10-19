@@ -2,7 +2,7 @@
 # Daily cleanup: caps runaway logs and clears regenerable caches.
 # Never touches the trade books (logs/dryrun_*.jsonl) or .data state files
 # other than the AI usage log, which only feeds the usage panel.
-cd /Users/saiyaganti/polymarket-hft || exit 1
+cd "$(dirname "$0")/.." || exit 1
 MB=$((1024*1024))
 
 # keep the last $2 MB of a file once it passes $1 MB (first partial line dropped)

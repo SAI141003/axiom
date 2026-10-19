@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cachedRoute } from "@/lib/swr";
 
 /**
  * Light live-quote endpoint — BATCH via Yahoo v7/finance/quote (one request
@@ -77,7 +78,7 @@ async function chartQuote(sym: string): Promise<Row> {
   }
 }
 
-export async function GET(request: Request) {
+async function compute(request: Request) {
   const { searchParams } = new URL(request.url);
   const symbols = (searchParams.get("symbols") ?? "")
     .split(",").map((s) => s.trim().toUpperCase()).filter(Boolean).slice(0, 160);
@@ -89,4 +90,9 @@ export async function GET(request: Request) {
   // fallback: parallel per-symbol charts (capped to protect Yahoo rate limits)
   const rows = await Promise.all(symbols.slice(0, 28).map(chartQuote));
   return NextResponse.json(rows);
+}
+
+// answered from memory in milliseconds; refreshed in the background every 15s
+export async function GET(req: Request) {
+  return cachedRoute(req, "quotes", 15000, compute);
 }

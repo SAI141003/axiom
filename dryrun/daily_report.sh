@@ -1,6 +1,6 @@
 #!/bin/bash
 # Nightly results archive — one dated file per day until Sunday review
-cd /Users/saiyaganti/polymarket-hft
+cd "$(dirname "$0")/.." || exit 1
 OUT="logs/reports/report_$(date +%Y-%m-%d).txt"
 {
   echo "════════ DAILY DRY-RUN REPORT $(date '+%Y-%m-%d %H:%M %Z') ════════"

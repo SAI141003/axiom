@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.polymarket.jarvis.study</string>
+  <key>ProgramArguments</key><array><string>__NODE__</string><string>__ROOT__/jarvis/study.mjs</string></array>
+  <key>WorkingDirectory</key><string>__ROOT__/jarvis</string>
+  <key>EnvironmentVariables</key><dict><key>PATH</key><string>__NODEBIN__:/usr/local/bin:/usr/bin:/bin</string></dict>
+  <key>StartCalendarInterval</key><dict><key>Hour</key><integer>4</integer><key>Minute</key><integer>10</integer></dict>
+  <key>StandardOutPath</key><string>__ROOT__/logs/jarvis_study.log</string>
+  <key>StandardErrorPath</key><string>__ROOT__/logs/jarvis_study.log</string>
+</dict></plist>

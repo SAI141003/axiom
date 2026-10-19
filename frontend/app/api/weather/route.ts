@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
+import { cachedRoute } from "@/lib/swr";
 
 /**
  * Weather edge scanner — live Polymarket temperature markets vs live meteorology.
@@ -180,7 +181,7 @@ function parseEventDate(slug: string): string | null {
   return `${m[3]}-${String(mo).padStart(2, "0")}-${String(parseInt(m[2])).padStart(2, "0")}`;
 }
 
-export async function GET() {
+async function compute(_req: Request) {
   // 1. Live weather events from Gamma
   //    Today's markets fill the first page; tomorrow's (listed ~2 days ahead) the next.
   let events: any[] = [];
@@ -398,4 +399,9 @@ export async function GET() {
   reports.sort((a, b) => Number(!!b.pick) - Number(!!a.pick) || a.buyFrom - b.buyFrom);
 
   return NextResponse.json({ generated: Date.now(), count: reports.length, reports });
+}
+
+// answered from memory in milliseconds; refreshed in the background every 120s
+export async function GET(req: Request) {
+  return cachedRoute(req, "weather", 120000, compute);
 }

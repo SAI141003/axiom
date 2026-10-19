@@ -46,7 +46,18 @@ failures** — rejected orders, timeouts, partial fills, slippage blowouts, dupl
 
 ## Quick start
 
-No API keys required — the core runs entirely on keyless public data.
+**Run the whole desk as background services (recommended):**
+
+```bash
+brew install python@3.12 node redis postgresql@16
+git clone https://github.com/SAI141003/axiom.git && cd axiom
+./scripts/install.sh          # installs, builds, starts everything; auto-starts at every login
+./scripts/axiom.sh status     # what is running
+```
+
+Full guide: [docs/RUNNING.md](docs/RUNNING.md).
+
+**Or just the dashboard, by hand.** No API keys required — the core runs entirely on keyless public data.
 
 ```bash
 git clone https://github.com/SAI141003/axiom.git && cd axiom
@@ -290,6 +301,7 @@ justify deploying capital. See [DISCLAIMER.md](DISCLAIMER.md).
 | **/lab** | research on one desk: edge donut, strategy-variant comparison, grid vs buy-and-hold, the anti-overfit chart, the equity curve, all 35 fault scenarios — then Backtest, Proving Ground, Scenario, Benchmarks and Data Desk as tabs |
 | **/tape** | the flow bot replayed frame by frame — bias, CVD, block trades, book imbalance next to the decision it made, after [hftengine](https://github.com/mirkovicdev/HFTENGINE) |
 | **/terminal** | the Bloomberg-style desk: order book, signal feed, kill switch |
+| **/invest** | monthly SIP planner for the US and Canada: the 20 largest ETFs from live data (fees, returns, holdings, which funds are duplicates), a plan built from your amount, years and risk — back-tested on real prices and projected over 2,000 paths — and a live watch on the chosen funds with exact buy dates and a tested sell rule, plus their news |
 | **/council** | eight role agents debate a thesis and rule; every ruling Brier-scored |
 | **/bots → + Create a bot** | the Bot OS: describe a bot in words (AXIOM writes the spec) or set the dials; it trades on paper from $100 and shows its own book |
 | **/news** | live television from ten channels (free YouTube streams), then the **World Wire** — 76 feeds from World Monitor's open catalog across markets, crypto, energy, crisis and geopolitics — above every classified headline |

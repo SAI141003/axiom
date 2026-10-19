@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { askLLM } from "@/lib/llm";
+import { cachedRoute } from "@/lib/swr";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 // category, so the panel is never empty.
 let cache: { at: number; payload: any } | null = null;
 
-export async function GET(request: Request) {
+async function compute(request: Request) {
   const force = new URL(request.url).searchParams.get("refresh") === "1";
   if (!force && cache && Date.now() - cache.at < 5 * 60_000) return NextResponse.json(cache.payload);
   const base = new URL(request.url).origin;
@@ -31,4 +32,9 @@ export async function GET(request: Request) {
   const payload = { generated: Date.now(), brain, summary, digest, headlines: lines.length };
   cache = { at: Date.now(), payload };
   return NextResponse.json(payload);
+}
+
+// answered from memory in milliseconds; refreshed in the background every 300s
+export async function GET(req: Request) {
+  return cachedRoute(req, "world-summary", 300000, compute);
 }

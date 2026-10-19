@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
+import { cachedRoute } from "@/lib/swr";
 
 const ROOT = path.join(process.cwd(), "..");
 
@@ -23,7 +24,7 @@ async function livePrice(slug: string, question: string, side: string) {
   } catch { return null; }
 }
 
-export async function GET() {
+async function compute(_req: Request) {
   let gate = { min: 0.75, max: 0.18 };
   try {
     const p = JSON.parse(await fs.readFile(path.join(ROOT, ".data", "tuned_params.json"), "utf-8"));
@@ -71,4 +72,9 @@ export async function GET() {
 
   return NextResponse.json({ gate, count: picks.length, picks,
     note: "The bot's edge on these exact markets. Review before acting — venue access is your call." });
+}
+
+// answered from memory in milliseconds; refreshed in the background every 60s
+export async function GET(req: Request) {
+  return cachedRoute(req, "weather-picks", 60000, compute);
 }

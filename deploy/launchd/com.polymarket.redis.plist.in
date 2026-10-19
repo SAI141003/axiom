@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.polymarket.redis</string>
+  <key>ProgramArguments</key><array><string>__REDIS__</string><string>--bind</string><string>127.0.0.1</string><string>--port</string><string>6379</string><string>--save</string><string></string><string>--appendonly</string><string>no</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>__ROOT__/logs/redis.log</string>
+  <key>StandardErrorPath</key><string>__ROOT__/logs/redis.log</string>
+</dict>
+</plist>

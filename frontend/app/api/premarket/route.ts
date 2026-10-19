@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
+import { cachedRoute } from "@/lib/swr";
 
 /**
  * Pre-market scanner tuned to the user's style:
@@ -223,7 +224,7 @@ async function analyze(sym: string) {
   };
 }
 
-export async function GET(request: Request) {
+async function compute(request: Request) {
   const { searchParams } = new URL(request.url);
   const budget = parseFloat(searchParams.get("budget") ?? String(BUDGET)) || BUDGET;
 
@@ -294,4 +295,9 @@ export async function GET(request: Request) {
     results,
     generated: Date.now(),
   });
+}
+
+// answered from memory in milliseconds; refreshed in the background every 60s
+export async function GET(req: Request) {
+  return cachedRoute(req, "premarket", 60000, compute);
 }
