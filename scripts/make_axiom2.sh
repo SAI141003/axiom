@@ -16,7 +16,7 @@ git -C "$SRC" archive HEAD | tar -x -C "$DEST"
 cd "$DEST"
 
 # ── remove Polymarket, crypto, weather and paper trading ──
-rm -rf main.py ws_bridge.py crypto_sim.py paper_sim.py docker-compose.yml Dockerfile \
+rm -rf .claude .mcp.json CLAUDE.md pytest.ini .github docs/axiom_stack.html main.py ws_bridge.py crypto_sim.py paper_sim.py docker-compose.yml Dockerfile \
        BUG_FIX_REPORT.md HANDOFF.md HANDOVER.md SESSION_LOG.md RESEARCH_*.md DISCLAIMER.md \
        ingest match execute execution paper persist portfolio risk compound consensus monitor monitoring workers \
        migrations tests testing backtest dryrun brody_repo kronos_repo rdagent_repo vibe_trading_repo graft skills skills-lock.json \
